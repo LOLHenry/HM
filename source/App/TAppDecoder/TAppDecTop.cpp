@@ -241,7 +241,7 @@ Void TAppDecTop::decode()
           m_cTDecTop.remCurPicBefILFFromDPBDecDPBFullnessByOne( pcListPic );
           m_cTDecTop.updateCurrentPictureFlag( pcListPic );
         }
-        else if ( m_cTDecTop.isCurrPicAsRef() )
+        else
         {
           m_cTDecTop.markCurrentPictureAfterILFforShortTermRef( pcListPic );
         }
