@@ -1527,12 +1527,12 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     ChromaFormat chromaFormat = CHROMA_420;
     TVideoIOYuv  inputFile;
     inputFile.parseY4mFileHeader(m_inputFileName, width, height, frameRate, inputBitDepth, chromaFormat);
-    if (width != m_iSourceWidth || height != m_iSourceHeight || frameRate != m_iFrameRate
+    if (width != m_sourceWidth || height != m_sourceHeight || frameRate != m_iFrameRate
       || inputBitDepth != m_inputBitDepth[0] || chromaFormat != m_chromaFormatIDC)
     {
       printf("\nWarning: Y4M file info is different from input setting. Using the info from Y4M file\n");
-      m_iSourceWidth = width;
-      m_iSourceHeight = height;
+      m_sourceWidth = width;
+      m_sourceHeight = height;
       m_iFrameRate = frameRate;
       m_inputBitDepth[0] = inputBitDepth;
       m_inputBitDepth[1] = inputBitDepth;

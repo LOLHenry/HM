@@ -574,7 +574,7 @@ Void TAppEncTop::xCreateLib()
 #if Y4M_SUPPORT
     if (isY4mFileExt(m_reconFileName))
     {
-      m_cTVideoIOYuvReconFile.setOutputY4mInfo(m_iSourceWidth, m_iSourceHeight, m_iFrameRate, 1, m_internalBitDepth[0],
+      m_cTVideoIOYuvReconFile.setOutputY4mInfo(m_sourceWidth, m_sourceHeight, m_iFrameRate, 1, m_internalBitDepth[0],
         m_chromaFormatIDC);
     }
 #endif
