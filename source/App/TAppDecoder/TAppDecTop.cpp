@@ -278,9 +278,10 @@ Void TAppDecTop::decode()
           {
             printf("\nWarning: No frame rate info found in the bitstream, default 50 fps is used.\n");
           }
-          m_cTVideoIOYuvReconFile.setOutputY4mInfo(
-            sps.getPicWidthInLumaSamples(), sps.getPicHeightInLumaSamples(), frameRate, frameScale,
-            m_outputBitDepth[0], sps.getChromaFormatIdc());
+          auto confWindow = sps.getConformanceWindow();
+          int picWidth = sps.getPicWidthInLumaSamples() - confWindow.getWindowLeftOffset() - confWindow.getWindowRightOffset();
+          int picHeight = sps.getPicHeightInLumaSamples() - confWindow.getWindowTopOffset() - confWindow.getWindowBottomOffset();
+          m_cTVideoIOYuvReconFile.setOutputY4mInfo(picWidth, picHeight, frameRate, frameScale, m_outputBitDepth[0], sps.getChromaFormatIdc());
         }
 #endif
         m_cTVideoIOYuvReconFile.open( m_reconFileName, true, m_outputBitDepth, m_outputBitDepth, bitDepths.recon ); // write mode
