@@ -410,6 +410,61 @@ Void SEIReader::xReadSEIPayloadData(Int const payloadType, Int const payloadSize
       xParseSEISEIPrefixIndication((SEIPrefixIndication&)*sei, payloadSize, pDecodedMessageOutputStream);
       break;
 #endif
+#if NNPFC_SEI_MESSAGE
+  case SEI::NEURAL_NETWORK_POST_FILTER_CHARACTERISTICS:
+    sei = new SEINeuralNetworkPostFilterCharacteristics;
+    xParseSEINNPostFilterCharacteristics((SEINeuralNetworkPostFilterCharacteristics &) *sei, payloadSize, sps, pDecodedMessageOutputStream);
+
+#if 0
+    if (xCheckNnpfcSeiMsg( ((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_id, ((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_baseFlag, nnpfcValues) )
+    {
+      nnpfcValues.push_back(((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_id);
+    }
+#endif
+    break;
+#endif
+#if NNPFA_SEI_MESSAGE
+    case SEI::NEURAL_NETWORK_POST_FILTER_ACTIVATION:
+      sei = new SEINeuralNetworkPostFilterActivation;
+      xParseSEINNPostFilterActivation((SEINeuralNetworkPostFilterActivation &) *sei, payloadSize, pDecodedMessageOutputStream);
+#if 0
+      nnpfcProcessed = false;
+      CHECK(nnpfcValues.size() == 0, "At leaset one NNPFC SEI message should precede NNPFA")
+      for(int i=0; i<nnpfcValues.size(); ++i)
+      {
+        if(((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_id == nnpfcValues[i])
+        {
+          //In the case that the NNPFA activates a non-base filter, only consider it process when we have NNPFC that updates the base filter present
+          if(((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_baseFlag ||
+             (!((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_baseFlag && xCheckNnpfcUpdatePresentSeiMsg( ((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_id, nnpfcValues)) )
+          {
+            nnpfcProcessed = true;
+          }
+        }
+      }
+      CHECK(!nnpfcProcessed, "No NNPFC, no NNPFA")
+      nnpfcProcessed = false;
+#endif
+      break;
+#if 0 /* for suffix SEI */
+    case SEI::PayloadType::NEURAL_NETWORK_POST_FILTER_ACTIVATION:
+      sei = new SEINeuralNetworkPostFilterActivation;
+      xParseSEINNPostFilterActivation((SEINeuralNetworkPostFilterActivation &) *sei, payloadSize,
+                                      pDecodedMessageOutputStream);
+      nnpfcProcessed = false;
+      CHECK(nnpfcValues.size() == 0, "At leaset one NNPFC SEI message should precede NNPFA")
+      for (int i = 0; i < nnpfcValues.size(); ++i)
+      {
+        if (((SEINeuralNetworkPostFilterCharacteristics*) sei)->m_id == nnpfcValues[i])
+        {
+          nnpfcProcessed = true;
+        }
+      }
+      CHECK(!nnpfcProcessed, "No NNPFC, no NNPFA")
+      nnpfcProcessed = false;
+    break;
+#endif
+#endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     case SEI::PayloadType::PHASE_INDICATION:
       sei = new SEIPhaseIndication;
@@ -1639,6 +1694,554 @@ Void SEIReader::xParseSEIShutterInterval(SEIShutterIntervalInfo& sei, UInt paylo
     {
       sei_read_code(pDecodedMessageOutputStream, 32, val, "sub_layer_num_units_in_shutter_interval[ i ]");
       sei.m_siiSubLayerNumUnitsInSI[i] = val;
+    }
+  }
+}
+#endif
+
+#if NNPFC_SEI_MESSAGE
+Void SEIReader::xParseSEINNPostFilterCharacteristics(SEINeuralNetworkPostFilterCharacteristics& sei, UInt payloadSize, const TComSPS* sps, std::ostream *pDecodedMessageOutputStream)
+{
+  output_sei_message_header(sei, pDecodedMessageOutputStream, payloadSize);
+  UInt val;
+
+  sei_read_code(pDecodedMessageOutputStream, 16, val, "nnpfc_purpose");
+  sei.m_purpose = val;
+  CHECK(sei.m_purpose >= 128 && sei.m_purpose <= 65535, "Reserved nnpfc_purpose value");
+
+  sei_read_uvlc( pDecodedMessageOutputStream, val, "nnpfc_id" );
+  sei.m_id = val;
+  CHECK((sei.m_id >= 256 && sei.m_id <= 511) || (sei.m_id >= (1<<31) && sei.m_id <= MAX_NNPFC_ID), "Reserved nnpfc_id value, shall ignore the SEI message");
+
+  sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_base_flag");
+  sei.m_baseFlag = val;
+
+  sei_read_uvlc( pDecodedMessageOutputStream, val, "nnpfc_mode_idc" );
+  sei.m_modeIdc = val;
+
+  if (sei.m_modeIdc == POST_FILTER_MODE::URI)
+  {
+    std::string val2;
+    while (m_pcBitstream->getNumBitsUntilByteAligned() != 0)
+    {
+      sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_alignment_zero_bit");
+      CHECK(val != 0, "nnpfc_alignment_zero_bit not equal to zero");
+    }
+
+    sei_read_string(pDecodedMessageOutputStream, val2, "nnpfc_uri_tag");
+    sei.m_uriTag = val2;
+
+    val2 = "";
+    sei_read_string(pDecodedMessageOutputStream, val2, "nnpfc_uri");
+    sei.m_uri = val2;
+  }
+
+  sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_property_present_flag");
+  sei.m_propertyPresentFlag = val;
+
+  if (sei.m_propertyPresentFlag)
+  {
+    ChromaFormat chromaFormatIdc = sps->getChromaFormatIdc();
+    UChar        subWidthC;
+    UChar        subHeightC;
+    if (chromaFormatIdc == ChromaFormat::CHROMA_420)
+    {
+      subWidthC  = 2;
+      subHeightC = 2;
+    }
+    else if (chromaFormatIdc == ChromaFormat::CHROMA_422)
+    {
+      subWidthC  = 2;
+      subHeightC = 1;
+    }
+    else
+    {
+      subWidthC  = 1;
+      subHeightC = 1;
+    }
+
+    sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_number_of_input_pictures_minus1");
+    sei.m_numberInputDecodedPicturesMinus1 = val;
+
+    sei.m_inputPicOutputFlag.clear();
+    sei.m_numInpPicsInOutputTensor = 0;
+    if (sei.m_numberInputDecodedPicturesMinus1 > 0)
+    {
+      Bool atLeastOne = false;
+      for (Int i = 0; i <= sei.m_numberInputDecodedPicturesMinus1; i++)
+      {
+        sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_input_pic_filtering_flag");
+        sei.m_inputPicOutputFlag.push_back((Bool)val);
+        if (sei.m_inputPicOutputFlag[i])
+        {
+          atLeastOne = true;
+          sei.m_numInpPicsInOutputTensor++;
+        }
+      }
+      if ((sei.m_purpose & NNPC_PurposeType::FRAME_RATE_UPSAMPLING) == 0)
+      {
+        CHECK(!atLeastOne, "When picRateUpsamplingFlag is equal to 0 and nnpfc_num_input_pics_minus1 is greater than 0, at least one value of nnpfc_input_pic_filtering_flag[i] shall be greater than 0");
+      }
+      sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_absent_input_pic_zero_flag");
+      sei.m_absentInputPicZeroFlag = val;
+    }
+    else
+    {
+      sei.m_inputPicOutputFlag.push_back(true);
+      sei.m_numInpPicsInOutputTensor = 1;
+    }
+
+    if((sei.m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0)
+    {
+      sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_out_sub_c_flag");
+      sei.m_outSubCFlag = val;
+
+      CHECK(((subWidthC == 2) && (subHeightC == 1) && (sei.m_outSubCFlag == 0)),
+            "If SubWidthC is equal to 2 and SubHeightC is equal to 1, nnpfc_out_sub_c_flag shall not be equal to 0");
+
+      if (sei.m_outSubCFlag)
+      {
+        sei.m_outSubWidthC = 1;
+        sei.m_outSubHeightC = 1;
+      }
+      else
+      {
+        sei.m_outSubWidthC = 2;
+        sei.m_outSubHeightC = 1;
+      }
+    }
+
+    CHECK(((subWidthC == 1) && (subHeightC == 1)) && ((sei.m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0),
+          "If SubWidthC is equal to 1 and SubHeightC is equal to 1, nnpfc_purpose & 0x02 shall be equal to 0");
+
+    if((sei.m_purpose & NNPC_PurposeType::COLOURIZATION) != 0)
+    {
+      CHECK(((sei.m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0), "When chromaUpsamplingFlag is not equal to 0, colourizationFlag shall be equal to 0");
+
+      sei_read_code(pDecodedMessageOutputStream, 2, val, "nnpfc_out_colour_format_idc");
+      sei.m_outColourFormatIdc = ChromaFormat(val);
+      CHECK(sei.m_outColourFormatIdc == ChromaFormat::CHROMA_400,
+            "The value of nnpfc_out_colour_format_idc shall not be equal to 0");
+
+      sei.m_outSubWidthC  = TComSPS::getWinUnitX(sei.m_outColourFormatIdc);
+      sei.m_outSubHeightC = TComSPS::getWinUnitY(sei.m_outColourFormatIdc);
+    }
+
+    if (((sei.m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) == 0) && ((sei.m_purpose & NNPC_PurposeType::COLOURIZATION) == 0))
+    {
+      sei.m_outSubWidthC  = subWidthC;
+      sei.m_outSubHeightC = subHeightC;
+    }
+
+    if((sei.m_purpose & NNPC_PurposeType::RESOLUTION_UPSAMPLING) != 0)
+    {
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_pic_width_num_minus1");
+      sei.m_picWidthNumeratorMinus1 = val;
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_pic_width_denominator_minus1");
+      sei.m_picWidthDenominatorMinus1 = val;
+
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_pic_height_num_minus1");
+      sei.m_picHeightNumeratorMinus1 = val;
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_pic_height_denominator_minus1");
+      sei.m_picHeightDenominatorMinus1 = val;
+      CHECK(sei.m_picWidthNumeratorMinus1 > 65535, "nnpfc_pic_width_num_minus1 shall be in the range of 0 to 65535");
+      CHECK(sei.m_picWidthDenominatorMinus1 > 65535, "nnpfc_pic_width_denom_minus1 shall be in the range of 0 to 65535");
+      CHECK(sei.m_picHeightNumeratorMinus1 > 65535, "nnpfc_pic_height_num_minus1 shall be in the range of 0 to 65535");
+      CHECK(sei.m_picHeightDenominatorMinus1 > 65535, "nnpfc_pic_height_denom_minus1 shall be in the range of 0 to 65535");
+      Int scaledHeightRatio = 16 * (sei.m_picHeightNumeratorMinus1 + 1) / (sei.m_picHeightDenominatorMinus1 + 1);
+      Int scaledWidthRatio = 16 * (sei.m_picWidthNumeratorMinus1 + 1) / (sei.m_picWidthDenominatorMinus1 + 1);
+
+      CHECK((scaledHeightRatio < 1) && (scaledHeightRatio > 256), "The value range of heightRatio shall be in the range of 1/16 to 16, inclusive");
+      CHECK((scaledWidthRatio < 1) && (scaledWidthRatio > 256), "The value range of widthRatio shall be in the range of 1/16 to 16, inclusive");
+    }
+
+    if((sei.m_purpose & NNPC_PurposeType::FRAME_RATE_UPSAMPLING) != 0)
+    {
+      CHECK(sei.m_numberInputDecodedPicturesMinus1 <= 0, "If nnpfc_purpose is FRAME_RATE_UPSAMPLING, nnpfc_num_input_pics_minus1 shall be greater than 0");
+      sei.m_numberInterpolatedPictures.resize(sei.m_numberInputDecodedPicturesMinus1);
+      Bool allZeroFlag = false;
+      for (Int i = 0; i < sei.m_numberInterpolatedPictures.size(); i++)
+      {
+        sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_interpolated_pictures");
+        sei.m_numberInterpolatedPictures[i] = val;
+        if(sei.m_numberInterpolatedPictures[i] > 0)
+        {
+          allZeroFlag = true;
+        }
+      }
+      CHECK(!allZeroFlag, "At least one value of nnpfc_interpolated_pics[i] shall be greater than 0");
+    }
+
+    if ((sei.m_purpose & NNPC_PurposeType::TEMPORAL_EXTRAPOLATION) != 0)
+    {
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_extrapolated_pics_minus1");
+      sei.m_numberExtrapolatedPicturesMinus1 = val;
+    }
+
+    if((sei.m_purpose & NNPC_PurposeType::SPATIAL_EXTRAPOLATION) != 0)
+    {
+      Int value;
+      sei_read_svlc(pDecodedMessageOutputStream, value, "nnpfc_spatial_extrapolation_left_offset");
+      sei.m_spatialExtrapolationLeftOffset = value;
+      sei_read_svlc(pDecodedMessageOutputStream, value, "nnpfc_spatial_extrapolation_right_offset");
+      sei.m_spatialExtrapolationRightOffset = value;
+      sei_read_svlc(pDecodedMessageOutputStream, value, "nnpfc_spatial_extrapolation_top_offset");
+      sei.m_spatialExtrapolationTopOffset = value;
+      sei_read_svlc(pDecodedMessageOutputStream, value, "nnpfc_spatial_extrapolation_bottom_offset");
+      sei.m_spatialExtrapolationBottomOffset = value;
+    }
+
+    sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_component_last_flag");
+    sei.m_componentLastFlag = val;
+
+    sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_inp_format_idc");
+    sei.m_inpFormatIdc = val;
+    CHECK(sei.m_inpFormatIdc > 255, "The value of nnpfc_inp_format_idc shall be in the range of 0 to 255");
+
+    sei_read_uvlc(pDecodedMessageOutputStream,val,"nnpfc_auxiliary_inp_idc");
+    sei.m_auxInpIdc = val;
+    CHECK(val > 7, "The value of nnpfc_auxiliary_inp_idc shall be in the range of 0 to 7");
+    if ((sei.m_auxInpIdc & 2) > 0)
+    {
+      sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_inband_prompt_flag");
+      sei.m_inbandPromptFlag = val;
+      if (sei.m_inbandPromptFlag)
+      {
+        std::string valp;
+        while (m_pcBitstream->getNumBitsUntilByteAligned() != 0)
+        {
+          sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_alignment_zero_bit_c");
+          CHECK(val != 0, "nnpfc_alignment_zero_bit_c not equal to zero");
+        }
+        sei_read_string(pDecodedMessageOutputStream, valp, "nnpfc_prompt");
+        sei.m_prompt = valp;
+      }
+    }
+    if ((sei.m_auxInpIdc & 4) > 0)
+    {
+      sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_inband_seed_flag");
+      sei.m_inbandSeedFlag = val;
+      if (sei.m_inbandSeedFlag)
+      {
+        sei_read_code(pDecodedMessageOutputStream, 16, val, "nnpfc_seed");
+        sei.m_seed = val;
+      }
+    }
+    sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_inp_order_idc");
+    sei.m_inpOrderIdc = val;
+    CHECK(val > 3, "The value of nnpfc_inp_order_idc shall be in the range of 0 to 3");
+    CHECK(((sei.m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0)  && sei.m_inpOrderIdc == 0, "When nnpfc_purpose & 0x02 is not equal to 0, nnpfc_inp_order_idc shall not be equal to 0.");
+
+    CHECK((chromaFormatIdc == ChromaFormat::CHROMA_400) && (sei.m_inpOrderIdc != 0), "When ChromaFormatIdc is equal to 0, nnpfc_inp_order_idc shall be equal to 0");
+    CHECK((chromaFormatIdc != ChromaFormat::CHROMA_420) && (sei.m_inpOrderIdc == 3), "When ChromaFormatIdc is not equal to 1, nnpfc_inp_order_idc shall not be equal to 3");
+    CHECK(((sei.m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0) && (sei.m_inpOrderIdc == 0), "When chromaUpsamplingFlag is equal to 1, nnpfc_inp_order_idc shall not be equal to 0");
+
+    if (sei.m_inpFormatIdc == 1)
+    {
+      if (sei.m_inpOrderIdc != 1)
+      {
+        sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_inp_tensor_luma_bitdepth_minus8");
+        sei.m_inpTensorBitDepthLumaMinus8 = val;
+        CHECK(val > 24, "The value of nnpfc_inp_tensor_luma_bitdepth_minus8 shall be in the range of 0 to 24");
+      }
+      if (sei.m_inpOrderIdc != 0)
+      {
+        sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_inp_tensor_chroma_bitdepth_minus8");
+        sei.m_inpTensorBitDepthChromaMinus8 = val;
+        CHECK(val > 24, "The value of nnpfc_inp_tensor_chroma_bitdepth_minus8 shall be in the range of 0 to 24");
+      }
+    }
+
+    sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_out_format_idc");
+    sei.m_outFormatIdc = val;
+    CHECK(sei.m_outFormatIdc > 255, "The value of nnpfc_out_format_idc shall be in the range of 0 to 255");
+
+    sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_out_order_idc");
+    sei.m_outOrderIdc = val;
+    CHECK(((sei.m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0)  && (sei.m_outOrderIdc == 0 || sei.m_outOrderIdc == 3), "When nnpfc_purpose & 0x02 is not equal to 0, nnpfc_out_order_idc shall not be equal to 0 or 3.");
+    CHECK(((sei.m_purpose & NNPC_PurposeType::COLOURIZATION) != 0)  && sei.m_outOrderIdc == 0, "When nnpfc_purpose & 0x20 is not equal to 0, nnpfc_out_order_idc shall not be equal to 0.");
+
+    if (sei.m_outFormatIdc == 1)
+    {
+      if (sei.m_outOrderIdc != 1)
+      {
+        sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_out_tensor_luma_bitdepth_minus8");
+        sei.m_outTensorBitDepthLumaMinus8 = val;
+        CHECK(val > 24, "The value of nnpfc_out_tensor_luma_bitdepth_minus8 shall be in the range of 0 to 24");
+      }
+      if (sei.m_outOrderIdc != 0)
+      {
+        sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_out_tensor_chroma_bitdepth_minus8");
+        sei.m_outTensorBitDepthChromaMinus8 = val; 
+        CHECK(val > 24, "The value of nnpfc_out_tensor_chroma_bitdepth_minus8 shall be in the range of 0 to 24");
+      }
+    }
+
+    if((sei.m_outFormatIdc == 1) && (sei.m_inpFormatIdc == 1) && (sei.m_outOrderIdc > 1) && (sei.m_inpOrderIdc > 1))
+    {
+      CHECK((sei.m_outTensorBitDepthLumaMinus8 > sei.m_inpTensorBitDepthLumaMinus8) && (sei.m_outTensorBitDepthChromaMinus8 < sei.m_inpTensorBitDepthChromaMinus8), "When outTensorBitDepthLuma is greater than inpTensorBitDepthLuma, outTensorBitDepthChroma shall not be less than inpTensorBitDepthChroma");
+      CHECK((sei.m_outTensorBitDepthLumaMinus8 < sei.m_inpTensorBitDepthLumaMinus8) && (sei.m_outTensorBitDepthChromaMinus8 > sei.m_inpTensorBitDepthChromaMinus8), "When outTensorBitDepthChroma is greater than inpTensorBitDepthChroma, outTensorBitDepthLuma shall not be less than inpTensorBitDepthLuma");
+    }
+
+    sei_read_flag(pDecodedMessageOutputStream,val,"nnpfc_sep_col_desc_flag");
+    sei.m_sepColDescriptionFlag = val;
+
+    if (sei.m_sepColDescriptionFlag)
+    {
+      sei_read_code(pDecodedMessageOutputStream, 8, val,"nnpfc_col_primaries");
+      sei.m_colPrimaries = val;
+      sei_read_code(pDecodedMessageOutputStream, 8, val,"nnpfc_trans_characteristics");
+      sei.m_transCharacteristics = val;
+      if (sei.m_outFormatIdc == 1)
+      {
+        sei_read_code(pDecodedMessageOutputStream, 8, val, "nnpfc_matrix_coeffs");
+        sei.m_matrixCoeffs = val;
+        CHECK(sei.m_matrixCoeffs == 0 && !(sei.m_outTensorBitDepthChromaMinus8 == sei.m_outTensorBitDepthLumaMinus8 && sei.m_outOrderIdc == 2 && sei.m_outSubHeightC == 1 && sei.m_outSubWidthC == 1),
+          "nnpfc_matrix_coeffs shall not be equal to 0 unless the following conditions are true: nnpfc_out_tensor_chroma_bitdepth_minus8 is equal to nnpfc_out_tensor_luma_bitdepth_minus8, nnpfc_out_order_idc is equal to 2, outSubHeightC is equal to 1, and outSubWidthC is equal to 1");
+        CHECK(sei.m_matrixCoeffs == 8 && !((sei.m_outTensorBitDepthChromaMinus8 == sei.m_outTensorBitDepthLumaMinus8) || (sei.m_outTensorBitDepthChromaMinus8 == (sei.m_outTensorBitDepthLumaMinus8 + 1) && sei.m_outOrderIdc == 2 && sei.m_outSubHeightC == 1 && sei.m_outSubWidthC == 1)),
+          "nnpfc_matrix_coeffs shall not be equal to 8 unless one of the following conditions is true: nnpfc_out_tensor_chroma_bitdepth_minus8 is equal to nnpfc_out_tensor_luma_bitdepth_minus8 or "
+          "nnpfc_out_tensor_chroma_bitdepth_minus8 is equal to nnpfc_out_tensor_luma_bitdepth_minus8 + 1, nnpfc_out_order_idc is equal to 2, outSubHeightC is equal to 1, and outSubWidthC is equal to 1");
+      }
+    }
+
+    if (sei.m_sepColDescriptionFlag & (sei.m_outFormatIdc == 1))
+    {
+      sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_full_range_flag");
+      sei.m_fullRangeFlag = val;
+    }
+
+    if (sei.m_outOrderIdc != 0)
+    {
+      sei_read_flag(pDecodedMessageOutputStream,val,"nnpfc_chroma_loc_info_present_flag");
+      sei.m_chromaLocInfoPresentFlag = val;
+    }
+    else
+    {
+      sei.m_chromaLocInfoPresentFlag = 0;
+    }
+
+    CHECK((sei.m_outColourFormatIdc != ChromaFormat::CHROMA_420) && sei.m_chromaLocInfoPresentFlag, "When nnpfc_out_colour_format_idc is not equal to 1, the value of nnpfc_chroma_loc_info_present_flag shall be equal to 0");
+    CHECK((sei.m_purpose & NNPC_PurposeType::COLOURIZATION) && sei.m_chromaLocInfoPresentFlag,"When colourizationFlag is equal to 0, the value of nnpfc_chroma_loc_info_present_flag shall be equal to 0");
+    
+    if(sei.m_chromaLocInfoPresentFlag)
+    {
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_chroma_sample_loc_type_frame");
+      sei.m_chromaSampleLocTypeFrame = static_cast<Chroma420LocType>(val);
+      CHECK(sei.m_chromaSampleLocTypeFrame > Chroma420LocType::UNSPECIFIED, "The value of nnpfc_chroma_sample_loc_type_frame shall be in the range of 0 to 6, inclusive");
+    }
+
+    if((sei.m_purpose & NNPC_PurposeType::SPATIAL_EXTRAPOLATION) == 0)
+    {
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_overlap");
+      sei.m_overlap = val;
+
+      sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_constant_patch_size_flag");
+      sei.m_constantPatchSizeFlag = val;
+    }
+    else
+    {
+      sei.m_overlap = 0;
+      sei.m_constantPatchSizeFlag = 1;
+    }
+
+    if (sei.m_constantPatchSizeFlag)
+    {
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_patch_width_minus1");
+      sei.m_patchWidthMinus1 = val;
+
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_patch_height_minus1");
+      sei.m_patchHeightMinus1 = val;
+    }
+    else
+    {
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_extended_patch_width_cd_delta_minus1");
+      sei.m_extendedPatchWidthCdDeltaMinus1 = val;
+
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_extended_patch_height_cd_delta_minus1");
+      sei.m_extendedPatchHeightCdDeltaMinus1 = val;
+    }
+
+    sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_padding_type");
+    sei.m_paddingType = val;
+  if((sei.m_paddingType >= 5) && (sei.m_paddingType <= 15))
+  {
+    std::cout<<"Reserved nnpfc_padding_type value, shall ignore the SEI message"<<std::endl;
+    return;
+  }
+  CHECK(sei.m_paddingType > 15, "Values of nnpfc_padding_type greater than 15 shall not be present in bitstreams");
+
+    if (sei.m_paddingType == NNPC_PaddingType::FIXED_PADDING)
+    {
+      if (sei.m_inpOrderIdc != 1)
+      {
+        sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_luma_padding_val");
+        sei.m_lumaPadding = val;
+        CHECK(sei.m_lumaPadding > ((1 << sps->getBitDepth(ChannelType::CHANNEL_TYPE_LUMA)) - 1), "The value of nnpfc_luma_padding_val shall be in the range of 0 to ( 1  <<  BitDepthY ) - 1");
+      }
+      if (sei.m_inpOrderIdc != 0)
+      {
+        sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_cb_padding_val");
+        sei.m_cbPadding = val;
+        CHECK(sei.m_cbPadding > ((1 << sps->getBitDepth(ChannelType::CHANNEL_TYPE_CHROMA)) - 1), "The value of nnpfc_cb_padding_val shall be in the range of 0 to ( 1  <<  BitDepthC ) - 1");
+
+        sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_cr_padding_val");
+        sei.m_crPadding = val;
+        CHECK(sei.m_crPadding > ((1 << sps->getBitDepth(ChannelType::CHANNEL_TYPE_CHROMA)) - 1), "The value of nnpfc_cr_padding_val shall be in the range of 0 to ( 1  <<  BitDepthC ) - 1");
+      }
+    }
+
+    sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_complexity_info_present_flag");
+    sei.m_complexityInfoPresentFlag = val;
+
+    if (sei.m_complexityInfoPresentFlag)
+    {
+        sei_read_code(pDecodedMessageOutputStream, 2, val, "nnpfc_parameter_type_idc");
+        sei.m_parameterTypeIdc = val;
+        if (sei.m_parameterTypeIdc != 2)
+        {
+          sei_read_code(pDecodedMessageOutputStream, 2, val, "nnpfc_log2_parameter_bit_length_minus3");
+          sei.m_log2ParameterBitLengthMinus3 = val;
+        }
+
+        sei_read_code(pDecodedMessageOutputStream, 6, val, "nnpfc_num_parameters_idc");
+        sei.m_numParametersIdc = val;
+
+        sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_num_kmac_operations_idc");
+        sei.m_numKmacOperationsIdc = val;
+
+        sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_total_kilobyte_size");
+        sei.m_totalKilobyteSize = val;
+    }
+
+    sei_read_uvlc(pDecodedMessageOutputStream, val, "nnpfc_metadata_extension_num_bits");
+    UInt metadataExtensionNumBits = val;
+    UInt numberExtensionBitsUsed = 0;
+    if ( metadataExtensionNumBits > 0 ) 
+    { 
+      CHECK (val > 4096, "Values of nnpfc_metadata_extension_num_bits greater than 4096 shall not be present in bitstreams");
+      if ( sei.m_purpose == 0 )
+      { 
+        sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_application_purpose_tag_uri_present_flag");
+        sei.m_applicationPurposeTagUriPresentFlag = val;
+        numberExtensionBitsUsed++;
+        if ( sei.m_applicationPurposeTagUriPresentFlag )
+        { 
+          std::string val2;
+          while (m_pcBitstream->getNumBitsUntilByteAligned() != 0)
+          {
+            sei_read_flag(pDecodedMessageOutputStream, val, "nnpfc_metadata_alignment_zero_bit");
+            CHECK(val != 0, "nnpfc_metadata_alignment_zero_bit not equal to zero");
+          }
+          sei_read_string(pDecodedMessageOutputStream, val2, "nnpfc_application_purpose_tag_uri");
+          sei.m_applicationPurposeTagUri = val2;
+          numberExtensionBitsUsed += (static_cast<UInt>(sei.m_applicationPurposeTagUri.length() + 1) * 8);
+        }
+      }
+      if ((sei.m_purpose & NNPC_PurposeType::SPATIAL_EXTRAPOLATION) != 0 || (sei.m_purpose & NNPC_PurposeType::RESOLUTION_UPSAMPLING) != 0)
+      {
+        sei_read_code(pDecodedMessageOutputStream, 2, val, "nnpfc_scan_type_idc");
+      }
+      sei_read_code(pDecodedMessageOutputStream, 2, val, "nnpfc_for_human_viewing_idc");
+      sei.m_forHumanViewingIdc = val;
+      numberExtensionBitsUsed += 2;
+      sei_read_code(pDecodedMessageOutputStream, 2, val, "nnpfc_for_machine_analysis_idc");
+      sei.m_forMachineAnalysisIdc = val;
+      numberExtensionBitsUsed += 2;
+      UInt numberExtensionBitRemaining = metadataExtensionNumBits - numberExtensionBitsUsed;
+      for (uint32_t i = 0; i < numberExtensionBitRemaining; i++)
+      {
+        UInt val2;
+        sei_read_code(pDecodedMessageOutputStream, 1, val2, "nnpfc_reserved_metadata_extension");
+      } 
+    }
+  }
+
+  if (sei.m_modeIdc == POST_FILTER_MODE::ISO_IEC_15938_17)
+  {
+    while (m_pcBitstream->getNumBitsUntilByteAligned() != 0)
+    {
+      sei_read_flag( pDecodedMessageOutputStream,   val,    "nnpfc_alignment_zero_bit");
+      CHECK (val != 0, "nnpfc_alignment_zero_bit not equal to zero");
+    }
+
+    Int payloadBytesRemaining = getBitstream()->getNumBitsLeft() / 8;
+    sei.m_payloadLength = payloadBytesRemaining;
+    sei.m_payloadByte = new TChar[sei.m_payloadLength];
+    Int code;
+
+    std::string filename = "payloadByte" + std::to_string(sei.m_id) + ".nnr";
+
+    std::ofstream outFile(filename.c_str(), std::ofstream::binary);
+
+    for (Int i = 0; i < payloadBytesRemaining; i++)
+    {
+      sei_read_scode ( pDecodedMessageOutputStream, 8, code, "nnpfc_payload_byte[i]");
+      sei.m_payloadByte[i] = (TChar)code;
+      outFile.write((TChar*)&code, 1);
+    }
+    outFile.close();
+  }
+}
+#endif
+
+#if NNPFA_SEI_MESSAGE
+Void SEIReader::xParseSEINNPostFilterActivation(SEINeuralNetworkPostFilterActivation &sei, UInt payloadSize, std::ostream *pDecodedMessageOutputStream)
+{
+  output_sei_message_header(sei, pDecodedMessageOutputStream, payloadSize);
+  UInt val;
+
+  sei_read_uvlc( pDecodedMessageOutputStream, val, "nnpfa_target_id" );
+  sei.m_targetId =val;
+  CHECK(sei.m_targetId > MAX_NNPFA_ID, "The value of nnpfa_target_id shall be in the range of 0 to 2^32 - 2");
+  sei_read_flag( pDecodedMessageOutputStream, val, "nnpfa_cancel_flag" );
+  sei.m_cancelFlag = val;
+
+  if(!sei.m_cancelFlag)
+  {
+    sei_read_flag( pDecodedMessageOutputStream, val, "nnpfa_persistence_flag" );
+    sei.m_persistenceFlag = val;
+    sei_read_flag( pDecodedMessageOutputStream, val, "nnpfa_target_base_flag" );
+    sei.m_targetBaseFlag = val;
+
+    sei_read_flag( pDecodedMessageOutputStream, val, "nnpfa_no_prev_clvs_flag" );
+    sei.m_noPrevCLVSFlag = val;
+    if (sei.m_persistenceFlag)
+    {
+      sei_read_flag( pDecodedMessageOutputStream, val, "nnpfa_no_foll_clvs_flag" );
+      sei.m_noFollCLVSFlag = val;
+    }
+
+    sei_read_uvlc( pDecodedMessageOutputStream, val, "nnpfa_num_output_entries" );
+    UInt numOutputEntries = val;
+    sei.m_outputFlag.resize(numOutputEntries);
+    for (UInt i = 0; i < numOutputEntries; i++)
+    {
+      sei_read_flag( pDecodedMessageOutputStream, val, "nnpfa_output_flag" );
+      sei.m_outputFlag[i] = val;
+    }
+    Int payloadBytesRemaining = getBitstream()->getNumBitsLeft() / 8;
+    if (payloadBytesRemaining)
+    {
+      sei_read_flag( pDecodedMessageOutputStream, val, "nnpfa_prompt_update_flag" );
+      sei.m_promptUpdateFlag = val;
+      if (sei.m_promptUpdateFlag)
+      {
+        std::string valp;
+        while (m_pcBitstream->getNumBitsUntilByteAligned() != 0)
+        {
+          sei_read_flag(pDecodedMessageOutputStream, val, "nnpfa_alignment_zero_bit");
+          CHECK(val != 0, "nnpfa_alignment_zero_bit not equal to zero");
+        }
+        sei_read_string(pDecodedMessageOutputStream, valp, "nnpfa_prompt");
+        sei.m_prompt = valp;
+      }
+      sei_read_flag( pDecodedMessageOutputStream, val, "nnpfa_seed_update_flag" );
+      sei.m_seedUpdateFlag = val;
+      if (sei.m_seedUpdateFlag)
+      {
+        sei_read_code(pDecodedMessageOutputStream, 16, val, "nnpfa_seed");
+        sei.m_seed = val;
+      }
     }
   }
 }

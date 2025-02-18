@@ -48,6 +48,9 @@
 
 #include "SyntaxElementParser.h"
 #include "TLibCommon/SEI.h"
+#if NNPFC_SEI_MESSAGE
+#include <fstream>
+#endif
 class TComInputBitstream;
 
 #if JVET_AK0194_DSC_SEI_DECODER_SYNTAX
@@ -116,6 +119,12 @@ protected:
   Void xParseSEIRegionalNesting               ( SEIRegionalNesting& sei,              UInt payloadSize, const TComSPS* sps, std::ostream *pDecodedMessageOutputStream );
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   Void xParseSEIShutterInterval               (SEIShutterIntervalInfo& sei,           UInt payloadSize,                     std::ostream *pDecodedMessageOutputStream);
+#endif
+#if NNPFC_SEI_MESSAGE
+  Void xParseSEINNPostFilterCharacteristics   (SEINeuralNetworkPostFilterCharacteristics& sei, UInt payloadSize, const TComSPS* sps, std::ostream *pDecodedMessageOutputStream);
+#endif
+#if NNPFA_SEI_MESSAGE
+  Void xParseSEINNPostFilterActivation        (SEINeuralNetworkPostFilterActivation& sei, UInt payloadSize, std::ostream *pDecodedMessageOutputStream);
 #endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   void xParseSEIPhaseIndication(SEIPhaseIndication& sei, uint32_t payloadSize, std::ostream* pDecodedMessageOutputStream);

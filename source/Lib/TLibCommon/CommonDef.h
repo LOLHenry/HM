@@ -258,6 +258,15 @@ static const int FG_BLK_16 =                                       16;
 static const int FG_BLK_32 =                                       32;
 static const int FG_BIT_DEPTH_8 =                                   8;
 #endif
+
+#if NNPFA_SEI_MESSAGE
+static const UInt MAX_NNPFA_ID =                           0xfffffffe; // Maximum supported nnpfa_id
+#endif
+#if NNPFC_SEI_MESSAGE
+static const UInt MAX_NNPFC_ID =                           0xfffffffe; // Maximum supported nnpfc_id
+static const Int MAX_NUM_NN_POST_FILTERS =                          8;
+#endif
+
 // ====================================================================================================================
 // Macro functions
 // ====================================================================================================================

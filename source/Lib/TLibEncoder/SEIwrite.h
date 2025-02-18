@@ -158,6 +158,12 @@ protected:
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   Void xWriteSEIShutterInterval                   (const SEIShutterIntervalInfo& sei);
 #endif
+#if NNPFC_SEI_MESSAGE
+  Void xWriteSEINeuralNetworkPostFilterCharacteristics(const SEINeuralNetworkPostFilterCharacteristics& sei);
+#endif
+#if NNPFA_SEI_MESSAGE
+  Void xWriteSEINeuralNetworkPostFilterActivation (const SEINeuralNetworkPostFilterActivation &sei);
+#endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   void xWriteSEIPhaseIndication                   (const SEIPhaseIndication&sei);
 #endif

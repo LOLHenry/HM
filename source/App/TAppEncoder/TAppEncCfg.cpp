@@ -766,6 +766,18 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   SMultiValueInput<UInt>   cfg_siiSEIInputNumUnitsInSI                (0, MAX_UINT, 0, 7);
 #endif
+#if NNPFC_SEI_MESSAGE
+  std::vector<SMultiValueInput<UInt>>   cfg_nnPostFilterSEICharacteristicsInterpolatedPicturesList;
+  std::vector<SMultiValueInput<Bool>>   cfg_nnPostFilterSEICharacteristicsInputPicOutputFlagList;
+  for (Int i = 0; i < MAX_NUM_NN_POST_FILTERS; i++)
+  {
+    cfg_nnPostFilterSEICharacteristicsInterpolatedPicturesList.push_back(SMultiValueInput<UInt>(0, std::numeric_limits<UInt>::max(), 1, 0));
+    cfg_nnPostFilterSEICharacteristicsInputPicOutputFlagList.push_back(SMultiValueInput<Bool>(0, 1, 1, 0));
+  }
+#endif
+#if NNPFA_SEI_MESSAGE
+  SMultiValueInput<Bool>   cfg_nnPostFilterSEIActivationOutputFlagList(0, 1, 1, 0);
+#endif
 
   Int warnUnknowParameter = 0;
   po::Options opts;
@@ -1204,6 +1216,21 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("SEICCVMaxLuminanceValue",                         m_ccvSEIMaxLuminanceValue,              0.1, "specifies the CCV max luminance value  in the content colour volume SEI message")
   ("SEICCVAvgLuminanceValuePresent",                  m_ccvSEIAvgLuminanceValuePresentFlag,  true,                                    "Specifies whether the CCV avg luminance value is present in the content colour volume SEI message")
   ("SEICCVAvgLuminanceValue",                         m_ccvSEIAvgLuminanceValue,              0.01, "specifies the CCV avg luminance value  in the content colour volume SEI message")
+#if NNPFA_SEI_MESSAGE
+  ("SEINNPostFilterActivationEnabled",                m_nnPostFilterSEIActivationEnabled,         false, "Control use of the Neural Network Post Filter SEI on current picture")
+  ("SEINNPostFilterActivationUseSuffixSEI",           m_nnPostFilterSEIActivationUseSuffixSEI,    false, "Code NNPFA SEI either as suffix (1) or prefix (0) SEI message")
+  ("SEINNPostFilterActivationTargetId",               m_nnPostFilterSEIActivationTargetId,           0u, "Target id of the Neural Network Post Filter on current picture")
+  ("SEINNPostFilterActivationCancelFlag",             m_nnPostFilterSEIActivationCancelFlag,      false, "Control use of the target neural network post filter established by any previous NNPFA SEI message")
+  ("SEINNPostFilterActivationTargetBaseFlag",         m_nnPostFilterSEIActivationTargetBaseFlag,  false, "Specifies that the target NNPF is the base NNPF")
+  ("SEINNPostFilterActivationNoPrevCLVSFlag",         m_nnPostFilterSEIActivationNoPrevCLVSFlag,  false, "Specifies whether input pictures cannot (1) or can (0) originate from a previous CLVS")
+  ("SEINNPostFilterActivationNoFollCLVSFlag",         m_nnPostFilterSEIActivationNoFollCLVSFlag,  false, "Specifies whether input pictures cannot (1) or can (0) originate from a following CLVS")
+  ("SEINNPostFilterActivationPersistenceFlag",        m_nnPostFilterSEIActivationPersistenceFlag, false, "Specifies the persistence of the target neural-network post-processing filter for the current layer")
+  ("SEINNPostFilterActivationOutputFlag",             cfg_nnPostFilterSEIActivationOutputFlagList, cfg_nnPostFilterSEIActivationOutputFlagList, "Specifies a list indicating whether the NNPF-generated picture that corresponds to the input picture having index InpIdx[i] is output or not")
+  ("SEINNPostFilterActivationPromptUpdateFlag",       m_nnPostFilterSEIActivationPromptUpdateFlag, false, "Specifies the value of nnpfa_prompt_update_flag in the Neural Network Post Filter Activation SEI message")
+  ("SEINNPostFilterActivationPrompt",                 m_nnPostFilterSEIActivationPrompt, std::string(""), "Specifies the text string prompt used as input for the target NNPF")
+  ("SEINNPostFilterActivationSeedUpdateFlag",         m_nnPostFilterSEIActivationSeedUpdateFlag,  false, "Specifies the value of nnpfa_seed_update_flag in the Neural Network Post Filter Activation SEI message")
+  ("SEINNPostFilterActivationSeed",                   m_nnPostFilterSEIActivationSeed,               0u, "Specifies the seed value used as input for the target NNPF")
+#endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   ("SEIPhaseIndicationFullResolution", m_phaseIndicationSEIEnabledFullResolution, false, "Control generation of Phase Indication SEI messages for full resolution pictures.")
   ("SEIPIHorPhaseNumFullResolution", m_piHorPhaseNumFullResolution, 0, "Specifies the Horizontal Phase Numerator of Phase Indication SEI messages for full resolution pictures.")
@@ -1381,6 +1408,277 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     ("LastValidFrame", m_lastValidFrame, MAX_INT, "Last valid frame")
     ("TemporalFilterStrengthFrame*", m_gopBasedTemporalFilterStrengths, std::map<Int, Double>(), "Strength for every * frame in GOP based temporal filter, where * is an integer."
                                                                                                    " E.g. --TemporalFilterStrengthFrame8 0.95 will enable GOP based temporal filter at every 8th frame with strength 0.95");
+
+#if NNPFC_SEI_MESSAGE
+  opts.addOptions()("SEINNPFCEnabled",      m_nnPostFilterSEICharacteristicsEnabled,      false, "Control generation of the Neural Network Post Filter Characteristics SEI messages");
+  opts.addOptions()("SEINNPFCUseSuffixSEI", m_nnPostFilterSEICharacteristicsUseSuffixSEI, false, "Code NNPFC SEI either as suffix (1) or prefix (0) SEI message");
+  opts.addOptions()("SEINNPFCNumFilters",   m_nnPostFilterSEICharacteristicsNumFilters,       0, "Specifies the number of Neural Network Post Filter Characteristics SEI messages" );
+  for (Int i = 0; i < MAX_NUM_NN_POST_FILTERS; i++)
+  {
+    std::ostringstream id;
+    id << "SEINNPFCId" << i;
+    opts.addOptions()(id.str(), m_nnPostFilterSEICharacteristicsId[i], 0u, "Specifies the identifying number in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream modeIdc;
+    modeIdc << "SEINNPFCModeIdc" << i;
+    opts.addOptions()(modeIdc.str(), m_nnPostFilterSEICharacteristicsModeIdc[i], 0u, "Specifies the Neural Network Post Filter IDC in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream propertyPresentFlag;
+    propertyPresentFlag << "SEINNPFCPropertyPresentFlag" << i;
+    opts.addOptions()(propertyPresentFlag.str(), m_nnPostFilterSEICharacteristicsPropertyPresentFlag[i], false, "Specifies whether the filter purpose, input formatting, output formatting and complexity are present in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream nnpfcBaseFlag;
+    nnpfcBaseFlag << "SEINNPFCBaseFlag" << i;
+    opts.addOptions()(nnpfcBaseFlag.str(), m_nnPostFilterSEICharacteristicsBaseFlag[i], false, "Specifies whether the filter is a base filter or not");
+
+    std::ostringstream purpose;
+    purpose << "SEINNPFCPurpose" << i;
+    opts.addOptions()(purpose.str(), m_nnPostFilterSEICharacteristicsPurpose[i], 0u, "Specifies the purpose in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream outSubWidthCFlag;
+    outSubWidthCFlag << "SEINNPFCOutSubCFlag" << i;
+    opts.addOptions()(outSubWidthCFlag.str(), m_nnPostFilterSEICharacteristicsOutSubCFlag[i], false, "Specifies output chroma format when upsampling");
+
+    std::ostringstream outColourFormatIdc;
+    outColourFormatIdc << "SEINNPFCOutColourFormatIdc" << i;
+    opts.addOptions()(outColourFormatIdc.str(), m_nnPostFilterSEICharacteristicsOutColourFormatIdc[i], 1u, "Specifies output chroma format for colourization purpose");
+
+    std::ostringstream picWidthNum;
+    picWidthNum << "SEINNPFCPicWidthNumerator" << i;
+    opts.addOptions()(picWidthNum.str(), m_nnPostFilterSEICharacteristicsPicWidthNumerator[i], 1u,
+                      "Specifies the numerator of output picture width resulting from applying the Neural Network Post "
+                      "Filter Characteristics SEI message");
+
+    std::ostringstream picWidthDenom;
+    picWidthDenom << "SEINNPFCPicWidthDenominator" << i;
+    opts.addOptions()(picWidthDenom.str(), m_nnPostFilterSEICharacteristicsPicWidthDenominator[i], 1u,
+                      "Specifies the denominator of output picture width resulting from applying the Neural Network "
+                      "Post Filter Characteristics SEI message");
+
+    std::ostringstream picHeightNum;
+    picHeightNum << "SEINNPFCPicHeightNumerator" << i;
+    opts.addOptions()(picHeightNum.str(), m_nnPostFilterSEICharacteristicsPicHeightNumerator[i], 1u,
+                      "Specifies the numerator of output picture height resulting from applying the Neural Network "
+                      "Post Filter Characteristics SEI message");
+
+    std::ostringstream picHeightDenom;
+    picHeightDenom << "SEINNPFCPicWidthDenominator" << i;
+    opts.addOptions()(picHeightDenom.str(), m_nnPostFilterSEICharacteristicsPicHeightDenominator[i], 1u,
+                      "Specifies the denominator of output picture height resulting from applying the Neural Network "
+                      "Post Filter Characteristics SEI message");
+
+    std::ostringstream inpTensorBitDepthLumaMinus8;
+    inpTensorBitDepthLumaMinus8 << "SEINNPFCInpTensorBitDepthLumaMinusEight" << i;
+    opts.addOptions()(inpTensorBitDepthLumaMinus8.str(), m_nnPostFilterSEICharacteristicsInpTensorBitDepthLumaMinus8[i], 0u, "Specifies the bit depth of the input tensor luma minus 8 in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream inpTensorBitDepthChromaMinus8;
+    inpTensorBitDepthChromaMinus8 << "SEINNPFCInpTensorBitDepthChromaMinusEight" << i;
+    opts.addOptions()(inpTensorBitDepthChromaMinus8.str(), m_nnPostFilterSEICharacteristicsInpTensorBitDepthChromaMinus8[i], 0u, "Specifies the bit depth of the input tensor chroma minus 8 in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream outTensorBitDepthLumaMinus8;
+    outTensorBitDepthLumaMinus8 << "SEINNPFCOutTensorBitDepthLumaMinusEight" << i;
+    opts.addOptions()(outTensorBitDepthLumaMinus8.str(), m_nnPostFilterSEICharacteristicsOutTensorBitDepthLumaMinus8[i], 0u, "Specifies the bit depth of the output tensor luma minus 8 in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream outTensorBitDepthChromaMinus8;
+    outTensorBitDepthChromaMinus8 << "SEINNPFCOutTensorBitDepthChromaMinusEight" << i;
+    opts.addOptions()(outTensorBitDepthChromaMinus8.str(), m_nnPostFilterSEICharacteristicsOutTensorBitDepthChromaMinus8[i], 0u, "Specifies the bit depth of the output tensor chroma minus 8 in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream componentLastFlag;
+    componentLastFlag << "SEINNPFCComponentLastFlag" << i;
+    opts.addOptions()(componentLastFlag.str(), m_nnPostFilterSEICharacteristicsComponentLastFlag[i], false, "Specifies the channel component is located in the last dimension for the Neural Network Post Filter Characteristics SEI message");
+
+
+    std::ostringstream inpFormatIdc;
+    inpFormatIdc << "SEINNPFCInpFormatIdc" << i;
+    opts.addOptions()(inpFormatIdc.str(), m_nnPostFilterSEICharacteristicsInpFormatIdc[i], 0u, "Specifies the method of converting an input sample in the the Neural Network Post Filter Characteristics SEI message");
+    std::ostringstream auxInpIdc;
+    auxInpIdc << "SEINNPFCAuxInpIdc" << i;
+    opts.addOptions()(auxInpIdc.str(), m_nnPostFilterSEICharacteristicsAuxInpIdc[i], 0u, "Specifies the auxillary input index in the Nueral Network Post Filter Characteristics SEI message");
+
+    std::ostringstream sepColDescriptionFlag;
+    sepColDescriptionFlag << "SEINNPFCSepColDescriptionFlag" << i;
+    opts.addOptions()(sepColDescriptionFlag.str(), m_nnPostFilterSEICharacteristicsSepColDescriptionFlag[i], false, "Specifies the presence of seperate color descriptions in the Nueral Network Post Filter Characteristics SEI message");
+
+    std::ostringstream fullRangeFlag;
+    fullRangeFlag << "SEINNPFCFullRangeFlag" << i;
+    opts.addOptions()(fullRangeFlag.str(), m_nnPostFilterSEICharacteristicsFullRangeFlag[i], false, "Specifies scaling and offset values applied in association with the matrix coefficients as specified by nnpfc_matrix_coeff.");
+  
+    std::ostringstream colPrimaries;
+    colPrimaries << "SEINNPFCColPrimaries" << i;
+    opts.addOptions()(colPrimaries.str(), m_nnPostFilterSEICharacteristicsColPrimaries[i], 0u, "Specifies color primaries in the Nueral Network Post Filter Characteristics SEI message");
+
+    std::ostringstream transCharacteristics;
+    transCharacteristics << "SEINNPFCTransCharacteristics" << i;
+    opts.addOptions()(transCharacteristics.str(), m_nnPostFilterSEICharacteristicsTransCharacteristics[i], 0u, "Specifies Transfer Characteristics in the Nueral Network Post Filter Characteristics SEI message");
+
+    std::ostringstream matrixCoeffs;
+    matrixCoeffs << "SEINNPFCMatrixCoeffs" << i;
+    opts.addOptions()(matrixCoeffs.str(), m_nnPostFilterSEICharacteristicsMatrixCoeffs[i], 0u, "Specifies color matrix coefficients in the Nueral Network Post Filter Characteristics SEI message");
+    std::ostringstream inpOrderIdc;
+    inpOrderIdc << "SEINNPFCInpOrderIdc" << i;
+    opts.addOptions()(inpOrderIdc.str(), m_nnPostFilterSEICharacteristicsInpOrderIdc[i], 0u, "Specifies the method of ordering the input sample arrays in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream outFormatIdc;
+    outFormatIdc << "SEINNPFCOutFormatIdc" << i;
+    opts.addOptions()(outFormatIdc.str(), m_nnPostFilterSEICharacteristicsOutFormatIdc[i], 0u, "Specifies the method of converting an output sample in the the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream outOrderIdc;
+    outOrderIdc << "SEINNPFCOutOrderIdc" << i;
+    opts.addOptions()(outOrderIdc.str(), m_nnPostFilterSEICharacteristicsOutOrderIdc[i], 0u, "Specifies the method of ordering the output sample arrays in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream constantPatchSizeFlag;
+    constantPatchSizeFlag << "SEINNPFCConstantPatchSizeFlag" << i;
+    opts.addOptions()(constantPatchSizeFlag.str(), m_nnPostFilterSEICharacteristicsConstantPatchSizeFlag[i], false, "Specifies the patch size flag in the the Neural Network Post Filter Characteristics SEI message");
+    
+    std::ostringstream chromaLocInfoPresentFlag;
+    chromaLocInfoPresentFlag << "SEINNPFCChromaLocInfoPresentFlag" << i;
+    opts.addOptions()(chromaLocInfoPresentFlag.str(), m_nnPostFilterSEICharacteristicsChromaLocInfoPresentFlag[i], false, "Specifies the chroma location information flag in the the Neural Network Post Filter Characteristics SEI message");
+    
+    std::ostringstream chromaSampleLocTypeFrame;
+    chromaSampleLocTypeFrame << "SEINNPFCChromaSampleLocTypeFrame" << i;
+    opts.addOptions()(chromaSampleLocTypeFrame.str(), m_nnPostFilterSEICharacteristicsChromaSampleLocTypeFrame[i], 0u, "Specifies the method of ordering the output sample arrays in the Neural Network Post Filter Characteristics SEI message");
+    
+    std::ostringstream patchWidthMinus1;
+    patchWidthMinus1 << "SEINNPFCPatchWidthMinus1" << i;
+    opts.addOptions()(patchWidthMinus1.str(), m_nnPostFilterSEICharacteristicsPatchWidthMinus1[i], 0u, "Specifies the horizontal sample counts of a patch in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream patchHeightMinus1;
+    patchHeightMinus1 << "SEINNPFCPatchHeightMinus1" << i;
+    opts.addOptions()(patchHeightMinus1.str(), m_nnPostFilterSEICharacteristicsPatchHeightMinus1[i], 0u, "Specifies the vertical sample counts of a patch in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream extendedPatchWidthCdDeltaMinus1;
+    extendedPatchWidthCdDeltaMinus1 << "SEINNPFCExtendedPatchWidthCdDeltaMinus1" << i;
+    opts.addOptions()(extendedPatchWidthCdDeltaMinus1.str(), m_nnPostFilterSEICharacteristicsExtendedPatchWidthCdDeltaMinus1[i], 0u, "Specifies the extended horizontal sample counts of a patch in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream extendedPatchHeightCdDeltaMinus1;
+    extendedPatchHeightCdDeltaMinus1 << "SEINNPFCExtendedPatchHeightCdDeltaMinus1" << i;
+    opts.addOptions()(extendedPatchHeightCdDeltaMinus1.str(), m_nnPostFilterSEICharacteristicsExtendedPatchHeightCdDeltaMinus1[i], 0u, "Specifies the extended vertical sample counts of a patch in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream overlap;
+    overlap << "SEINNPFCOverlap" << i;
+    opts.addOptions()(overlap.str(), m_nnPostFilterSEICharacteristicsOverlap[i], 0u, "Specifies the overlap in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream paddingType;
+    paddingType << "SEINNPFCPaddingType" << i;
+    opts.addOptions()(paddingType.str(), m_nnPostFilterSEICharacteristicsPaddingType[i], 0u, "Specifies the process of padding when referencing sample locations outside the boundaries of the cropped decoded output picture ");
+
+    std::ostringstream lumaPadding;
+    lumaPadding << "SEINNPFCLumaPadding" << i;
+    opts.addOptions()(lumaPadding.str(), m_nnPostFilterSEICharacteristicsLumaPadding[i], 0u, "Specifies the luma padding when when the padding type is fixed padding ");
+
+    std::ostringstream crPadding;
+    crPadding << "SEINNPFCCrPadding" << i;
+    opts.addOptions()(crPadding.str(), m_nnPostFilterSEICharacteristicsCrPadding[i], 0u, "Specifies the Cr padding when when the padding type is fixed padding ");
+
+    std::ostringstream cbPadding;
+    cbPadding << "SEINNPFCCbPadding" << i;
+    opts.addOptions()(cbPadding.str(), m_nnPostFilterSEICharacteristicsCbPadding[i], 0u, "Specifies the Cb padding when when the padding type is fixed padding ");
+
+    std::ostringstream complexityInfoPresentFlag;
+    complexityInfoPresentFlag << "SEINNPFCComplexityInfoPresentFlag" << i;
+    opts.addOptions()(complexityInfoPresentFlag.str(), m_nnPostFilterSEICharacteristicsComplexityInfoPresentFlag[i], false, "Specifies the value of nnpfc_complexity_info_present_flag in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream applicationPurposeTagUriPresentFlag;
+    applicationPurposeTagUriPresentFlag << "SEINNPFCApplicationPurposeTagUriPresentFlag" << i;
+    opts.addOptions()(applicationPurposeTagUriPresentFlag.str(), m_nnPostFilterSEICharacteristicsApplicationPurposeTagUriPresentFlag[i], false, "equal to 1 indicates that the nnpfc_application_purpose_tag_uri syntax element is present in this NNPFC SEI message. nnpfc_application_purpose_tag_uri_present_flag equal to 0 indicates that the nnpfc_application_purpose_tag_uri syntax element is not present in this NNPFC SEI message.");
+
+    std::ostringstream applicationPurposeTagUri;
+    applicationPurposeTagUri << "SEINNPFCApplicationPurposeTagUri" << i;
+    opts.addOptions()(applicationPurposeTagUri.str(), m_nnPostFilterSEICharacteristicsApplicationPurposeTagUri[i], std::string(""), "specifies a tag URI with syntax and semantics as specified in IETF RFC 4151 identifying the application determined purpose of the NNPF, when nnpfc_purpose is equal to 0.");
+
+    std::ostringstream scanTypeIdc;
+    scanTypeIdc << "SEINNPFCScanTypeIdc" << i;
+    opts.addOptions()(scanTypeIdc.str(), m_nnPostFilterSEICharacteristicsScanTypeIdc[i], 0u, "Specifies the preferred display method for the pictures output by the NNPF");
+
+    std::ostringstream forHumanViewingIdc;
+    forHumanViewingIdc << "SEINNPFCForHumanViewingIdc" << i;
+    opts.addOptions()(forHumanViewingIdc.str(), m_nnPostFilterSEICharacteristicsForHumanViewingIdc[i], 0u, "Specifies the user viewing usage level of a neural-network post-filter: optimal for human viewing (3), suitable (2), unsuitable (1), unknown (0)");
+
+    std::ostringstream forMachineAnalysis;
+    forMachineAnalysis << "SEINNPFCForMachineAnalysisIdc" << i;
+    opts.addOptions()(forMachineAnalysis.str(), m_nnPostFilterSEICharacteristicsForMachineAnalysisIdc[i], 0u, "Specifies the machine analysis usage level of a neural-network post-filter: optimal for machine analysis (3), suitable (2), unsuitable (1), unknown (0)");
+
+    std::ostringstream uriTag;
+    uriTag << "SEINNPFCUriTag" << i;
+    opts.addOptions()(
+      uriTag.str(), m_nnPostFilterSEICharacteristicsUriTag[i], std::string(""),
+      "Specifies the neural network uri tag in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream uri;
+    uri << "SEINNPFCUri" << i;
+    opts.addOptions()(
+      uri.str(), m_nnPostFilterSEICharacteristicsUri[i], std::string(""),
+      "Specifies the neural network information uri in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream parameterTypeIdc;
+    parameterTypeIdc << "SEINNPFCParameterTypeIdc" << i;
+    opts.addOptions()(parameterTypeIdc.str(), m_nnPostFilterSEICharacteristicsParameterTypeIdc[i], 0u, "Specifies the data type of parameters in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream log2ParameterBitLengthMinus3;
+    log2ParameterBitLengthMinus3 << "SEINNPFCLog2ParameterBitLengthMinus3" << i;
+    opts.addOptions()(log2ParameterBitLengthMinus3.str(), m_nnPostFilterSEICharacteristicsLog2ParameterBitLengthMinus3[i], 0u, "Indicates that the neural network does not use parameter of bit length greater than 2^(N+3) bits");
+
+    std::ostringstream numParametersIdc;
+    numParametersIdc << "SEINNPFCNumParametersIdc" << i;
+    opts.addOptions()(numParametersIdc.str(), m_nnPostFilterSEICharacteristicsNumParametersIdc[i], 0u, "Specifies the maximum number of parameters ((2048<<NumParametersIdc)-1) in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream numKmacOperationsIdc;
+    numKmacOperationsIdc << "SEINNPFCNumKmacOperationsIdc" << i;
+    opts.addOptions()(numKmacOperationsIdc.str(), m_nnPostFilterSEICharacteristicsNumKmacOperationsIdc[i], 0u, "Specifies the maximum number of operations (KMAC) per pixel in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream totalKilobyteSize; 
+    totalKilobyteSize << "SEINNPFCTotalKilobyteSize" << i; 
+    opts.addOptions()(totalKilobyteSize.str(), m_nnPostFilterSEICharacteristicsTotalKilobyteSize[i], 0u, "Indicates the total size in kilobytes required to store the uncompressed NN parameters in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream payloadFilename;
+    payloadFilename << "SEINNPFCPayloadFilename" << i;
+    opts.addOptions()(payloadFilename.str(), m_nnPostFilterSEICharacteristicsPayloadFilename[i], std::string(""),
+                      "Specifies the NNR bitstream in the Neural Network Post Filter Characteristics SEI message");
+
+    std::ostringstream numberDecodedInputPics;
+    numberDecodedInputPics << "SEINNPFCNumberInputDecodedPicsMinusOne" << i;
+    opts.addOptions()(numberDecodedInputPics.str(), m_nnPostFilterSEICharacteristicsNumberInputDecodedPicturesMinus1[i], 0u, "Specifies the number of decoded output pictures used as input for the post processing filter");
+    std::ostringstream numberInterpolatedPics;
+    numberInterpolatedPics << "SEINNPFCNumberInterpolatedPics" << i;
+    opts.addOptions()(numberInterpolatedPics.str(), cfg_nnPostFilterSEICharacteristicsInterpolatedPicturesList[i], cfg_nnPostFilterSEICharacteristicsInterpolatedPicturesList[i], "Number of pictures to interpolate");
+    std::ostringstream numberExtrapolatedPicturesMinus1;
+    numberExtrapolatedPicturesMinus1 << "SEINNPFCNumberExtrapolatedPicsMinus1" << i; 
+    opts.addOptions()(numberExtrapolatedPicturesMinus1.str(), m_nnPostFilterSEICharacteristicsNumberExtrapolatedPicturesMinus1[i], 0u, "Number of pictures to extrapolate");
+    std::ostringstream spatialExtrapolationLeftOffset;
+    spatialExtrapolationLeftOffset << "SEINNPFCSpatialExtrapolationLeftOffset" << i; 
+    opts.addOptions()(spatialExtrapolationLeftOffset.str(), m_nnPostFilterSEICharacteristicsSpatialExtrapolationLeftOffset[i], 0, "Left offset of spatial extrapolation");
+
+    std::ostringstream spatialExtrapolationRightOffset;
+    spatialExtrapolationRightOffset << "SEINNPFCSpatialExtrapolationRightOffset" << i; 
+    opts.addOptions()(spatialExtrapolationRightOffset.str(), m_nnPostFilterSEICharacteristicsSpatialExtrapolationRightOffset[i], 0, "Right offset of spatial extrapolation");
+
+    std::ostringstream spatialExtrapolationTopOffset;
+    spatialExtrapolationTopOffset << "SEINNPFCSpatialExtrapolationTopOffset" << i; 
+    opts.addOptions()(spatialExtrapolationTopOffset.str(), m_nnPostFilterSEICharacteristicsSpatialExtrapolationTopOffset[i], 0, "Top offset of spatial extrapolation");
+
+    std::ostringstream spatialExtrapolationBottomOffset;
+    spatialExtrapolationBottomOffset << "SEINNPFCSpatialExtrapolationLeftOffset" << i; 
+    opts.addOptions()(spatialExtrapolationBottomOffset.str(), m_nnPostFilterSEICharacteristicsSpatialExtrapolationBottomOffset[i], 0, "Bottom offset of spatial extrapolation");
+    std::ostringstream inbandPromptFlag;
+    inbandPromptFlag << "SEINNPFCInbandPromptFlag" << i;
+    opts.addOptions()(inbandPromptFlag.str(), m_nnPostFilterSEICharacteristicsInbandPromptFlag[i], false, "equal to 1 specifies that nnpfc_prompt syntax element is present and nnpfc_alignment_zero_bit_c syntax element may be present. nnpfc_spatial_extrapolation_prompt_present_flag equal to 0 specifies that nnpfc_prompt syntax element and nnpfc_alignment_zero_bit_c syntax element are not present.");
+    std::ostringstream prompt;
+    prompt << "SEINNPFCPrompt" << i;
+    opts.addOptions()(prompt.str(), m_nnPostFilterSEICharacteristicsPrompt[i], std::string(""), "specifies the text string prompt");
+    std::ostringstream InputPicOutputFlag;
+    InputPicOutputFlag << "SEINNPFCInputPicOutputFlag" << i;
+    opts.addOptions()(InputPicOutputFlag.str(), cfg_nnPostFilterSEICharacteristicsInputPicOutputFlagList[i], cfg_nnPostFilterSEICharacteristicsInputPicOutputFlagList[i], "Indicates whether NNPF will generate a corresponding output picture for the input picture");
+    std::ostringstream absentInputPicZeroFlag;
+    absentInputPicZeroFlag << "SEINNPFCAbsentInputPicZeroFlag" << i;
+    opts.addOptions()(absentInputPicZeroFlag.str(), m_nnPostFilterSEICharacteristicsAbsentInputPicZeroFlag[i], false, "Specifies the value of nnpfc_absent_input_pic_zero_flag in the Neural Network Post Filter Characteristics SEI message");
+    std::ostringstream inbandSeedFlag;
+    inbandSeedFlag << "SEINNPFCInbandSeedFlag" << i;
+    opts.addOptions()(inbandSeedFlag.str(), m_nnPostFilterSEICharacteristicsInbandSeedFlag[i], false, "Specifies the value of nnpfc_inband_seed_flag in the Neural Network Post Filter Characteristics SEI message");
+    std::ostringstream seed;
+    seed << "SEINNPFCSeed" << i;
+    opts.addOptions()(seed.str(), m_nnPostFilterSEICharacteristicsSeed[i], 0u, "Indicates the seed value used as input for an NNPF");
+  }
+#endif
 
 #if EXTENSION_360_VIDEO
   TExt360AppEncCfg::TExt360AppEncCfgContext ext360CfgContext;

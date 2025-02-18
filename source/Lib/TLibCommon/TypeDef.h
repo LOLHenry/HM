@@ -110,6 +110,8 @@
 #define DECODER_CHECK_SUBSTREAM_AND_SLICE_TRAILING_BYTES  1 ///< TODO: integrate this macro into a broader conformance checking system.
 #define MCTS_ENC_CHECK                                    1  ///< Temporal MCTS encoder constraint and decoder checks. Also requires SEITMCTSTileConstraint to be enabled to enforce constraint
 #define SHUTTER_INTERVAL_SEI_MESSAGE                      1  ///< support for shutter interval SEI message 
+#define NNPFC_SEI_MESSAGE                                 1  ///< support for NNPFC SEI message
+#define NNPFA_SEI_MESSAGE                                 1  ///< support for NNPFA SEI message
 #define JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE          1  ///< support for phase indication SEI message
 #define SEI_ENCODER_CONTROL                               1  ///< add encoder control for the following SEI: film grain characteristics, content light level, ambient viewing environment
 #define DPB_ENCODER_USAGE_CHECK                           1 ///< Adds DPB encoder usage check.
@@ -321,6 +323,20 @@ enum ChromaFormat
   CHROMA_444        = 3,
   NUM_CHROMA_FORMAT = 4
 };
+
+#if NNPFC_SEI_MESSAGE
+enum Chroma420LocType
+{
+  LEFT,
+  CENTER,
+  TOP_LEFT,
+  TOP,
+  BOTTOM_LEFT,
+  BOTTOM,
+  UNSPECIFIED,
+  NUM,
+};
+#endif
 
 enum ChannelType
 {
@@ -795,6 +811,36 @@ private:
 #define CHECK(c,x)          if(c){ THROW(x); }
 #define EXIT(x)             throw( Exception( "\n" ) << x << "\n" )
 #define CHECK_NULLPTR(_ptr) CHECK( !( _ptr ), "Accessing an empty pointer pointer!" )
+
+#if NNPFC_SEI_MESSAGE
+enum NNPC_PaddingType
+{
+  ZERO_PADDING = 0,
+  REPLICATION_PADDING = 1,
+  REFLECTION_PADDING = 2,
+  WRAP_AROUND_PADDING = 3,
+  FIXED_PADDING = 4
+};
+
+enum NNPC_PurposeType
+{
+  UNKONWN                    = 0,
+  VISUAL_QUALITY_IMPROVEMENT = 1,
+  CHROMA_UPSAMPLING          = 2,
+  RESOLUTION_UPSAMPLING      = 4,
+  FRAME_RATE_UPSAMPLING      = 8,
+  BIT_DEPTH_UPSAMPLING       = 16,
+  COLOURIZATION              = 32,
+  TEMPORAL_EXTRAPOLATION     = 64,
+  SPATIAL_EXTRAPOLATION      = 128
+};
+
+enum POST_FILTER_MODE
+{
+  ISO_IEC_15938_17 = 0,
+  URI = 1
+};
+#endif
 
 // ====================================================================================================================
 // Type definition
