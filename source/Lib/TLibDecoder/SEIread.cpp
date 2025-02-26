@@ -415,55 +415,33 @@ Void SEIReader::xReadSEIPayloadData(Int const payloadType, Int const payloadSize
     sei = new SEINeuralNetworkPostFilterCharacteristics;
     xParseSEINNPostFilterCharacteristics((SEINeuralNetworkPostFilterCharacteristics &) *sei, payloadSize, sps, pDecodedMessageOutputStream);
 
-#if 0
     if (xCheckNnpfcSeiMsg( ((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_id, ((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_baseFlag, nnpfcValues) )
     {
       nnpfcValues.push_back(((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_id);
     }
-#endif
     break;
 #endif
 #if NNPFA_SEI_MESSAGE
     case SEI::NEURAL_NETWORK_POST_FILTER_ACTIVATION:
       sei = new SEINeuralNetworkPostFilterActivation;
       xParseSEINNPostFilterActivation((SEINeuralNetworkPostFilterActivation &) *sei, payloadSize, pDecodedMessageOutputStream);
-#if 0
       nnpfcProcessed = false;
-      CHECK(nnpfcValues.size() == 0, "At leaset one NNPFC SEI message should precede NNPFA")
-      for(int i=0; i<nnpfcValues.size(); ++i)
+      CHECK(nnpfcValues.size() == 0, "At leaset one NNPFC SEI message should precede NNPFA");
+      for(Int i=0; i<nnpfcValues.size(); ++i)
       {
-        if(((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_id == nnpfcValues[i])
+        if(((SEINeuralNetworkPostFilterActivation*)sei)->m_targetId == nnpfcValues[i])
         {
           //In the case that the NNPFA activates a non-base filter, only consider it process when we have NNPFC that updates the base filter present
-          if(((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_baseFlag ||
-             (!((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_baseFlag && xCheckNnpfcUpdatePresentSeiMsg( ((SEINeuralNetworkPostFilterCharacteristics*)sei)->m_id, nnpfcValues)) )
+          if(((SEINeuralNetworkPostFilterActivation*)sei)->m_targetBaseFlag ||
+             (!((SEINeuralNetworkPostFilterActivation*)sei)->m_targetBaseFlag && xCheckNnpfcUpdatePresentSeiMsg( ((SEINeuralNetworkPostFilterActivation*)sei)->m_targetId, nnpfcValues)) )
           {
             nnpfcProcessed = true;
           }
         }
       }
-      CHECK(!nnpfcProcessed, "No NNPFC, no NNPFA")
+      CHECK(!nnpfcProcessed, "No NNPFC, no NNPFA");
       nnpfcProcessed = false;
-#endif
       break;
-#if 0 /* for suffix SEI */
-    case SEI::PayloadType::NEURAL_NETWORK_POST_FILTER_ACTIVATION:
-      sei = new SEINeuralNetworkPostFilterActivation;
-      xParseSEINNPostFilterActivation((SEINeuralNetworkPostFilterActivation &) *sei, payloadSize,
-                                      pDecodedMessageOutputStream);
-      nnpfcProcessed = false;
-      CHECK(nnpfcValues.size() == 0, "At leaset one NNPFC SEI message should precede NNPFA")
-      for (int i = 0; i < nnpfcValues.size(); ++i)
-      {
-        if (((SEINeuralNetworkPostFilterCharacteristics*) sei)->m_id == nnpfcValues[i])
-        {
-          nnpfcProcessed = true;
-        }
-      }
-      CHECK(!nnpfcProcessed, "No NNPFC, no NNPFA")
-      nnpfcProcessed = false;
-    break;
-#endif
 #endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     case SEI::PayloadType::PHASE_INDICATION:
@@ -506,6 +484,55 @@ Void SEIReader::xReadSEIPayloadData(Int const payloadType, Int const payloadSize
       break;
     }
 }
+
+#if NNPFC_SEI_MESSAGE
+Bool SEIReader::xCheckNnpfcSeiMsg(UInt seiId, Bool baseFlag, const std::vector<Int> nnpfcValueList)
+{
+  if (baseFlag)
+  {
+    //Check if this is a new filter or a repetition of an existing base flag
+    for (auto val : nnpfcValueList)
+    {
+      if (val == seiId)
+      {
+        //The filter is a repetition.
+        return false;
+      }
+    }
+  }
+  else
+  {
+    Bool filterHasPresent = false;
+    for(auto val : nnpfcValueList)
+    {
+      if (val == seiId)
+      {
+        filterHasPresent = true;
+        break;
+      }
+    }
+    CHECK(!filterHasPresent, "Cannot have update filter without base filter already present!");
+  }
+  return true;
+}
+
+Bool SEIReader::xCheckNnpfcUpdatePresentSeiMsg(UInt seiId, const std::vector<Int> nnpfcValueList)
+{
+  Int count = 0;
+  for (auto val : nnpfcValueList)
+  {
+    if (val == seiId)
+    {
+      count++;
+      if (count == 2)
+      {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+#endif
 
 Void SEIReader::xReadSEImessage(SEIMessages& seis, const NalUnitType nalUnitType, const TComSPS *sps, std::ostream *pDecodedMessageOutputStream, const vector<SEI::PayloadType>& allowedSeiTypes, std::string const &typeName)
 {
