@@ -1169,7 +1169,10 @@ Bool TDecTop::isRandomAccessSkipPicture(Int& iSkipFrame,  Int& iPOCLastDisplay)
     }
   }
   // skip the reordered pictures, if necessary
-  else if (m_apcSlicePilot->getPOC() < m_pocRandomAccess && (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_R || m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N))
+  else if (m_apcSlicePilot->getPOC() < m_pocRandomAccess &&
+      (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_R ||
+       m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N) &&
+      m_noRaslOutputFlag) // Skip only when NoRaslOutputFlag = 1
   {
     iPOCLastDisplay++;
     return true;
