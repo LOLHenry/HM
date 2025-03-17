@@ -146,7 +146,9 @@ protected:
     return 2 * n + 1;
   }
 #endif 
-
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  void xWriteSEIAIUsageRestrictions(const SEIAIUsageRestrictions &sei);
+#endif 
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   Void xWriteSEIShutterInterval                   (const SEIShutterIntervalInfo& sei);
 #endif

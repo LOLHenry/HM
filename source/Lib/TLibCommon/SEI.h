@@ -117,6 +117,9 @@ public:
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     PHASE_INDICATION                     = 212,
 #endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+    AI_USAGE_RESTRICTIONS = 225,   
+#endif
   };
 
   SEI() {}
@@ -1274,5 +1277,27 @@ public:
   uint8_t getNumsOfSeiPrefixIndications(const SEI* sei);
 };
 #endif 
+#if  JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+class SEIAIUsageRestrictions : public SEI
+{
+public:
+  PayloadType payloadType() const { return AI_USAGE_RESTRICTIONS; }
+  SEIAIUsageRestrictions()
+    : m_cancelFlag(false)
+    , m_persistenceFlag(false)
+    , m_numRestrictionsMinus1(0)
+  {}
+  SEIAIUsageRestrictions(const SEIAIUsageRestrictions& sei);
 
+  virtual ~SEIAIUsageRestrictions() {}
+
+  bool                  m_cancelFlag;
+  bool                  m_persistenceFlag;
+  uint32_t              m_numRestrictionsMinus1;
+  std::vector<uint32_t> m_restrictions;
+  std::vector<bool>     m_contextPresentFlag;
+  std::vector<uint32_t> m_context;
+
+};
+#endif
 //! \}

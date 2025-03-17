@@ -91,6 +91,9 @@ const std::vector<SEI::PayloadType> SEI::prefix_sei_messages({
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   , SEI::PHASE_INDICATION
 #endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  , SEI::AI_USAGE_RESTRICTIONS
+#endif
 });
 
 const std::vector<SEI::PayloadType> SEI::suffix_sei_messages({
@@ -378,6 +381,9 @@ const TChar *SEI::getSEIMessageString(SEI::PayloadType payloadType)
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     case SEI::PHASE_INDICATION:                     return "Phase Indication";
 #endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+    case SEI::AI_USAGE_RESTRICTIONS:                return "AI usage restrictions";
+#endif   
     default:                                        return "Unknown";
   }
 }

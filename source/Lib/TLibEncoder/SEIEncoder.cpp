@@ -1605,5 +1605,27 @@ Void SEIEncoder::initSEISEIPrefixIndication(SEIPrefixIndication* seiSeiPrefixInd
   seiSeiPrefixIndications->m_payload = sei;
 }
 #endif 
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+void SEIEncoder::initSEIAIUsageRestrictions(SEIAIUsageRestrictions *sei)
+{
+  
+  sei->m_cancelFlag = m_pcCfg->getAURSEICancelFlag();
+  if (!sei->m_cancelFlag)
+  {
+    sei->m_persistenceFlag = m_pcCfg->getAURSEIPersistenceFlag();
+    sei->m_numRestrictionsMinus1 = m_pcCfg->getAURSEINumRestrictionsMinus1();
+    sei->m_restrictions.resize(sei->m_numRestrictionsMinus1 + 1);
+    sei->m_contextPresentFlag.resize(sei->m_numRestrictionsMinus1 + 1);
+    sei->m_context.resize(sei->m_numRestrictionsMinus1 + 1);
+    for (uint32_t i = 0; i <= sei->m_numRestrictionsMinus1; i++)
+    {
+      sei->m_restrictions[i] = m_pcCfg->getAURSEIRestrictions(i);
+      sei->m_contextPresentFlag[i] = m_pcCfg->getAURSEIContextPresentFlag(i);
+      if (sei->m_contextPresentFlag[i])
+        sei->m_context[i] = m_pcCfg->getAURSEIContext(i);
+    }
 
+  }
+}
+#endif 
 //! \}
