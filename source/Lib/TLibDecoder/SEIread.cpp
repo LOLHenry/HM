@@ -2348,7 +2348,7 @@ Void SEIReader::xParseSEIModalityInfo(SEIModalityInfo& sei, UInt payloadSize, st
     {
       UInt code2;
       sei_read_code(pDecodedMessageOutputStream, 1, code2, "reserved_modality_type_extension");   // Decoders shall ignore the presence and value of reserved_modality_type_extension                                                   
->>>>>>> source/Lib/TLibDecoder/SEIread.cpp
+
     }
   }
 }

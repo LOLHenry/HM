@@ -1769,7 +1769,7 @@ Void SEIWriter::xWriteByteAlign()
     }
   }
 }
-<<<<<<< source/Lib/TLibEncoder/SEIwrite.cpp
+
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
 void SEIWriter::xWriteSEIAIUsageRestrictions(const SEIAIUsageRestrictions &sei)
 {
@@ -1788,7 +1788,7 @@ void SEIWriter::xWriteSEIAIUsageRestrictions(const SEIAIUsageRestrictions &sei)
     }
   }
 }
-=======
+#endif
 
 #if JVET_AK0194_DSC_SEI
 void SEIWriter::xWriteSEIDigitallySignedContentInitialization(const SEIDigitallySignedContentInitialization &sei)
@@ -1832,6 +1832,6 @@ void SEIWriter::xWriteSEIDigitallySignedContentVerification(const SEIDigitallySi
     WRITE_CODE(sei.dscvSignature[i], 8, "dscv_signature");
   }
 }
->>>>>>> source/Lib/TLibEncoder/SEIwrite.cpp
+
 #endif
 //! \}

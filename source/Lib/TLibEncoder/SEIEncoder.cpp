@@ -1676,9 +1676,6 @@ void SEIEncoder::initSEIDigitallySignedContentVerification(SEIDigitallySignedCon
   sei->dscvSignature = signature;
 }
 #endif
->>>>>>> source/Lib/TLibEncoder/SEIEncoder.cpp
 
-  }
-}
-#endif 
+ 
 //! \}
