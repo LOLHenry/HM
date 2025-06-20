@@ -267,7 +267,6 @@ Void SEIWriter::xWriteSEIpayloadData(TComBitIf& bs, const SEI& sei, const TComSP
     break;
   case SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_VERIFICATION:
     xWriteSEIDigitallySignedContentVerification(*static_cast<const SEIDigitallySignedContentVerification *>(&sei));
->>>>>>> source/Lib/TLibEncoder/SEIwrite.cpp
     break;
 #endif
   default:
