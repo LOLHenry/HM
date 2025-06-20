@@ -391,15 +391,12 @@ const TChar *SEI::getSEIMessageString(SEI::PayloadType payloadType)
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     case SEI::PHASE_INDICATION:                     return "Phase Indication";
 #endif
-<<<<<<< source/Lib/TLibCommon/SEI.cpp
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
     case SEI::AI_USAGE_RESTRICTIONS:                return "AI usage restrictions";
 #endif   
-=======
 #if JVET_AK0107_MODALITY_INFORMATION
     case SEI::MODALITY_INFORMATION:                 return "Modality information";
 #endif
->>>>>>> source/Lib/TLibCommon/SEI.cpp
     default:                                        return "Unknown";
   }
 }
