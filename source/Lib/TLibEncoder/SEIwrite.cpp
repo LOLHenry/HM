@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,16 +38,17 @@
 #include "TLibCommon/TComPicYuv.h"
 #include "SEIwrite.h"
 
+
 //! \ingroup TLibEncoder
 //! \{
 
 #if ENC_DEC_TRACE
-Void  xTraceSEIHeader()
+Void  SEIWriter::xTraceSEIHeader()
 {
   fprintf( g_hTrace, "=========== SEI message ===========\n");
 }
 
-Void  xTraceSEIMessageType(SEI::PayloadType payloadType)
+Void  SEIWriter::xTraceSEIMessageType(SEI::PayloadType payloadType)
 {
   fprintf( g_hTrace, "=========== %s SEI message ===========\n", SEI::getSEIMessageString(payloadType));
 }
@@ -245,9 +246,28 @@ Void SEIWriter::xWriteSEIpayloadData(TComBitIf& bs, const SEI& sei, const TComSP
     xWriteSEIPhaseIndication(*static_cast<const SEIPhaseIndication *>(&sei));
     break;
 #endif
+
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
   case SEI::PayloadType::AI_USAGE_RESTRICTIONS:
     xWriteSEIAIUsageRestrictions(*static_cast<const SEIAIUsageRestrictions *>(&sei));
+    break;
+#endif  
+
+#if JVET_AK0107_MODALITY_INFORMATION
+  case SEI::PayloadType::MODALITY_INFORMATION:
+    xWriteSEIModalityInfo(*static_cast<const SEIModalityInfo *>(&sei));
+    break;
+#endif 
+#if JVET_AK0194_DSC_SEI
+  case SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_INITIALIZATION:
+    xWriteSEIDigitallySignedContentInitialization(*static_cast<const SEIDigitallySignedContentInitialization *>(&sei));
+    break;
+  case SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_SELECTION:
+    xWriteSEIDigitallySignedContentSelection(*static_cast<const SEIDigitallySignedContentSelection *>(&sei));
+    break;
+  case SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_VERIFICATION:
+    xWriteSEIDigitallySignedContentVerification(*static_cast<const SEIDigitallySignedContentVerification *>(&sei));
+>>>>>>> source/Lib/TLibEncoder/SEIwrite.cpp
     break;
 #endif
   default:
@@ -1240,6 +1260,27 @@ void SEIWriter::xWriteSEIPhaseIndication(const SEIPhaseIndication& sei)
 }
 #endif
 
+#if JVET_AK0107_MODALITY_INFORMATION
+Void SEIWriter::xWriteSEIModalityInfo(const SEIModalityInfo& sei)
+{
+  WRITE_FLAG( sei.m_miCancelFlag,                                  "modality_info_cancel_flag" );
+  if(!sei.m_miCancelFlag)
+  {
+    WRITE_FLAG( sei.m_miPersistenceFlag,                           "modality_info_persistence_flag" );
+    WRITE_CODE( sei.m_miModalityType,                  5,          "modality_type");
+    WRITE_FLAG( sei.m_miSpectrumRangePresentFlag,                  "spectrum_range_present_flag" );
+    if (sei.m_miSpectrumRangePresentFlag)
+    {
+      WRITE_CODE( sei.m_miMinWavelengthMantissa,      11,          "min_wavelength_mantissa ");
+      WRITE_CODE( sei.m_miMinWavelengthExponentPlus15, 5,          "min_wavelength_exponent_plus15 ");
+      WRITE_CODE( sei.m_miMaxWavelengthMantissa,      11,          "max_wavelength_mantissa ");
+      WRITE_CODE( sei.m_miMaxWavelengthExponentPlus15, 5,          "max_wavelength_exponent_plus15 ");
+    }
+    WRITE_UVLC(0, "modality_type_extension_bits");   // mi_modality_type_extension_bits shall be equal to 0 in the current edition 
+  }
+}
+#endif 
+
 Void SEIWriter::xWriteSEIEquirectangularProjection(const SEIEquirectangularProjection &sei
 #if JCTVC_AD0021_SEI_PREFIX_INDICATION
   , Int SEIPrefixIndicationIdx
@@ -1719,15 +1760,16 @@ Void SEIWriter::xWriteSEIPrefixIndicationByteAlign() {
 
 Void SEIWriter::xWriteByteAlign()
 {
-    if (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0)
+  if (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0)
+  {
+    WRITE_FLAG(1, "payload_bit_equal_to_one");
+    while (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0)
     {
-        WRITE_FLAG(1, "payload_bit_equal_to_one");
-        while (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0)
-        {
-            WRITE_FLAG(0, "payload_bit_equal_to_zero");
-        }
+      WRITE_FLAG(0, "payload_bit_equal_to_zero");
     }
+  }
 }
+<<<<<<< source/Lib/TLibEncoder/SEIwrite.cpp
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
 void SEIWriter::xWriteSEIAIUsageRestrictions(const SEIAIUsageRestrictions &sei)
 {
@@ -1746,5 +1788,50 @@ void SEIWriter::xWriteSEIAIUsageRestrictions(const SEIAIUsageRestrictions &sei)
     }
   }
 }
+=======
+
+#if JVET_AK0194_DSC_SEI
+void SEIWriter::xWriteSEIDigitallySignedContentInitialization(const SEIDigitallySignedContentInitialization &sei)
+{
+  WRITE_CODE(sei.dsciHashMethodType, 8, "dsci_hash_method_type");
+  WRITE_STRING(sei.dsciKeySourceUri, "dsci_key_source_uri");
+  CHECK (sei.dsciNumVerificationSubstreams < 1, "Number of DSC verification substreams has to be greater than zero");
+  WRITE_UVLC(sei.dsciNumVerificationSubstreams - 1, "dsci_num_verification_substreams_minus1");
+  WRITE_UVLC(sei.dsciKeyRetrievalModeIdc, "dsci_key_retrieval_mode_idc");
+  if (sei.dsciKeyRetrievalModeIdc == 1)
+  {
+    WRITE_FLAG(sei.dsciUseKeyRegisterIdxFlag, "dsci_use_key_register_idx_flag");
+    if( sei.dsciUseKeyRegisterIdxFlag )
+    {
+      WRITE_UVLC(sei.dsciKeyRegisterIdx, "dsci_key_register_idx");
+    }
+  }
+  WRITE_FLAG(sei.dsciContentUuidPresentFlag, "dsci_content_uuid_present_flag");
+  if (sei.dsciContentUuidPresentFlag)
+  {
+    for (int i=0; i<16; i++)
+    {
+      WRITE_CODE(sei.dsciContentUuid[i], 8, "dsci_content_uuid");
+    }
+  }
+}
+
+void SEIWriter::xWriteSEIDigitallySignedContentSelection(const SEIDigitallySignedContentSelection &sei)
+{
+  WRITE_UVLC(sei.dscsVerificationSubstreamId, "dscs_verification_substream_id");
+}
+
+void SEIWriter::xWriteSEIDigitallySignedContentVerification(const SEIDigitallySignedContentVerification &sei)
+{
+  WRITE_UVLC(sei.dscvVerificationSubstreamId, "dscv_verification_substream_id");
+  CHECK (sei.dscvSignatureLengthInOctets < 1, "Length of signature has to be greater than zero");
+  WRITE_UVLC(sei.dscvSignatureLengthInOctets - 1, "dscv_signature_length_in_octets_minus1");
+  CHECK (sei.dscvSignatureLengthInOctets != sei.dscvSignature.size(), "Signature length incosistent");
+  for (int i=0; i< sei.dscvSignature.size(); i++)
+  {
+    WRITE_CODE(sei.dscvSignature[i], 8, "dscv_signature");
+  }
+}
+>>>>>>> source/Lib/TLibEncoder/SEIwrite.cpp
 #endif
 //! \}

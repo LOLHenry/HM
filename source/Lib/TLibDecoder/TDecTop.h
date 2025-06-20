@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,6 +52,19 @@
 #include "TDecCAVLC.h"
 #include "SEIread.h"
 #include "TDecConformance.h"
+
+#if JVET_AK0194_DSC_SEI
+#include "SEIDigitallySignedContent.h"
+#endif
+
+#if JVET_AK0194_DSC_SEI
+struct binNalUnit
+{
+  NalUnitType nalUnitType = NAL_UNIT_INVALID;
+  size_t  length = 0;
+  uint8_t *data  = nullptr;
+};
+#endif
 
 class InputNALUnit;
 
@@ -122,6 +135,11 @@ private:
 
   Bool                    m_warningMessageSkipPicture;
 
+#if JVET_AK0194_DSC_SEI
+  std::string   m_keyStoreDir;
+  std::string   m_trustStoreDir;
+#endif
+
 #if MCTS_ENC_CHECK
   Bool                    m_tmctsCheckEnabled;
 
@@ -138,7 +156,16 @@ public:
 #if MCTS_ENC_CHECK
   Void setTMctsCheckEnabled(Bool enabled) { m_tmctsCheckEnabled = enabled; }
 
-#endif  
+#endif
+#if JVET_AK0194_DSC_SEI
+  void xStoreNALUnitForSignature(InputNALUnit &nalu);
+  void xRemoveLastNalUnitFromSignature();
+  void xProcessStoredNALUnitsForSignature(int substream_id);
+
+  std::list<binNalUnit> m_signedContentNalUnitBuffer;
+  DscSubstreamManager   m_dscSubstreamManager;
+#endif
+
   Void  init();
 #if MCTS_EXTRACTION
   SEIMessages& getSEIs() { return m_SEIs; }
@@ -168,6 +195,13 @@ public:
 #endif
   Void  setDecodedSEIMessageOutputStream(std::ostream *pOpStream) { m_pDecodedSEIOutputStream = pOpStream; }
   UInt  getNumberOfChecksumErrorsDetected() const { return m_cGopDecoder.getNumberOfChecksumErrorsDetected(); }
+#if JVET_AK0194_DSC_SEI
+  void setKeyStoreParameters(const std::string &keyStoreDir, const std::string &trustStoreDir)
+  {
+    m_keyStoreDir = keyStoreDir;
+    m_trustStoreDir = trustStoreDir;
+  }
+#endif
 
 protected:
   Void  xGetNewPicBuffer  (const TComSPS &sps, const TComPPS &pps, TComPic*& rpcPic, const UInt temporalLayer);

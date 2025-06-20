@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -867,7 +867,7 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("QuadtreeTUMaxDepthInter",                         m_uiQuadtreeTUMaxDepthInter,                         2u, "Depth of TU tree for inter CUs")
 
   // Coding structure paramters
-  ("IntraPeriod,-ip",                                 m_iIntraPeriod,                                      -1, "Intra period in frames, (-1: only first frame)")
+  ("IntraPeriod,-ip",                                 m_iIntraPeriod,                                      -1, "Intra period in frames, (-1: only first frame, -N: set to a multiple of N based on frame rate)")
   ("DecodingRefreshType,-dr",                         m_iDecodingRefreshType,                               0, "Intra refresh type (0:none 1:CRA 2:IDR 3:RecPointSEI)")
   ("GOPSize,g",                                       m_iGOPSize,                                           1, "GOP size of temporal structure")
   ("ReWriteParamSetsFlag",                            m_bReWriteParamSetsFlag,                           true, "Enable rewriting of Parameter sets before every (intra) random access point")
@@ -1348,6 +1348,33 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
 #if JCTVC_AD0021_SEI_PREFIX_INDICATION
   ("SEISEIPrefixIndicationEnabled",                   m_SEIPrefixIndicationSEIEnabled,          false,                                   "Controls if SEI Prefix Indications SEI messages enabled")
 #endif
+#if JVET_AK0107_MODALITY_INFORMATION
+// Modality Information SEI
+  ("SEIModalityInfoEnabled",                          m_miSEIEnabled,                                    false, "Control generation of Modality Information SEI messages")
+  ("SEIMiCancelFlag",                                 m_miCancelFlag,                                    false, "Indicates that Modality Information SEI message cancels the persistence or follows")
+  ("SEIMiPersistenceFlag",                            m_miPersistenceFlag,                                true, "Specifies the persistence of the Modality Information SEI message")
+  ("SEIMiModalityType",                               m_miModalityType,                                      1, "Specifies the type of modality. 0: unspecified; 1: visible picture; 2: Infrared Picture; 3: Ultraviolet Picture")
+  ("SEIMiSpectrumRangePresentFlag",                   m_miSpectrumRangePresentFlag,                      false, "Specifies the presence of the spectrum band of the optical radiation wavelength")
+  ("SEIMiMinWavelengthMantissa",                      m_miMinWavelengthMantissa,                             0, "Specifies the mantissa part of the minimum wavelength indicating the spectral band of optical radiation")
+  ("SEIMiMinWavelengthExponentPlus15",                m_miMinWavelengthExponentPlus15,                       0, "Specifies the exponent part of the minimum wavelength indicating the spectral band of optical radiation")
+  ("SEIMiMaxWavelengthMantissa",                      m_miMaxWavelengthMantissa,                             0, "Specifies the mantissa part of the maximum wavelength indicating the spectral band of optical radiation")
+  ("SEIMiMaxWavelengthExponentPlus15",                m_miMaxWavelengthExponentPlus15,                       0, "Specifies the exponent part of the maximum wavelength indicating the spectral band of optical radiation")
+#endif
+#if JVET_AK0194_DSC_SEI
+  ("SEIDSCEnabled", m_cfgDigitallySignedContentSEI.enabled, false, "Control generation of Digitally Signed Content SEI messages")
+  ("SEIDSCHashMethod", m_cfgDigitallySignedContentSEI.hashMethod, 0 , "Hash type to be used:\n"
+                                                                       "\t0: SHA-1 (default)\n"
+                                                                       "\t1: SHA-224\n"
+                                                                       "\t2: SHA-256\n"
+                                                                       "\t3: SHA-384\n"
+                                                                       "\t4: SHA-512\n"
+                                                                       "\t5: SHA-512/224\n"
+                                                                       "\t6: SHA-512/256")
+  ("SEIDSCSigningKeyFile", m_cfgDigitallySignedContentSEI.privateKeyFile, std::string("") , "(Private) signing key location for Digitally Signed Content SEI messages")
+  ("SEIDSCVerificationKeyURI", m_cfgDigitallySignedContentSEI.publicKeyUri, std::string("") , "(Public) verification key URI for Digitally Signed Content SEI messages")
+  ("SEIDSCKeyIDEnabled", m_cfgDigitallySignedContentSEI.keyIdEnabled, false, "Enable using a key ID addition to URI of public key of Digitally Signed Content SEI messages")
+  ("SEIDSCKeyID", m_cfgDigitallySignedContentSEI.keyId, 0 , "Public Key ID for Digitally Signed Content SEI messages (if enabled)")
+#endif
   ;
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
   opts.addOptions()
@@ -1409,6 +1436,21 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
    */
   m_inputFileWidth  = m_sourceWidth;
   m_inputFileHeight = m_sourceHeight;
+
+  if (m_iIntraPeriod < -1)
+  {
+    // Set IntraPeriod to a multiple of -m_intraPeriod according to frame rate of source
+    // When setting to m_intraPeriod to -32, it is changed to appropriate value according to CTC:
+    // Frame rate | IntraPeriod
+    //     20     |     32
+    //     24     |     32
+    //     30     |     32
+    //     50     |     64
+    //     60     |     64
+    //    100     |     96
+    const int ipBase = -m_iIntraPeriod;
+    m_iIntraPeriod    = std::max((m_iFrameRate + ipBase / 2) / ipBase, 1) * ipBase;
+  }
 
   if (!inputPathPrefix.empty() && inputPathPrefix.back() != '/' && inputPathPrefix.back() != '\\' )
   {

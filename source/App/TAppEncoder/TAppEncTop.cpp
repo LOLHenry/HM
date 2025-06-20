@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -114,6 +114,9 @@ Void TAppEncTop::xInitLibCfg()
 
 #if SHUTTER_INTERVAL_SEI_PROCESSING
   m_cTEncTop.setShutterFilterFlag                                 ( m_ShutterFilterEnable );
+#endif
+#if JVET_AK0194_DSC_SEI
+  m_cTEncTop.setDigitallySignedContentSEICfg                      (m_cfgDigitallySignedContentSEI);
 #endif
 
   m_cTEncTop.setCabacZeroWordPaddingEnabled                       ( m_cabacZeroWordPaddingEnabled );
@@ -352,6 +355,18 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setHorPhaseDenMinus1FullResolution                    ( m_piHorPhaseDenMinus1FullResolution );
   m_cTEncTop.setVerPhaseNumFullResolution                          ( m_piVerPhaseNumFullResolution );
   m_cTEncTop.setVerPhaseDenMinus1FullResolution                    ( m_piVerPhaseDenMinus1FullResolution );
+#endif
+#if JVET_AK0107_MODALITY_INFORMATION
+  // Modality Information SEI
+  m_cTEncTop.setMiSEIEnabled                                      (m_miSEIEnabled);
+  m_cTEncTop.setMiCancelFlag                                      (m_miCancelFlag);
+  m_cTEncTop.setMiPersistenceFlag                                 (m_miPersistenceFlag);
+  m_cTEncTop.setMiModalityType                                    (m_miModalityType);
+  m_cTEncTop.setMiSpectrumRangePresentFlag                        (m_miSpectrumRangePresentFlag);
+  m_cTEncTop.setMiMinWavelengthMantissa                           (m_miMinWavelengthMantissa);
+  m_cTEncTop.setMiMinWavelengthExponentPlus15                     (m_miMinWavelengthExponentPlus15);
+  m_cTEncTop.setMiMaxWavelengthMantissa                           (m_miMaxWavelengthMantissa);
+  m_cTEncTop.setMiMaxWavelengthExponentPlus15                     (m_miMaxWavelengthExponentPlus15);
 #endif
   m_cTEncTop.setTMCTSSEIEnabled                                   ( m_tmctsSEIEnabled );
 #if MCTS_ENC_CHECK

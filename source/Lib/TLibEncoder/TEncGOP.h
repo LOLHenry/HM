@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -59,6 +59,9 @@
 #endif
 #if JVET_X0048_X0103_FILM_GRAIN
 #include "TLibCommon/SEIFilmGrainAnalyzer.h"
+#endif
+#if JVET_AK0194_DSC_SEI
+#include "TLibCommon/SEIDigitallySignedContent.h"
 #endif
 
 #include "TEncAnalyze.h"
@@ -153,6 +156,13 @@ private:
   SEIEncoder              m_seiEncoder;
   TComPicYuv*             m_pcDeblockingTempPicYuv;
   Int                     m_DBParam[MAX_ENCODER_DEBLOCKING_QUALITY_LAYERS][4];   //[layer_id][0: available; 1: bDBDisabled; 2: Beta Offset Div2; 3: Tc Offset Div2;]
+#if JVET_AK0194_DSC_SEI
+  void xAddToSubstream(int substreamId, OutputNALUnit &nalu);
+
+  DscSubstreamManager m_dscSubstreamManager;
+  int                 m_totalPicsCoded = 0;
+  int                 m_prevPicTemporalId = 0;
+#endif
 
 public:
   TEncGOP();

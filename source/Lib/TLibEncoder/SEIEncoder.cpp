@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,6 +33,9 @@
 
 #include "TLibCommon/CommonDef.h"
 #include "TLibCommon/SEI.h"
+#if JVET_AK0194_DSC_SEI
+#include "TLibCommon/SEIDigitallySignedContent.h"
+#endif
 #include "TEncGOP.h"
 #include "TEncTop.h"
 
@@ -262,6 +265,29 @@ void SEIEncoder::initSEIPhaseIndication(SEIPhaseIndication* seiPhaseIndication)
   seiPhaseIndication->m_horPhaseDenMinus1 = m_pcCfg->getHorPhaseDenMinus1FullResolution();
   seiPhaseIndication->m_verPhaseNum = m_pcCfg->getVerPhaseNumFullResolution();
   seiPhaseIndication->m_verPhaseDenMinus1 = m_pcCfg->getVerPhaseDenMinus1FullResolution();
+}
+#endif
+
+#if JVET_AK0107_MODALITY_INFORMATION
+Void SEIEncoder::initSEIModalityInfo(SEIModalityInfo *seiMI)
+{
+  assert(m_isInitialized);
+  assert(seiMI != NULL);
+  //  Set SEI message parameters read from command line options
+  seiMI->m_miCancelFlag = m_pcCfg->getMiCancelFlag(); 
+  if (!seiMI->m_miCancelFlag)
+  {
+    seiMI->m_miPersistenceFlag            = m_pcCfg->getMiPersistenceFlag();
+    seiMI->m_miModalityType               = m_pcCfg->getMiModalityType();
+    seiMI->m_miSpectrumRangePresentFlag   = m_pcCfg->getMiSpectrumRangePresentFlag();
+    if (seiMI->m_miSpectrumRangePresentFlag)
+    {
+      seiMI->m_miMinWavelengthMantissa         = m_pcCfg->getMiMinWavelengthMantissa();
+      seiMI->m_miMinWavelengthExponentPlus15   = m_pcCfg->getMiMinWavelengthExponentPlus15();
+      seiMI->m_miMaxWavelengthMantissa         = m_pcCfg->getMiMaxWavelengthMantissa();
+      seiMI->m_miMaxWavelengthExponentPlus15   = m_pcCfg->getMiMaxWavelengthExponentPlus15();
+    }
+  }
 }
 #endif
 
@@ -1604,6 +1630,7 @@ Void SEIEncoder::initSEISEIPrefixIndication(SEIPrefixIndication* seiSeiPrefixInd
   seiSeiPrefixIndications->m_numSeiPrefixIndicationsMinus1 = seiSeiPrefixIndications->getNumsOfSeiPrefixIndications(sei) - 1;
   seiSeiPrefixIndications->m_payload = sei;
 }
+
 #endif 
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
 void SEIEncoder::initSEIAIUsageRestrictions(SEIAIUsageRestrictions *sei)
@@ -1624,6 +1651,32 @@ void SEIEncoder::initSEIAIUsageRestrictions(SEIAIUsageRestrictions *sei)
       if (sei->m_contextPresentFlag[i])
         sei->m_context[i] = m_pcCfg->getAURSEIContext(i);
     }
+  }
+}
+#endif
+
+
+#if JVET_AK0194_DSC_SEI
+void SEIEncoder::initSEIDigitallySignedContentInitialization(SEIDigitallySignedContentInitialization *sei)
+{
+  sei->dsciNumVerificationSubstreams = 1; //m_pcCfg->getMaxTempLayer();
+  sei->dsciHashMethodType = m_pcCfg->getDigitallySignedContentSEICfg().hashMethod;
+  sei->dsciKeySourceUri = m_pcCfg->getDigitallySignedContentSEICfg().publicKeyUri;
+  sei->dsciUseKeyRegisterIdxFlag = m_pcCfg->getDigitallySignedContentSEICfg().keyIdEnabled;
+  sei->dsciKeyRegisterIdx = m_pcCfg->getDigitallySignedContentSEICfg().keyId;
+}
+void SEIEncoder::initSEIDigitallySignedContentSelection(SEIDigitallySignedContentSelection *sei, int substream)
+{
+  sei->dscsVerificationSubstreamId = substream;
+}
+void SEIEncoder::initSEIDigitallySignedContentVerification(SEIDigitallySignedContentVerification *sei, int32_t substream, const std::vector<uint8_t> &signature)
+{
+  sei->dscvVerificationSubstreamId = substream;
+  sei->dscvSignatureLengthInOctets = (int32_t) signature.size();
+  sei->dscvSignature = signature;
+}
+#endif
+>>>>>>> source/Lib/TLibEncoder/SEIEncoder.cpp
 
   }
 }

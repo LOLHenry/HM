@@ -32,6 +32,8 @@ set( SET_ENABLE_TRACING OFF CACHE BOOL "Set ENABLE_TRACING as a compiler flag" )
 set( ENABLE_TRACING OFF CACHE BOOL "If SET_ENABLE_TRACING is on, it will be set to this value" )
 set( HIGH_BITDEPTH OFF CACHE BOOL "Build libraries and applications with high bit depth support" )
 
+set( ENABLE_SEARCH_OPENSSL ON CACHE BOOL "ENABLE_SEARCH_OPENSSL will be set to this value" )
+
 if( CMAKE_COMPILER_IS_GNUCC )
   set( BUILD_STATIC OFF CACHE BOOL "Build static executables" )
 endif()
@@ -92,7 +94,7 @@ endif()
 bb_enable_warnings( msvc warnings-as-errors "/wd4996" )
 
 # enable sse4.1 build for all source files for gcc and clang
-if( UNIX OR MINGW )
+if( (UNIX OR MINGW) AND NOT (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64") )
   add_compile_options( "-msse4.1" )
 endif()
 

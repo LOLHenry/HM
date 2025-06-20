@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -82,6 +82,10 @@ protected:
   Bool          m_bClipOutputVideoToRec709Range;      ///< If true, clip the output video to the Rec 709 range on saving.
 #if MCTS_ENC_CHECK
   Bool          m_tmctsCheck;
+#endif
+#if JVET_AK0194_DSC_SEI
+  std::string   m_keyStoreDir;
+  std::string   m_trustStoreDir;
 #endif
 
 public:

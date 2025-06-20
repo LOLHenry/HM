@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -411,6 +411,9 @@ Void TAppDecTop::xInitDecLib()
 #endif
 #if O0043_BEST_EFFORT_DECODING
   m_cTDecTop.setForceDecodeBitDepth(m_forceDecodeBitDepth);
+#endif
+#if JVET_AK0194_DSC_SEI
+  m_cTDecTop.setKeyStoreParameters(m_keyStoreDir, m_trustStoreDir);
 #endif
   if (!m_outputDecodedSEIMessagesFilename.empty())
   {

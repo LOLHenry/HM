@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,6 +45,8 @@
 #include <vector>
 #include <utility>
 #include <iostream>
+#include <sstream>
+
 
 //! \ingroup TLibCommon
 //! \{
@@ -58,6 +60,13 @@
 
 #define JVET_Y0105_SW_AND_QDF                             1 // An adaptive smooth window (SW) size and extension of quality dependency factor (QDF) to low frame rate in rate control 
 
+
+#define JVET_AK0194_DSC_SEI_DECODER_SYNTAX                1 // read the Digitally Signed Content SEIs at the decoder
+
+// Keep the following define. Can be switched off by CMake, when OpenSSL is not found
+#ifndef JVET_AK0194_DSC_SEI
+#define JVET_AK0194_DSC_SEI   1                      // Digitally signed content signing and verification (requires OpenSSL v3)
+#endif
 
 // ====================================================================================================================
 // Debugging
@@ -112,6 +121,7 @@
 #if SHUTTER_INTERVAL_SEI_MESSAGE
 #define SHUTTER_INTERVAL_SEI_PROCESSING                   1 ///< JCTVC-AM0024: pre-/post-processing to use shutter interval SEI
 #endif
+#define JVET_AK0107_MODALITY_INFORMATION                  1 // Implementation of Modality Information SEI message
 // ====================================================================================================================
 // Tool Switches
 // ====================================================================================================================
@@ -764,6 +774,28 @@ enum LumaLevelToDQPMode
   LUMALVL_TO_DQP_MAX_METHOD = 2,  // use maximum value of CTU to determine luma level
   LUMALVL_TO_DQP_NUM_MODES  = 3
 };
+
+// ---------------------------------------------------------------------------
+// exception class
+// ---------------------------------------------------------------------------
+
+class Exception : public std::exception
+{
+public:
+  Exception( const std::string& _s ) : m_str( _s ) { }
+  Exception( const Exception& _e ) : std::exception( _e ), m_str( _e.m_str ) { }
+  virtual ~Exception() noexcept { };
+  virtual const char* what() const noexcept { return m_str.c_str(); }
+  Exception& operator=( const Exception& _e ) { std::exception::operator=( _e ); m_str = _e.m_str; return *this; }
+  template<typename T> Exception& operator<<( T t ) { std::ostringstream oss; oss << t; m_str += oss.str(); return *this; }
+private:
+  std::string m_str;
+};
+
+#define THROW(x)            throw( Exception( "\nERROR: In function \"" ) << __FUNCTION__ << "\" in " << __FILE__ << ":" << __LINE__ << ": " << x )
+#define CHECK(c,x)          if(c){ THROW(x); }
+#define EXIT(x)             throw( Exception( "\n" ) << x << "\n" )
+#define CHECK_NULLPTR(_ptr) CHECK( !( _ptr ), "Accessing an empty pointer pointer!" )
 
 // ====================================================================================================================
 // Type definition

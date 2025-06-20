@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -120,6 +120,14 @@ public:
 #endif
 #if JCTVC_AD0021_SEI_PREFIX_INDICATION
   Void initSEISEIPrefixIndication(SEIPrefixIndication* seiSeiPrefixIndications, const SEI* sei);
+#endif
+#if JVET_AK0107_MODALITY_INFORMATION
+  Void initSEIModalityInfo(SEIModalityInfo *sei);
+#endif
+#if JVET_AK0194_DSC_SEI
+  void initSEIDigitallySignedContentInitialization(SEIDigitallySignedContentInitialization *sei);
+  void initSEIDigitallySignedContentSelection(SEIDigitallySignedContentSelection *sei, int substream);
+  void initSEIDigitallySignedContentVerification(SEIDigitallySignedContentVerification *sei, int32_t substream, const std::vector<uint8_t> &signature);
 #endif
   // trailing SEIs
   Void initDecodedPictureHashSEI(SEIDecodedPictureHash *sei, TComPic *pcPic, std::string &rHashString, const BitDepths &bitDepths);

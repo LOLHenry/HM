@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -100,6 +100,10 @@ Bool TAppDecCfg::parseCfg( Int argc, TChar* argv[] )
   ("ClipOutputVideoToRec709Range",      m_bClipOutputVideoToRec709Range,  false, "If true then clip output video to the Rec. 709 Range on saving")
 #if MCTS_ENC_CHECK
   ("TMCTSCheck",                  m_tmctsCheck,                          false,    "If enabled, the decoder checks for violations of mc_exact_sample_value_match_flag in Temporal MCTS ")
+#endif
+#if JVET_AK0194_DSC_SEI
+  ("KeyStoreDir",              m_keyStoreDir,            std::string("keystore/pub"),    "Directory for locally stored public keys for verifying digitally signed content")
+  ("TrustStoreDir",            m_trustStoreDir,          std::string("keystore/ca"),     "Directory for locally stored trusted CA certificates")
 #endif
   ;
 

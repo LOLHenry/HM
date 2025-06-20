@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,6 +38,10 @@
 #include "NALread.h"
 #include "TDecTop.h"
 #include "TDecConformance.h"
+
+#if JVET_AK0194_DSC_SEI || JVET_AK0194_DSC_SEI_DECODER_SYNTAX
+#include "SEIDigitallySignedContent.h"
+#endif
 
 //! \ingroup TLibDecoder
 //! \{
@@ -249,6 +253,43 @@ Void TDecTop::xGetNewPicBuffer ( const TComSPS &sps, const TComPPS &pps, TComPic
 #endif
 }
 
+#if JVET_AK0194_DSC_SEI
+void TDecTop::xStoreNALUnitForSignature(InputNALUnit &nalu)
+{
+  std::ostringstream rbspPayload;
+  binNalUnit binNalu;
+  binNalu.nalUnitType = nalu.m_nalUnitType;
+  binNalu.length  = nalu.getBitstream().getOrigFifo().size();
+  binNalu.data = new uint8_t [binNalu.length];
+
+  std::memcpy(binNalu.data, nalu.getBitstream().getOrigFifo().data(), binNalu.length);
+
+  m_signedContentNalUnitBuffer.push_back(binNalu);
+  nalu.getBitstream().clearOrigFifo();
+}
+
+void TDecTop::xRemoveLastNalUnitFromSignature()
+{
+  binNalUnit nalu = m_signedContentNalUnitBuffer.back();
+  free (nalu.data);
+  m_signedContentNalUnitBuffer.pop_back();
+}
+
+
+void TDecTop::xProcessStoredNALUnitsForSignature(int substreamId)
+{
+  const bool verificationActive = m_dscSubstreamManager.isVerificationActive();
+  for (auto nalu: m_signedContentNalUnitBuffer)
+  {
+    if (verificationActive)
+    {
+      m_dscSubstreamManager.addToSubstream(substreamId, (char*)nalu.data, nalu.length);
+    }
+    delete[] (nalu.data);
+  }
+  m_signedContentNalUnitBuffer.clear();
+}
+#endif
 Void TDecTop::executeLoopFilters(Int& poc, TComList<TComPic*>*& rpcListPic)
 {
   if (!m_pcPic)
@@ -667,6 +708,9 @@ Bool TDecTop::xDecodeSlice(InputNALUnit &nalu, Int &iSkipFrame, Int iPOCLastDisp
       //rewind the trace counter since we didn't actually decode the slice
       g_nSymbolCounter = originalSymbolCount;
 #endif
+#if JVET_AK0194_DSC_SEI
+      xRemoveLastNalUnitFromSignature();
+#endif
       return true;
     }
     m_prevPOC = m_apcSlicePilot->getPOC();
@@ -691,6 +735,40 @@ Bool TDecTop::xDecodeSlice(InputNALUnit &nalu, Int &iSkipFrame, Int iPOCLastDisp
   xActivateParameterSets(bSkipCabacAndReconstruction);
 #else
   xActivateParameterSets();
+#endif
+
+#if JVET_AK0194_DSC_SEI
+  SEIMessages dscInitSEIs = getSeisByType( m_pcPic->getSEIs(), SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_INITIALIZATION);
+  if (!dscInitSEIs.empty())
+  {
+    if (dscInitSEIs.size()>1)
+    {
+      printf ("Warming: received more than one Digitally Signed Content Initialization SEI message at a time. Using first only.\n");
+    }
+    SEIDigitallySignedContentInitialization* dsci = (SEIDigitallySignedContentInitialization*) dscInitSEIs.front();
+    m_dscSubstreamManager.initDscSubstreamManager(dsci->dsciNumVerificationSubstreams, dsci->dsciHashMethodType, dsci->dsciKeySourceUri,
+                                                  dsci->dsciContentUuidPresentFlag, dsci->dsciContentUuid);
+    if (!m_dscSubstreamManager.initVerificator(m_keyStoreDir, m_trustStoreDir))
+    {
+      printf("Error: Cannot initialize Digitally Signed Content verification\n");
+    }
+  }
+  SEIMessages dscSelectionSEIs = getSeisByType(m_pcPic->getSEIs(), SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_SELECTION);
+  if (!dscSelectionSEIs.empty())
+  {
+    if (dscSelectionSEIs.size()>1)
+    {
+      printf ("Warming: received more than one Digitally Signed Content Selection SEI message at a time. Using first only.\n");
+    }
+    SEIDigitallySignedContentSelection* dscs = (SEIDigitallySignedContentSelection*) dscSelectionSEIs.front();
+    xProcessStoredNALUnitsForSignature(dscs->dscsVerificationSubstreamId);
+  }
+  else
+  {
+    // process as substream 0, when no selection SEI is received
+    // todo: multiples slices
+    xProcessStoredNALUnitsForSignature(0);
+  }
 #endif
 
 
@@ -857,13 +935,22 @@ Bool TDecTop::decode(InputNALUnit& nalu, Int& iSkipFrame, Int& iPOCLastDisplay)
   {
     case NAL_UNIT_VPS:
       xDecodeVPS(nalu.getBitstream().getFifo());
+#if JVET_AK0194_DSC_SEI
+      xStoreNALUnitForSignature(nalu);
+#endif
       return false;
 
     case NAL_UNIT_SPS:
+#if JVET_AK0194_DSC_SEI
+      xStoreNALUnitForSignature(nalu);
+#endif
       xDecodeSPS(nalu.getBitstream().getFifo());
       return false;
 
     case NAL_UNIT_PPS:
+#if JVET_AK0194_DSC_SEI
+      xStoreNALUnitForSignature(nalu);
+#endif
       xDecodePPS(nalu.getBitstream().getFifo());
       return false;
 
@@ -873,16 +960,28 @@ Bool TDecTop::decode(InputNALUnit& nalu, Int& iSkipFrame, Int& iPOCLastDisplay)
       return false;
 
     case NAL_UNIT_SUFFIX_SEI:
-      if (m_pcPic)
       {
-        m_seiReader.parseSEImessage( &(nalu.getBitstream()), m_pcPic->getSEIs(), nalu.m_nalUnitType, m_parameterSetManager.getActiveSPS(), m_pDecodedSEIOutputStream );
+        if (m_pcPic)
+        {
+          m_seiReader.parseSEImessage( &(nalu.getBitstream()), m_pcPic->getSEIs(), nalu.m_nalUnitType, m_parameterSetManager.getActiveSPS(), m_pDecodedSEIOutputStream );
+        }
+        else
+        {
+          printf ("Note: received suffix SEI but no picture currently active.\n");
+        }
+  #if JVET_AK0194_DSC_SEI
+        SEIMessages dscVerifySEIs = getSeisByType( m_pcPic->getSEIs(), SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_VERIFICATION);
+        if (!dscVerifySEIs.empty())
+        {
+          for (auto dscvsei:dscVerifySEIs)
+          {
+            SEIDigitallySignedContentVerification *sei = (SEIDigitallySignedContentVerification*) dscvsei;
+            m_dscSubstreamManager.verifySubstream(sei->dscvVerificationSubstreamId, sei->dscvSignature );
+          }
+        }
+  #endif
+        return false;
       }
-      else
-      {
-        printf ("Note: received suffix SEI but no picture currently active.\n");
-      }
-      return false;
-
     case NAL_UNIT_CODED_SLICE_TRAIL_R:
     case NAL_UNIT_CODED_SLICE_TRAIL_N:
     case NAL_UNIT_CODED_SLICE_TSA_R:
@@ -899,6 +998,9 @@ Bool TDecTop::decode(InputNALUnit& nalu, Int& iSkipFrame, Int& iPOCLastDisplay)
     case NAL_UNIT_CODED_SLICE_RADL_R:
     case NAL_UNIT_CODED_SLICE_RASL_N:
     case NAL_UNIT_CODED_SLICE_RASL_R:
+#if JVET_AK0194_DSC_SEI
+      xStoreNALUnitForSignature(nalu);
+#endif
 #if MCTS_EXTRACTION
       return xDecodeSlice(nalu, iSkipFrame, iPOCLastDisplay, bSkipCabacAndReconstruction);
 #else

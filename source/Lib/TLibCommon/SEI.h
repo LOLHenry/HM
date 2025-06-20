@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -116,6 +116,16 @@ public:
 #endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     PHASE_INDICATION                     = 212,
+#endif
+
+#if JVET_AK0107_MODALITY_INFORMATION
+    MODALITY_INFORMATION                 = 218,
+#endif
+#if JVET_AK0194_DSC_SEI_DECODER_SYNTAX
+    DIGITALLY_SIGNED_CONTENT_INITIALIZATION = 220,
+    DIGITALLY_SIGNED_CONTENT_SELECTION      = 221,
+    DIGITALLY_SIGNED_CONTENT_VERIFICATION   = 222,
+
 #endif
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
     AI_USAGE_RESTRICTIONS = 225,   
@@ -997,6 +1007,36 @@ public:
   int                   m_horPhaseDenMinus1;
   int                   m_verPhaseNum;
   int                   m_verPhaseDenMinus1;
+};
+#endif
+
+#if JVET_AK0107_MODALITY_INFORMATION
+class SEIModalityInfo : public SEI
+{
+public:
+  PayloadType payloadType() const { return PayloadType::MODALITY_INFORMATION; }
+  SEIModalityInfo() 
+    : m_miCancelFlag(false)
+    , m_miPersistenceFlag(true)
+    , m_miModalityType(1)
+    , m_miSpectrumRangePresentFlag(false)
+    , m_miMinWavelengthMantissa(0)
+    , m_miMinWavelengthExponentPlus15(0)
+    , m_miMaxWavelengthMantissa(0)
+    , m_miMaxWavelengthExponentPlus15(0)
+  { }
+  SEIModalityInfo(const SEIModalityInfo& sei);
+
+  virtual ~SEIModalityInfo() { }
+
+  Bool             m_miCancelFlag;
+  Bool             m_miPersistenceFlag;
+  Int              m_miModalityType;  
+  Bool             m_miSpectrumRangePresentFlag; 
+  Int              m_miMinWavelengthMantissa; 
+  Int              m_miMinWavelengthExponentPlus15; 
+  Int              m_miMaxWavelengthMantissa;  
+  Int              m_miMaxWavelengthExponentPlus15;  
 };
 #endif
 

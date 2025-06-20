@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,6 +38,9 @@
 
 #include "SyntaxElementWriter.h"
 #include "TLibCommon/SEI.h"
+#if JVET_AK0194_DSC_SEI
+#include "TLibCommon/SEIDigitallySignedContent.h"
+#endif
 
 class TComBitIf;
 
@@ -146,20 +149,35 @@ protected:
     return 2 * n + 1;
   }
 #endif 
+
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
   void xWriteSEIAIUsageRestrictions(const SEIAIUsageRestrictions &sei);
 #endif 
+
+#if JVET_AK0194_DSC_SEI
+  void xWriteSEIDigitallySignedContentInitialization(const SEIDigitallySignedContentInitialization &sei);
+  void xWriteSEIDigitallySignedContentSelection(const SEIDigitallySignedContentSelection &sei);
+  void xWriteSEIDigitallySignedContentVerification(const SEIDigitallySignedContentVerification &sei);
+#endif
+
+>>>>>>> source/Lib/TLibEncoder/SEIwrite.h
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   Void xWriteSEIShutterInterval                   (const SEIShutterIntervalInfo& sei);
 #endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   void xWriteSEIPhaseIndication                   (const SEIPhaseIndication&sei);
 #endif
+#if JVET_AK0107_MODALITY_INFORMATION
+  Void xWriteSEIModalityInfo(const SEIModalityInfo &sei);
+#endif
   Void xWriteSEIpayloadData(TComBitIf& bs, const SEI& sei, const TComSPS *sps
 #if JCTVC_AD0021_SEI_PREFIX_INDICATION
     , Int SEIPrefixIndicationIdx = 0
 #endif
   );
+
+  Void  xTraceSEIHeader();
+  Void  xTraceSEIMessageType(SEI::PayloadType payloadType);
   Void xWriteByteAlign();
 };
 

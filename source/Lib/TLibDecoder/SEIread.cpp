@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -51,12 +51,12 @@
 
 
 #if ENC_DEC_TRACE
-Void  xTraceSEIHeader()
+Void  SEIReader::xTraceSEIHeader()
 {
   fprintf( g_hTrace, "=========== SEI message ===========\n");
 }
 
-Void  xTraceSEIMessageType(SEI::PayloadType payloadType)
+Void  SEIReader::xTraceSEIMessageType(SEI::PayloadType payloadType)
 {
   fprintf( g_hTrace, "=========== %s SEI message ===========\n", SEI::getSEIMessageString(payloadType));
 }
@@ -104,6 +104,15 @@ Void SEIReader::sei_read_flag(std::ostream *pOS, UInt& ruiCode, const TChar *pSy
   if (pOS)
   {
     (*pOS) << "  " << std::setw(55) << pSymbolName << ": " << (ruiCode?1:0) << "\n";
+  }
+}
+
+void SEIReader::sei_read_string(std::ostream* os, std::string& code, const TChar* symbolName)
+{
+  READ_STRING(code, symbolName);
+  if (os)
+  {
+    (*os) << "  " << std::setw(55) << symbolName << ": " << code << "\n";
   }
 }
 
@@ -411,6 +420,26 @@ Void SEIReader::xReadSEIPayloadData(Int const payloadType, Int const payloadSize
     case SEI::PayloadType::PHASE_INDICATION:
       sei = new SEIPhaseIndication;
       xParseSEIPhaseIndication((SEIPhaseIndication &) *sei, payloadSize, pDecodedMessageOutputStream);
+      break;
+#endif
+#if JVET_AK0107_MODALITY_INFORMATION
+    case SEI::MODALITY_INFORMATION:
+      sei = new SEIModalityInfo; 
+      xParseSEIModalityInfo((SEIModalityInfo &) *sei, payloadSize, pDecodedMessageOutputStream);
+      break;
+#endif
+#if JVET_AK0194_DSC_SEI_DECODER_SYNTAX
+    case SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_INITIALIZATION:
+      sei = new SEIDigitallySignedContentInitialization;
+      xParseSEIDigitallySignedContentInitialization((SEIDigitallySignedContentInitialization &) *sei, payloadSize, pDecodedMessageOutputStream);
+      break;
+    case SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_SELECTION:
+      sei = new SEIDigitallySignedContentSelection;
+      xParseSEIDigitallySignedContentSelection((SEIDigitallySignedContentSelection &) *sei, payloadSize, pDecodedMessageOutputStream);
+      break;
+    case SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_VERIFICATION:
+      sei = new SEIDigitallySignedContentVerification;
+      xParseSEIDigitallySignedContentVerification((SEIDigitallySignedContentVerification &) *sei, payloadSize, pDecodedMessageOutputStream);
       break;
 #endif
     default:
@@ -2203,6 +2232,7 @@ Void SEIReader::xParseSEISEIPrefixIndication(SEIPrefixIndication& sei, UInt payl
   }
 }
 #endif
+
 #if  JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
 void SEIReader::xParseSEIAIUsageRestrictions(SEIAIUsageRestrictions& sei, uint32_t payloadSize, std::ostream* pDecodedMessageOutputStream)
 {
@@ -2230,6 +2260,95 @@ void SEIReader::xParseSEIAIUsageRestrictions(SEIAIUsageRestrictions& sei, uint32
         sei_read_uvlc(pDecodedMessageOutputStream, val, "aur_context");
         sei.m_context[i] = val;
       }
+    }
+  }
+}
+#endif 
+
+#if JVET_AK0194_DSC_SEI_DECODER_SYNTAX
+void SEIReader::xParseSEIDigitallySignedContentInitialization(SEIDigitallySignedContentInitialization &sei, uint32_t payloadSize, std::ostream *pDecodedMessageOutputStream)
+{
+  unsigned int val;
+  sei_read_code(pDecodedMessageOutputStream, 8, val, "dsci_hash_method_type");
+  sei.dsciHashMethodType = val;
+  sei_read_string(pDecodedMessageOutputStream, sei.dsciKeySourceUri, "twci_key_source_uri");
+  sei_read_uvlc(pDecodedMessageOutputStream, val, "dsci_num_verification_substreams_minus1");
+  sei.dsciNumVerificationSubstreams = val + 1;
+  sei_read_uvlc(pDecodedMessageOutputStream, val, "dsci_key_retrieval_mode_idc");
+  sei.dsciKeyRetrievalModeIdc = val;
+  if (sei.dsciKeyRetrievalModeIdc == 1)
+  {
+    sei_read_flag(pDecodedMessageOutputStream, val, "dsci_use_key_register_idx_flag");
+    sei.dsciUseKeyRegisterIdxFlag = (val!=0);
+    if( sei.dsciUseKeyRegisterIdxFlag )
+    {
+      sei_read_uvlc(pDecodedMessageOutputStream, val, "dsci_key_register_idx");
+      sei.dsciKeyRegisterIdx = val;
+    }
+  }
+  sei_read_flag(pDecodedMessageOutputStream, val, "dsci_content_uuid_present_flag");
+  sei.dsciContentUuidPresentFlag = (val!=0);
+  if (sei.dsciContentUuidPresentFlag)
+  {
+    for (int i=0; i<16; i++)
+    {
+      sei_read_code(pDecodedMessageOutputStream, 8, val, "dsci_content_uuid");
+      sei.dsciContentUuid[i] = val;
+    }
+
+  }
+}
+
+void SEIReader::xParseSEIDigitallySignedContentSelection(SEIDigitallySignedContentSelection &sei, uint32_t payloadSize, std::ostream *pDecodedMessageOutputStream)
+{
+  unsigned int val;
+  sei_read_uvlc(pDecodedMessageOutputStream, val, "dscs_verification_substream_id");
+  sei.dscsVerificationSubstreamId = val;
+}
+
+void SEIReader::xParseSEIDigitallySignedContentVerification(SEIDigitallySignedContentVerification &sei, uint32_t payloadSize, std::ostream *pDecodedMessageOutputStream)
+{
+  unsigned int val;
+  sei_read_uvlc(pDecodedMessageOutputStream, val, "dscv_verification_substream_id");
+  sei.dscvVerificationSubstreamId = val;
+  sei_read_uvlc(pDecodedMessageOutputStream, val, "dscv_signature_length_in_octets_minus1");
+  sei.dscvSignatureLengthInOctets = val + 1;
+  sei.dscvSignature.resize(sei.dscvSignatureLengthInOctets);
+  for (int i=0; i< sei.dscvSignature.size(); i++)
+  {
+    sei_read_code(pDecodedMessageOutputStream, 8, val, "dscv_signature");
+    sei.dscvSignature[i] = val;
+  }
+}
+#endif
+
+#if JVET_AK0107_MODALITY_INFORMATION
+Void SEIReader::xParseSEIModalityInfo(SEIModalityInfo& sei, UInt payloadSize, std::ostream *pDecodedMessageOutputStream)
+{
+  uint32_t code;
+  output_sei_message_header(sei, pDecodedMessageOutputStream, payloadSize);
+  sei_read_flag( pDecodedMessageOutputStream,           code,    "modality_info_cancel_flag" );                      sei.m_miCancelFlag = code;
+  if (!sei.m_miCancelFlag)
+   {
+    sei_read_flag( pDecodedMessageOutputStream,         code,    "modality_info_persistence_flag" );                 sei.m_miPersistenceFlag = code;
+    sei_read_code( pDecodedMessageOutputStream,     5,  code,    "modality_type" );                                  sei.m_miModalityType = code;
+    sei_read_flag( pDecodedMessageOutputStream,         code,    "spectrum_range_present_flag" );                    sei.m_miSpectrumRangePresentFlag = code;
+    if (sei.m_miSpectrumRangePresentFlag)
+    {
+      sei_read_code( pDecodedMessageOutputStream,  11,  code,    "min_wavelength_mantissa " );                       sei.m_miMinWavelengthMantissa = code;
+      sei_read_code( pDecodedMessageOutputStream,  5,   code,    "min_wavelength_exponent_plus15" );                 sei.m_miMinWavelengthExponentPlus15 = code;
+      sei_read_code( pDecodedMessageOutputStream,  11,  code,    "max_wavelength_mantissa " );                       sei.m_miMaxWavelengthMantissa = code;
+      sei_read_code( pDecodedMessageOutputStream,  5,   code,    "max_wavelength_exponent_plus15" );                 sei.m_miMaxWavelengthExponentPlus15 = code;
+    }
+    sei_read_uvlc(pDecodedMessageOutputStream,          code,    "modality_type_extension_bits");   // modality_type_extension_bits shall be equal to 0 in the current edition
+    if (code > 2048){
+      printf ("Warning: Values of modality_type_extension_bits greater than 2048 shall not be present in bitstreams.");
+    }
+    for (UInt i = 0; i < code; i++)
+    {
+      UInt code2;
+      sei_read_code(pDecodedMessageOutputStream, 1, code2, "reserved_modality_type_extension");   // Decoders shall ignore the presence and value of reserved_modality_type_extension                                                   
+>>>>>>> source/Lib/TLibDecoder/SEIread.cpp
     }
   }
 }

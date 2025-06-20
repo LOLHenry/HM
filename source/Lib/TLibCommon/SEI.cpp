@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2022, ITU/ISO/IEC
+ * Copyright (c) 2010-2025, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -76,23 +76,30 @@ const std::vector<SEI::PayloadType> SEI::prefix_sei_messages({
   SEI::DEPENDENT_RAP_INDICATION,
   SEI::CODED_REGION_COMPLETION,
   SEI::ALTERNATIVE_TRANSFER_CHARACTERISTICS,
-  SEI::AMBIENT_VIEWING_ENVIRONMENT
-  , SEI::CONTENT_COLOUR_VOLUME
-  , SEI::EQUIRECTANGULAR_PROJECTION
-  , SEI::SPHERE_ROTATION
-  , SEI::OMNI_VIEWPORT
-  , SEI::CUBEMAP_PROJECTION
-  , SEI::REGION_WISE_PACKING
-  , SEI::FISHEYE_VIDEO_INFO
-  , SEI::REGIONAL_NESTING
+  SEI::AMBIENT_VIEWING_ENVIRONMENT,
+  SEI::CONTENT_COLOUR_VOLUME,
+  SEI::EQUIRECTANGULAR_PROJECTION,
+  SEI::SPHERE_ROTATION,
+  SEI::OMNI_VIEWPORT,
+  SEI::CUBEMAP_PROJECTION,
+  SEI::REGION_WISE_PACKING,
+  SEI::FISHEYE_VIDEO_INFO,
+  SEI::REGIONAL_NESTING,
 #if SHUTTER_INTERVAL_SEI_MESSAGE
-  , SEI::SHUTTER_INTERVAL_INFO
+  SEI::SHUTTER_INTERVAL_INFO,
 #endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
-  , SEI::PHASE_INDICATION
+  SEI::PHASE_INDICATION,
+#endif
+#if JVET_AK0107_MODALITY_INFORMATION
+  SEI::MODALITY_INFORMATION,
+#endif
+#if JVET_AK0194_DSC_SEI_DECODER_SYNTAX
+  SEI::DIGITALLY_SIGNED_CONTENT_INITIALIZATION,
+  SEI::DIGITALLY_SIGNED_CONTENT_SELECTION,
 #endif
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
-  , SEI::AI_USAGE_RESTRICTIONS
+  SEI::AI_USAGE_RESTRICTIONS
 #endif
 });
 
@@ -104,6 +111,9 @@ const std::vector<SEI::PayloadType> SEI::suffix_sei_messages({
   SEI::POST_FILTER_HINT,
   SEI::DECODED_PICTURE_HASH,
   SEI::CODED_REGION_COMPLETION,
+#if JVET_AK0194_DSC_SEI_DECODER_SYNTAX
+  SEI::DIGITALLY_SIGNED_CONTENT_VERIFICATION,
+#endif
 });
 
 const std::vector<SEI::PayloadType> SEI::regional_nesting_sei_messages({
@@ -381,9 +391,15 @@ const TChar *SEI::getSEIMessageString(SEI::PayloadType payloadType)
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     case SEI::PHASE_INDICATION:                     return "Phase Indication";
 #endif
+<<<<<<< source/Lib/TLibCommon/SEI.cpp
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
     case SEI::AI_USAGE_RESTRICTIONS:                return "AI usage restrictions";
 #endif   
+=======
+#if JVET_AK0107_MODALITY_INFORMATION
+    case SEI::MODALITY_INFORMATION:                 return "Modality information";
+#endif
+>>>>>>> source/Lib/TLibCommon/SEI.cpp
     default:                                        return "Unknown";
   }
 }
