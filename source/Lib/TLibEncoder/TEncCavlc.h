@@ -74,6 +74,10 @@ public:
   virtual ~TEncCavlc();
 
 protected:
+#if NH_MV
+  TEncTop*      m_encTop;
+#endif
+
   Void codeShortTermRefPicSet              ( const TComReferencePictureSet* pcRPS, Bool calledFromSliceHeader, Int idx );
   Bool findMatchingLTRP ( TComSlice* pcSlice, UInt *ltrpsIndex, Int ltrpPOC, Bool usedFlag );
 
@@ -86,9 +90,26 @@ public:
   Void  resetBits             ()                { m_pcBitIf->resetBits(); }
   UInt  getNumberOfWrittenBits()                { return  m_pcBitIf->getNumberOfWrittenBits();  }
   Void  codeVPS                 ( const TComVPS* pcVPS );
+#if NH_MV
+  Void  codeVPSExtension       ( const TComVPS *pcVPS );
+  Void  codeVideoSignalInfo    ( const TComVideoSignalInfo* pcVideoSignalInfo );
+
+  Void  codeDpbSize            ( const TComVPS* vps );
+
+  Void  codeRepFormat           ( Int i, const TComRepFormat* curRepFormat, const TComRepFormat* prevRepFormat );
+  Void  codeVPSVUI              ( const TComVPS* pcVPS );
+  Void  codeVpsVuiBspHrdParameters( const TComVPS* pcVPS );
+#endif
+
   Void  codeVUI                 ( const TComVUI *pcVUI, const TComSPS* pcSPS );
+#if NH_MV
+  Void  codeSPSExtension        ( const TComSPS* pcSPS );
+#endif
   Void  codeSPS                 ( const TComSPS* pcSPS );
   Void  codePPS                 ( const TComPPS* pcPPS );
+#if NH_MV
+  Void  codePpsMultilayerExtension( const TComPPS* pcPPS );
+#endif
   Void  codeSliceHeader         ( TComSlice* pcSlice );
   Void  codePTL                 ( const TComPTL* pcPTL, Bool profilePresentFlag, Int maxNumSubLayersMinus1);
   Void  codeProfileTier         ( const ProfileTierLevel* ptl, const Bool bIsSubLayer );
@@ -140,6 +161,11 @@ public:
   Void xCodeScalingList ( const TComScalingList* scalingList, UInt sizeId, UInt listId);
 
   Void codeExplicitRdpcmMode( TComTU &rTu, const ComponentID compID );
+
+#if NH_MV
+  TEncTop* getEncTop()               { return m_encTop; };
+  Void     setEncTop( TEncTop* et )  {  m_encTop = et; };
+#endif
 };
 
 //! \}

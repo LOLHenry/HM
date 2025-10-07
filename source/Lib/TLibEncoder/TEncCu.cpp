@@ -97,6 +97,14 @@ Void TEncCu::create(UChar uhTotalDepth, UInt uiMaxWidth, UInt uiMaxHeight, Chrom
   }
 
   m_bEncodeDQP                     = false;
+
+#if KWU_RC_MADPRED_E0227
+  m_LCUPredictionSAD = 0;
+  m_addSADDepth      = 0;
+  m_temporalSAD      = 0;
+  m_spatialSAD       = 0;
+#endif
+
   m_stillToCodeChromaQpOffsetFlag  = false;
   m_cuChromaQpOffsetIdxPlus1       = 0;
   m_bFastDeltaQP                   = false;
@@ -240,6 +248,13 @@ Void TEncCu::compressCtu( TComDataCU* pCtu )
   m_ppcBestCU[0]->initCtu( pCtu->getPic(), pCtu->getCtuRsAddr() );
   m_ppcTempCU[0]->initCtu( pCtu->getPic(), pCtu->getCtuRsAddr() );
   m_bEncodeDQP         = false;
+
+#if KWU_RC_MADPRED_E0227
+  m_LCUPredictionSAD = 0;
+  m_addSADDepth      = 0;
+  m_temporalSAD      = 0;
+  m_spatialSAD       = 0;
+#endif
 
   // analysis of CU
   DEBUG_STRING_NEW(sDebug)
@@ -545,6 +560,17 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, const 
   const UInt uiBPelY   = uiTPelY + rpcBestCU->getHeight(0) - 1;
   const UInt uiWidth   = rpcBestCU->getWidth(0);
 
+#if NH_MV_ENC_DEC_TRAC
+#if ENC_DEC_TRACE
+    stopAtPos  ( rpcBestCU->getSlice()->getPOC(),
+                 rpcBestCU->getSlice()->getLayerId(),
+                 rpcBestCU->getCUPelX(),
+                 rpcBestCU->getCUPelY(),
+                 rpcBestCU->getWidth(0),
+                 rpcBestCU->getHeight(0) );
+#endif
+#endif
+
   Int iBaseQP = xComputeQP( rpcBestCU, uiDepth );
   Int iMinQP;
   Int iMaxQP;
@@ -725,6 +751,14 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, const 
       }
     }
 
+#if KWU_RC_MADPRED_E0227
+    if ( uiDepth <= m_addSADDepth )
+    {
+      m_LCUPredictionSAD += m_temporalSAD;
+      m_addSADDepth = uiDepth;
+    }
+#endif
+
     if(!earlyDetectionSkipMode)
     {
       for (Int iQP=iMinQP; iQP<=iMaxQP; iQP++)
@@ -904,6 +938,14 @@ Void TEncCu::xCompressCU( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, const 
         {
 #endif 
           xCheckRDCostIntra( rpcBestCU, rpcTempCU, SIZE_2Nx2N DEBUG_STRING_PASS_INTO(sDebug) );
+#if KWU_RC_MADPRED_E0227
+            if ( uiDepth <= m_addSADDepth )
+            {
+              m_LCUPredictionSAD += m_spatialSAD;
+              m_addSADDepth = uiDepth;
+            }
+#endif
+
           rpcTempCU->initEstData( uiDepth, iQP, bIsLosslessMode );
           if( uiDepth == sps.getLog2DiffMaxMinCodingBlockSize() )
           {
@@ -1266,6 +1308,14 @@ Void TEncCu::xEncodeCU( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDepth )
         UInt uiTPelY   = pcCU->getCUPelY() + g_auiRasterToPelY[ g_auiZscanToRaster[uiAbsPartIdx] ];
   const UInt uiBPelY   = uiTPelY + (maxCUHeight>>uiDepth) - 1;
 
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_CU_S("=========== coding_quadtree ===========\n")
+  DTRACE_CU("x0", uiLPelX)
+  DTRACE_CU("x1", uiTPelY)
+  DTRACE_CU("log2CbSize", maxCUWidth>>uiDepth )
+  DTRACE_CU("cqtDepth"  , uiDepth)
+#endif
+
   if( ( uiRPelX < sps.getPicWidthInLumaSamples() ) && ( uiBPelY < sps.getPicHeightInLumaSamples() ) )
   {
     m_pcEntropyCoder->encodeSplitFlag( pcCU, uiAbsPartIdx, uiDepth );
@@ -1300,6 +1350,10 @@ Void TEncCu::xEncodeCU( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDepth )
     return;
   }
 
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_CU_S("=========== coding_unit ===========\n")
+#endif
+
   if( uiDepth <= pps.getMaxCuDQPDepth() && pps.getUseDQP())
   {
     setdQPFlag(true);
@@ -1322,6 +1376,12 @@ Void TEncCu::xEncodeCU( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDepth )
 
   if( pcCU->isSkipped( uiAbsPartIdx ) )
   {
+#if NH_MV_ENC_DEC_TRAC
+    DTRACE_PU_S("=========== prediction_unit ===========\n")
+    DTRACE_PU("x0", uiLPelX)
+    DTRACE_PU("x1", uiTPelY)
+#endif
+
     m_pcEntropyCoder->encodeMergeIndex( pcCU, uiAbsPartIdx );
     finishCU(pcCU,uiAbsPartIdx);
     return;
@@ -1483,6 +1543,11 @@ Void TEncCu::xCheckRDCostMerge2Nx2N( TComDataCU*& rpcBestCU, TComDataCU*& rpcTem
   {
     return;   // never check merge in fast deltaqp mode
   }
+
+#if NH_MV
+  D_PRINT_INC_INDENT( g_traceModeCheck, "xCheckRDCostMerge2Nx2N" );
+#endif
+
   TComMvField  cMvFieldNeighbours[2 * MRG_MAX_NUM_CANDS]; // double length for mv of both lists
   UChar uhInterDirNeighbours[MRG_MAX_NUM_CANDS];
   Int numValidMergeCand = 0;
@@ -1528,8 +1593,16 @@ Void TEncCu::xCheckRDCostMerge2Nx2N( TComDataCU*& rpcBestCU, TComDataCU*& rpcTem
 
   for( UInt uiNoResidual = 0; uiNoResidual < iteration; ++uiNoResidual )
   {
+#if NH_MV
+    D_PRINT_INC_INDENT ( g_traceModeCheck, "uiNoResidual: " + n2s( uiNoResidual) );
+#endif
+
     for( UInt uiMergeCand = 0; uiMergeCand < numValidMergeCand; ++uiMergeCand )
     {
+#if NH_MV
+      D_PRINT_INC_INDENT ( g_traceModeCheck, "uiMergeCand: "+  n2s(uiMergeCand) );
+#endif
+
       if(!(uiNoResidual==1 && mergeCandBuffer[uiMergeCand]==1))
       {
         if( !(bestIsSkip && uiNoResidual == 0) )
@@ -1586,6 +1659,9 @@ Void TEncCu::xCheckRDCostMerge2Nx2N( TComDataCU*& rpcBestCU, TComDataCU*& rpcTem
           }
         }
       }
+#if NH_MV
+      D_DEC_INDENT( g_traceModeCheck );
+#endif
     }
 
     if(uiNoResidual == 0 && m_pcEncCfg->getUseEarlySkipDetection())
@@ -1617,8 +1693,15 @@ Void TEncCu::xCheckRDCostMerge2Nx2N( TComDataCU*& rpcBestCU, TComDataCU*& rpcTem
         }
       }
     }
+#if NH_MV
+    D_DEC_INDENT( g_traceModeCheck );
+#endif
   }
   DEBUG_STRING_APPEND(sDebug, bestStr)
+
+#if NH_MV
+ D_DEC_INDENT( g_traceModeCheck );
+#endif
 }
 
 
@@ -1639,6 +1722,10 @@ Void TEncCu::xCheckRDCostInter( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
       return; // only check necessary 2Nx2N Inter in fast deltaqp mode
     }
   }
+
+#if NH_MV
+  D_PRINT_INC_INDENT(g_traceModeCheck,   "xCheckRDCostInter; ePartSize:" + n2s( ePartSize) );
+#endif
 
   // prior to this, rpcTempCU will have just been reset using rpcTempCU->initEstData( uiDepth, iQP, bIsLosslessMode );
   UChar uhDepth = rpcTempCU->getDepth( 0 );
@@ -1661,8 +1748,21 @@ Void TEncCu::xCheckRDCostInter( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
 #if AMP_MRG
   if ( !rpcTempCU->getMergeAMP() )
   {
+#if NH_MV
+        D_DEC_INDENT( g_traceModeCheck );
+#endif
     return;
   }
+#endif
+
+#if KWU_RC_MADPRED_E0227
+      if ( m_pcEncCfg->getUseRateCtrl() && m_pcEncCfg->getLCULevelRC() && ePartSize == SIZE_2Nx2N && uhDepth <= m_addSADDepth )
+      {
+        UInt SAD = m_pcRdCost->getSADPart( g_bitDepthY, m_ppcPredYuvTemp[uhDepth]->getLumaAddr(), m_ppcPredYuvTemp[uhDepth]->getStride(),
+          m_ppcOrigYuv[uhDepth]->getLumaAddr(), m_ppcOrigYuv[uhDepth]->getStride(),
+          rpcTempCU->getWidth(0), rpcTempCU->getHeight(0) );
+        m_temporalSAD = (Int)SAD;
+      }
 #endif
 
 #if MCTS_ENC_CHECK
@@ -1681,6 +1781,9 @@ Void TEncCu::xCheckRDCostInter( TComDataCU*& rpcBestCU, TComDataCU*& rpcTempCU, 
 
   xCheckDQP( rpcTempCU );
   xCheckBestMode(rpcBestCU, rpcTempCU, uhDepth DEBUG_STRING_PASS_INTO(sDebug) DEBUG_STRING_PASS_INTO(sTest));
+#if NH_MV
+  D_DEC_INDENT( g_traceModeCheck );
+#endif
 }
 
 Void TEncCu::xCheckRDCostIntra( TComDataCU *&rpcBestCU,
@@ -1699,6 +1802,10 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU *&rpcBestCU,
       return; // only check necessary 2Nx2N Intra in fast deltaqp mode
     }
   }
+
+#if NH_MV
+  D_PRINT_INC_INDENT (g_traceModeCheck, "xCheckRDCostIntra; eSize: " + n2s(eSize) );
+#endif
 
   UInt uiDepth = rpcTempCU->getDepth( 0 );
 
@@ -1748,6 +1855,10 @@ Void TEncCu::xCheckRDCostIntra( TComDataCU *&rpcBestCU,
   xCheckDQP( rpcTempCU );
 
   xCheckBestMode(rpcBestCU, rpcTempCU, uiDepth DEBUG_STRING_PASS_INTO(sDebug) DEBUG_STRING_PASS_INTO(sTest));
+
+#if NH_MV
+  D_DEC_INDENT( g_traceModeCheck );
+#endif
 }
 
 
@@ -1894,7 +2005,15 @@ Void TEncCu::xCopyYuv2Pic(TComPic* rpcPic, UInt uiCUAddr, UInt uiAbsPartIdx, UIn
   UInt uiPartIdx = uiPartIdxY * ( uiSrcBlkWidth / uiBlkWidth ) + uiPartIdxX;
   m_ppcRecoYuvBest[uiSrcDepth]->copyToPicYuv( rpcPic->getPicYuvRec (), uiCUAddr, uiAbsPartIdx, uiDepth - uiSrcDepth, uiPartIdx);
 
+#if ENC_DEC_TRACE && NH_MV_ENC_DEC_TRAC
+  Bool oldtraceCopyBack = g_traceCopyBack;
+  g_traceCopyBack = false;
+#endif
   m_ppcPredYuvBest[uiSrcDepth]->copyToPicYuv( rpcPic->getPicYuvPred (), uiCUAddr, uiAbsPartIdx, uiDepth - uiSrcDepth, uiPartIdx);
+
+#if ENC_DEC_TRACE && NH_MV_ENC_DEC_TRAC
+  g_traceCopyBack = oldtraceCopyBack;
+#endif
 }
 
 Void TEncCu::xCopyYuv2Tmp( UInt uiPartUnitIdx, UInt uiNextDepth )

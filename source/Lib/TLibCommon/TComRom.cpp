@@ -258,6 +258,23 @@ Void initROM()
       //--------------------------------------------------------------------------------------------------
     }
   }
+#if NH_MV
+#if NH_MV_HLS_PTL_LIMITS
+ g_generalTierAndLevelLimits[ Level::LEVEL1   ] = TComGeneralTierAndLevelLimits(    36864,     350,  MIN_INT,   16,   1,   1 );
+ g_generalTierAndLevelLimits[ Level::LEVEL2   ] = TComGeneralTierAndLevelLimits(   122880,    1500,  MIN_INT,   16,   1,   1 );
+ g_generalTierAndLevelLimits[ Level::LEVEL2_1 ] = TComGeneralTierAndLevelLimits(   245760,    3000,  MIN_INT,   20,   1,   1 );
+ g_generalTierAndLevelLimits[ Level::LEVEL3   ] = TComGeneralTierAndLevelLimits(   552960,    6000,  MIN_INT,   30,   2,   2 );
+ g_generalTierAndLevelLimits[ Level::LEVEL3_1 ] = TComGeneralTierAndLevelLimits(   983040,   10000,  MIN_INT,   40,   3,   3 );
+ g_generalTierAndLevelLimits[ Level::LEVEL4   ] = TComGeneralTierAndLevelLimits(  2228224,   12000,    30000,   75,   5,   5 );
+ g_generalTierAndLevelLimits[ Level::LEVEL4_1 ] = TComGeneralTierAndLevelLimits(  2228224,   20000,    50000,   75,   5,   5 );
+ g_generalTierAndLevelLimits[ Level::LEVEL5   ] = TComGeneralTierAndLevelLimits(  8912896,   25000,   100000,  200,  11,  10 );
+ g_generalTierAndLevelLimits[ Level::LEVEL5_1 ] = TComGeneralTierAndLevelLimits(  8912896,   40000,   160000,  200,  11,  10 );
+ g_generalTierAndLevelLimits[ Level::LEVEL5_2 ] = TComGeneralTierAndLevelLimits(  8912896,   60000,   240000,  200,  11,  10 );
+ g_generalTierAndLevelLimits[ Level::LEVEL6   ] = TComGeneralTierAndLevelLimits( 35651584,   60000,   240000,  600,  22,  20 );
+ g_generalTierAndLevelLimits[ Level::LEVEL6_1 ] = TComGeneralTierAndLevelLimits( 35651584,  120000,   480000,  600,  22,  20 );
+ g_generalTierAndLevelLimits[ Level::LEVEL6_2 ] = TComGeneralTierAndLevelLimits( 35651584,  240000,   800000,  600,  22,  20 );
+#endif
+#endif
 }
 
 Void destroyROM()
@@ -666,6 +683,33 @@ const Bool g_bEncDecTraceDisable = false;
 Bool   g_HLSTraceEnable = true;
 Bool   g_bJustDoIt = false;
 UInt64 g_nSymbolCounter = 0;
+#if NH_MV_ENC_DEC_TRAC
+Bool g_traceCU = false;
+Bool g_tracePU = false;
+Bool g_traceTU = false;
+Bool g_disableNumbering = false;
+Bool g_disableHLSTrace = false;
+UInt64 g_stopAtCounter       = 4660;
+Bool g_traceCopyBack         = false;
+Bool g_decTraceDispDer       = false;
+Bool g_decTraceMvFromMerge   = false;
+Bool g_decTracePicOutput     = false;
+Bool g_startStopTrace          = false;
+Bool g_outputPos             = false;
+Bool g_traceCameraParameters = false;
+Bool g_encNumberOfWrittenBits     = false;
+Bool g_traceEncFracBits        = false;
+Bool g_traceIntraSearchCost    = false;
+Bool g_traceRDCost             = false;
+Bool g_traceSAOCost            = false;
+Bool g_traceModeCheck          = false;
+UInt g_indent                  = false;
+Bool g_decNumBitsRead          = false;
+Bool g_traceMotionInfoBeforUniPred = false;
+Bool g_traceMergeCandListConst = false;
+Bool g_traceBitsRead          = false;
+Bool g_traceSubPBMotion       = false;
+#endif
 #endif
 // ====================================================================================================================
 // Scanning order & context model mapping
@@ -779,5 +823,123 @@ const Int g_quantInterDefault8x8[8*8] =
 
 const UInt g_scalingListSize   [SCALING_LIST_SIZE_NUM] = {16,64,256,1024};
 const UInt g_scalingListSizeX  [SCALING_LIST_SIZE_NUM] = { 4, 8, 16,  32};
-
+#if NH_MV_ENC_DEC_TRAC
+#if ENC_DEC_TRACE
+Void tracePSHeader( const TChar* psName, Int layerId )
+{
+  if ( !g_disableHLSTrace  )
+  {
+    fprintf( g_hTrace, "=========== ");
+    fprintf( g_hTrace, "%s", psName );
+    fprintf( g_hTrace, " Layer %d ===========", layerId );
+    fprintf( g_hTrace, "\n" );
+    fflush ( g_hTrace );
+  }
+}
+Void stopAtPos( Int poc, Int layerId, Int cuPelX, Int cuPelY, Int cuWidth, Int cuHeight )
+{
+  if ( g_outputPos )
+  {
+    std::cout << "POC\t"        << poc
+              << "\tLayerId\t"  << layerId
+              << "\tCuPelX\t"   << cuPelX
+              << "\tCuPelY\t"   << cuPelY
+              << "\tCuWidth\t"  << cuWidth
+              << "\tCuHeight\t" << cuHeight
+              << std::endl;
+  }
+  Bool startTrace = false;
+  if ( g_startStopTrace && poc == 0 && layerId == 0 )
+  {
+    startTrace = ( cuPelX  == 0 ) && ( cuPelY  == 0 ) && ( cuWidth == 64 ) && ( cuHeight == 64 );
+    }
+  if ( startTrace )
+  {
+    g_outputPos              = true;
+    g_traceEncFracBits       = false;
+    g_traceIntraSearchCost   = false;
+    g_encNumberOfWrittenBits = false;
+    g_traceRDCost            = true;
+    g_traceModeCheck         = true;
+    g_traceCopyBack          = false;
+    }
+  Bool stopTrace = false;
+  if ( g_startStopTrace && poc == 0 && layerId == 0 )
+  {
+    stopTrace = ( cuPelX  == 128 ) && ( cuPelY  == 0 ) && ( cuWidth == 64 ) && ( cuHeight == 64 );
+  }
+  if ( stopTrace )
+  {
+    g_outputPos              = false;
+    g_traceModeCheck         = false;
+    g_traceEncFracBits       = false;
+    g_traceIntraSearchCost   = false;
+    g_encNumberOfWrittenBits = false;
+    g_traceRDCost            = false;
+    g_traceCopyBack          = false;
+  }
+}
+Void writeToTraceFile( const TChar* symbolName, Int val, Bool doIt )
+{
+  if ( ( ( g_nSymbolCounter >= COUNTER_START && g_nSymbolCounter <= COUNTER_END )|| g_bJustDoIt ) && doIt  )
+  {
+    incSymbolCounter();
+    if ( !g_disableNumbering )
+    {
+      fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter );
+    }
+    fprintf( g_hTrace, "%-50s       : %d\n", symbolName, val );
+    fflush ( g_hTrace );
+  }
+}
+UInt64 incSymbolCounter( )
+{
+  g_nSymbolCounter++;
+  if ( g_stopAtCounter == g_nSymbolCounter )
+  {
+    std::cout << "Break point here." << std::endl;
+  }
+  return g_nSymbolCounter;
+}
+Void writeToTraceFile( const TChar* symbolName, Bool doIt )
+{
+  if ( ( ( g_nSymbolCounter >= COUNTER_START && g_nSymbolCounter <= COUNTER_END )|| g_bJustDoIt ) && doIt  )
+  {
+    incSymbolCounter();
+    fprintf( g_hTrace, "%s", symbolName );
+    fflush ( g_hTrace );
+  }
+}
+Void printStr( std::string str )
+{
+  std::cout << str << std::endl;
+}
+Void printStrIndent( Bool b, std::string strStr )
+{
+  if ( b )
+  {
+    std::cout << std::string(g_indent, ' ');
+    printStr( strStr );
+  }
+}
+Void prinStrIncIndent( Bool b,  std::string strStr )
+{
+  if ( b )
+  {
+    printStrIndent( true,  strStr );
+    if (g_indent < 50)
+    {
+      g_indent++;
+    }
+  }
+}
+Void decIndent( Bool b )
+{
+  if (b && g_indent > 0)
+  {
+    g_indent--;
+  }
+}
+#endif
+#endif
 //! \}

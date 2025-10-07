@@ -147,6 +147,11 @@ public:
   Void               releaseReconstructionIntermediateData();
   Void               releaseAllReconstructionData();
 #else
+#if NH_MV
+#if MCTS_EXTRACTION
+  friend class MctsExtractorTComPicSym;
+#endif
+#endif
   Void               create  ( const TComSPS &sps, const TComPPS &pps, UInt uiMaxDepth );
 #endif
   Void               destroy ();

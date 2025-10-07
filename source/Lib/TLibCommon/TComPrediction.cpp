@@ -483,7 +483,13 @@ Bool TComPrediction::xCheckIdenticalMotion ( TComDataCU* pcCU, UInt PartAddr )
     {
       Int RefPOCL0 = pcCU->getSlice()->getRefPic(REF_PIC_LIST_0, pcCU->getCUMvField(REF_PIC_LIST_0)->getRefIdx(PartAddr))->getPOC();
       Int RefPOCL1 = pcCU->getSlice()->getRefPic(REF_PIC_LIST_1, pcCU->getCUMvField(REF_PIC_LIST_1)->getRefIdx(PartAddr))->getPOC();
+#if NH_MV
+      Int layerIdL0 = pcCU->getSlice()->getRefPic(REF_PIC_LIST_0, pcCU->getCUMvField(REF_PIC_LIST_0)->getRefIdx(PartAddr))->getLayerId();
+      Int layerIdL1 = pcCU->getSlice()->getRefPic(REF_PIC_LIST_1, pcCU->getCUMvField(REF_PIC_LIST_1)->getRefIdx(PartAddr))->getLayerId();
+      if(RefPOCL0 == RefPOCL1 && layerIdL0 == layerIdL1 && pcCU->getCUMvField(REF_PIC_LIST_0)->getMv(PartAddr) == pcCU->getCUMvField(REF_PIC_LIST_1)->getMv(PartAddr))
+#else
       if(RefPOCL0 == RefPOCL1 && pcCU->getCUMvField(REF_PIC_LIST_0)->getMv(PartAddr) == pcCU->getCUMvField(REF_PIC_LIST_1)->getMv(PartAddr))
+#endif
       {
         return true;
       }
@@ -567,6 +573,19 @@ Void TComPrediction::xPredInterUni ( TComDataCU* pcCU, UInt uiPartAddr, Int iWid
   TComMv      cMv         = pcCU->getCUMvField( eRefPicList )->getMv( uiPartAddr );
   pcCU->clipMv(cMv);
 
+#if ENC_DEC_TRACE && NH_MV_ENC_DEC_TRAC
+  if ( g_traceMotionInfoBeforUniPred  )
+  {
+    std::cout << "RefPic POC     : " << pcCU->getSlice()->getRefPic( eRefPicList, iRefIdx )->getPOC()     << std::endl;
+    std::cout << "RefPic Layer Id: " << pcCU->getSlice()->getRefPic( eRefPicList, iRefIdx )->getLayerId() << std::endl;
+    std::cout << "RefIdx         : " << iRefIdx                                                           << std::endl;
+    std::cout << "RefPIcList     : " << eRefPicList                                                        << std::endl;
+  }
+#endif
+
+#if NH_MV
+  pcCU->checkMvVertRest(cMv, eRefPicList, iRefIdx );
+#endif
   for (UInt comp=COMPONENT_Y; comp<pcYuvPred->getNumberValidComponents(); comp++)
   {
     const ComponentID compID=ComponentID(comp);
@@ -642,6 +661,9 @@ Void TComPrediction::xPredInterBi ( TComDataCU* pcCU, UInt uiPartAddr, Int iWidt
 
 Void TComPrediction::xPredInterBlk(const ComponentID compID, TComDataCU *cu, TComPicYuv *refPic, UInt partAddr, TComMv *mv, Int width, Int height, TComYuv *dstPic, Bool bi, const Int bitDepth )
 {
+#if NH_MV
+  assert( refPic->getBorderExtension() );
+#endif
   Int     refStride  = refPic->getStride(compID);
   Int     dstStride  = dstPic->getStride(compID);
   Int shiftHor=(2+refPic->getComponentScaleX(compID));

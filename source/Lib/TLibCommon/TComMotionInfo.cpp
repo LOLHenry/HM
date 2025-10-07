@@ -39,6 +39,9 @@
 #include "TComMotionInfo.h"
 #include "assert.h"
 #include <stdlib.h>
+#if NH_MV
+#include <iomanip>
+#endif
 
 //! \ingroup TLibCommon
 //! \{
@@ -369,6 +372,32 @@ Void TComCUMvField::compress(SChar* pePredMode, Int scale)
       m_pcMv[ uiPartIdx + i ] = cMv;
       pePredMode[ uiPartIdx + i ] = predMode;
       m_piRefIdx[ uiPartIdx + i ] = iRefIdx;
+    }
+  }
+}
+#endif
+
+#if NH_MV
+Void TComCUMvField::print(SChar* pePredMode)
+{
+  for ( Int uiPartIdx = 0; uiPartIdx < m_uiNumPartition; uiPartIdx += 1 )
+  {
+    PredMode predMode = static_cast<PredMode>( pePredMode[ uiPartIdx ] );
+
+    if ( predMode == MODE_INTRA)
+    {
+      std::cout << std::setfill(' ') << "("
+        << std::setw(3) <<  "   "    << ","
+        << std::setw(3) <<  "   "    << ","
+        << std::setw(3) <<  "   "    << ")";
+    }
+    else
+    {
+      ;
+      std::cout << std::setfill(' ') << "("
+        << std::setw(3) <<  (Int) m_piRefIdx[ uiPartIdx ]        << ","
+        << std::setw(3) <<  m_pcMv[ uiPartIdx ].getHor()   << ","
+        << std::setw(3) <<  m_pcMv[ uiPartIdx ].getVer()   << ")";
     }
   }
 }

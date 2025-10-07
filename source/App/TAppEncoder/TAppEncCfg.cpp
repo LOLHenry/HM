@@ -55,6 +55,10 @@ static inline std::istream& operator >> (std::istream &in, std::map<T1, T2> &map
 #include "TAppEncCfg.h"
 #include "Utilities/program_options_lite.h"
 #include "TLibEncoder/TEncRateCtrl.h"
+#if NH_MV
+#include <set>
+#endif
+
 #ifdef WIN32
 #define strdup _strdup
 #endif
@@ -64,6 +68,7 @@ static inline std::istream& operator >> (std::istream &in, std::map<T1, T2> &map
 
 using namespace std;
 
+#if !NH_MV
 enum UIProfileName // this is used for determining profile strings, where multiple profiles map to a single profile idc with various constraint flag combinations
 {
   UI_NONE = 0,
@@ -78,6 +83,9 @@ enum UIProfileName // this is used for determining profile strings, where multip
   //                           the chroma format in the next digit
   //                           the intra constraint in the next digit (1 for no intra constraint, 2 for intra constraint)
   //                           If it is a RExt still picture, there is a '1' for the top digit.
+#if NH_MV
+  UI_MULTIVIEWMAIN     = 6,
+#endif
   UI_MONOCHROME_8      = 1008,
   UI_MONOCHROME_12     = 1012,
   UI_MONOCHROME_16     = 1016,
@@ -110,6 +118,7 @@ enum UIProfileName // this is used for determining profile strings, where multip
   UI_HIGHTHROUGHPUT_444_14  = 21314,
   UI_HIGHTHROUGHPUT_444_16_INTRA  = 22316
 };
+#endif
 
 constexpr int TF_DEFAULT_REFS = 4;
 
@@ -128,18 +137,40 @@ TAppEncCfg::TAppEncCfg()
 , m_ext360(*this)
 #endif
 {
+#if !NH_MV
   m_aidQP = NULL;
+#endif
   m_startOfCodedInterval = NULL;
   m_codedPivotValue = NULL;
   m_targetPivotValue = NULL;
+    
+#if KWU_RC_MADPRED_E0227
+  m_depthMADPred = 0;
+#endif
 }
 
 TAppEncCfg::~TAppEncCfg()
 {
+#if NH_MV
+  for( Int layer = 0; layer < m_aidQP.size(); layer++ )
+  {
+    if ( m_aidQP[layer] != NULL )
+    {
+      delete[] m_aidQP[layer];
+      m_aidQP[layer] = NULL;
+    }
+  }
+  for(Int i = 0; i< m_pchInputFileList.size(); i++ )
+  {
+    if ( m_pchInputFileList[i] != NULL )
+      free (m_pchInputFileList[i]);
+  }
+#else
   if ( m_aidQP )
   {
     delete[] m_aidQP;
   }
+#endif
   if ( m_startOfCodedInterval )
   {
     delete[] m_startOfCodedInterval;
@@ -155,6 +186,27 @@ TAppEncCfg::~TAppEncCfg()
     delete[] m_targetPivotValue;
     m_targetPivotValue = NULL;
   }
+#if NH_MV
+  for(Int i = 0; i< m_pchReconFileList.size(); i++ )
+  {
+    if ( m_pchReconFileList[i] != NULL )
+      free (m_pchReconFileList[i]);
+  }
+
+  for( Int i = 0; i < m_GOPListMvc.size(); i++ )
+  {
+    if( m_GOPListMvc[i] )
+    {
+      delete[] m_GOPListMvc[i];
+      m_GOPListMvc[i] = NULL;
+    }
+  }
+
+  if ( m_pchBaseViewCameraNumbers != NULL )
+  {
+    free ( m_pchBaseViewCameraNumbers );
+  }
+#endif
 }
 
 Void TAppEncCfg::create()
@@ -164,6 +216,54 @@ Void TAppEncCfg::create()
 Void TAppEncCfg::destroy()
 {
 }
+
+#if NH_MV
+
+GOPEntry* TAppEncCfg::xGetGopEntries(Int layerIdInVps)
+{
+  return m_GOPListMvc[ m_layerIdxInVpsToGopDefIdx[ layerIdInVps ] ];
+}
+
+GOPEntry* TAppEncCfg::xGetGopEntry(Int layerIdInVps, Int poc)
+{
+  GOPEntry* geFound = NULL;
+  for( Int i = 0; i < ( getGOPSize() + 1) && geFound == NULL ; i++ )
+  {
+    GOPEntry* ge = &(xGetGopEntries( layerIdInVps)[ ( i < getGOPSize()  ? i : MAX_GOP ) ]);
+    if ( ge->m_POC == poc )
+    {
+      geFound = ge;
+    }
+  }
+  assert( geFound != NULL );
+  return geFound;
+}
+
+Void TAppEncCfg::xParseSeiCfg()
+{
+  for (Int i = 0; i < MAX_NUM_SEIS; i++)
+  {
+    if ( m_seiCfgFileNames[i] != NULL )
+    {
+      Int payloadType;
+      po::Options opts;
+      
+      opts.addOptions()("PayloadType", payloadType,-1, "Payload Type");
+      po::setDefaults(opts);
+
+      po::ErrorReporter err;
+      err.output_on_unknow_parameter = false;
+      po::parseConfigFile( opts, m_seiCfgFileNames[i], err );
+      SEI* sei = SEI::getNewSEIMessage( (SEI::PayloadType) payloadType );
+      assert( sei != NULL );
+
+      sei->setupFromCfgFile( m_seiCfgFileNames[i] );
+
+      m_seiMessages.push_back( sei );
+    }
+  }
+}
+#endif
 
 std::istringstream &operator>>(std::istringstream &in, GOPEntry &entry)     //input
 {
@@ -198,6 +298,22 @@ std::istringstream &operator>>(std::istringstream &in, GOPEntry &entry)     //in
   {
     in>>entry.m_deltaRPS;
   }
+#if NH_MV
+  in>>entry.m_numActiveRefLayerPics;
+  for( Int i = 0; i < entry.m_numActiveRefLayerPics; i++ )
+  {
+    in>>entry.m_interLayerPredLayerIdc[i];
+  }
+  for( Int i = 0; i < entry.m_numActiveRefLayerPics; i++ )
+  {
+    in>>entry.m_interViewRefPosL[0][i];
+  }
+  for( Int i = 0; i < entry.m_numActiveRefLayerPics; i++ )
+  {
+    in>>entry.m_interViewRefPosL[1][i];
+  }
+#endif
+
   return in;
 }
 
@@ -215,6 +331,18 @@ static inline ChromaFormat numberToChromaFormat(const Int val)
   }
 }
 
+#if NH_MV
+static inline std::vector<ChromaFormat> numberToChromaFormat(const IntAry1d val)
+{
+  std::vector<ChromaFormat> chromaFormats;
+  for( Int i = 0; i < val.size(); i++)
+  {
+    chromaFormats.push_back( numberToChromaFormat( val[i] ) );
+  }
+  return chromaFormats;
+}
+#endif
+
 static const struct MapStrToProfile
 {
   const TChar* str;
@@ -229,6 +357,12 @@ strToProfile[] =
   {"main10-still-picture", Profile::MAIN10             },
   {"main-RExt",            Profile::MAINREXT           },
   {"high-throughput-RExt", Profile::HIGHTHROUGHPUTREXT }
+#if NH_MV
+  ,{"multiview-main"     , Profile::MULTIVIEWMAIN      }
+#if NH_MV_ALLOW_NON_CONFORMING
+  ,{"multiview-main_NONCONFORMING", Profile::MULTIVIEWMAIN_NONCONFORMING }
+#endif
+#endif
 };
 
 static const struct MapStrToUIProfileName
@@ -253,6 +387,27 @@ strToUIProfileName[] =
     {"high-throughput-RExt",      UI_HIGHTHROUGHPUTREXT },
     {"high_throughput_rext",      UI_HIGHTHROUGHPUTREXT },
     {"high-throughput-rext",      UI_HIGHTHROUGHPUTREXT },
+#if NH_MV
+    {"multiview-main"     , UI_MULTIVIEWMAIN   },
+#if JVET_AH0046
+  {"multiview-extended"  , UI_MULTIVIEWEXTENDED   },
+  {"multiview-extended10"     , UI_MULTIVIEWEXTENDED10   },
+#else
+#if JVET_AE0295
+    {"multiview-main10"     , UI_MULTIVIEWMAIN10   },
+#endif //JVET_AE0295
+#endif  // JVET_AH0046
+#if JVET_AM1080
+    {"multiview_RExt"       , UI_MULTIVIEWREXT   },
+    {"multiview-RExt"       , UI_MULTIVIEWREXT   },
+    {"multiview_rext"       , UI_MULTIVIEWREXT   },
+    {"multiview-rext"       , UI_MULTIVIEWREXT   },
+    {"multiview-rext"       , UI_MULTIVIEWREXT   },
+#endif  // JVET_AM1080
+#if NH_MV_ALLOW_NON_CONFORMING
+    {"multiview-main_NONCONFORMING"     , UI_MULTIVIEWMAIN_NONCONF   },
+#endif
+#endif
     {"monochrome",                UI_MONOCHROME_8     },
     {"monochrome12",              UI_MONOCHROME_12    },
     {"monochrome16",              UI_MONOCHROME_16    },
@@ -664,9 +819,29 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
 {
   Bool do_help = false;
 
+#if NH_MV
+  vector<Int>   cfg_dimensionLength;
+  string        cfg_profiles;
+  string        cfg_levels;
+  string        cfg_tiers;
+  cfg_dimensionLength.push_back( 64 );
+#endif
+
+#if NH_MV
+  IntAry1d tmpInputChromaFormat;
+  IntAry1d tmpChromaFormat;
+  IntAry2d tmpPad(2);
+
+  IntAry2d tmpInputBitDepth      (2);
+  IntAry2d tmpOutputBitDepth     (2);
+  IntAry2d tmpMSBExtendedBitDepth(2);
+  IntAry2d tmpInternalBitDepth   (2);
+
+#else
   Int tmpChromaFormat;
   Int tmpInputChromaFormat;
   Int tmpConstraintChromaFormat;
+#endif
   Int tmpWeightedPredictionMethod;
   Int tmpFastInterSearchMode;
   Int tmpMotionEstimationSearchMethod;
@@ -675,7 +850,11 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   Int tmpDecodedPictureHashSEIMappedType;
   string inputColourSpaceConvert;
   string inputPathPrefix;
+#if NH_MV
+  std::vector<UIProfileName> UIProfiles;
+#else
   UIProfileName UIProfile;
+#endif
   Int saoOffsetBitShift[MAX_NUM_CHANNEL_TYPE];
 
   // Multi-value input fields:                                // minval, maxval (incl), min_entries, max_entries (incl) [, default values, number of default values]
@@ -775,13 +954,74 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("WarnUnknowParameter,w",                           warnUnknowParameter,                                  0, "warn for unknown configuration parameters instead of failing")
 
   // File, I/O and source parameters
+#if NH_MV
+  ("InputFile_%d,i_%d",       m_pchInputFileList,       (char *) 0 , MAX_NUM_LAYER_IDS , "original Yuv input file name %d")
+#else
   ("InputFile,i",                                     m_inputFileName,                             string(""), "Original YUV input file name")
+#endif
   ("InputPathPrefix,-ipp",                            inputPathPrefix,                             string(""), "pathname to prepend to input filename")
   ("BitstreamFile,b",                                 m_bitstreamFileName,                         string(""), "Bitstream output file name")
+#if NH_MV
+  ("ReconFile_%d,o_%d",       m_pchReconFileList,       (char *) 0 , MAX_NUM_LAYER_IDS , "reconstructed Yuv output file name %d")
+#else
   ("ReconFile,o",                                     m_reconFileName,                             string(""), "Reconstructed YUV output file name")
+#endif
 #if SHUTTER_INTERVAL_SEI_PROCESSING
   ("SEIShutterIntervalPreFilename,-sii",              m_shutterIntervalPreFileName,                string(""), "File name of Pre-Filtering video. If empty, not output video\n")
 #endif
+#if NH_MV
+  ("NumberOfLayers",                 m_numberOfLayers     , 1,                     "Number of layers")
+  ("ScalabilityMask",                m_scalabilityMask    , 2                    , "Scalability Mask: 2: Multiview, 8: Auxiliary, 10: Multiview + Auxiliary")
+  ("DimensionIdLen",                 m_dimensionIdLen     , cfg_dimensionLength  , "Number of bits used to store dimensions Id")
+  ("ViewOrderIndex",                 m_viewOrderIndex              , IntAry1d(1,0),                                 "View Order Index per layer")
+  ("ViewId",                         m_viewId                      , IntAry1d(1,0),                                 "View Id per View Order Index")
+  ("AuxId",                          m_auxId                       , IntAry1d(1,0),                                 "AuxId per layer")
+  ("TargetEncLayerIdList",           m_targetEncLayerIdList        , IntAry1d(0,0),                                 "LayerIds in Nuh to be encoded")
+  ("LayerIdInNuh",                   m_layerIdInNuh                , IntAry1d(1,0),                                 "LayerId in Nuh")
+  ("SplittingFlag",                  m_splittingFlag               , false,                                         "Splitting Flag")
+
+  // Layer Sets + Output Layer Sets + Profile Tier Level
+  ("VpsNumLayerSets"               , m_vpsNumLayerSets             , 1                                          ,   "Number of layer sets")
+  ("LayerIdsInSet_%d"              , m_layerIdxInVpsInSets         , IntAry1d(1,0) , MAX_VPS_OP_SETS_PLUS1      ,   "Layer indices in VPS of layers in layer set")
+  ("NumAddLayerSets"               , m_numAddLayerSets             , 0 ,                                             "NumAddLayerSets     ")
+  ("HighestLayerIdxPlus1_%d"       , m_highestLayerIdxPlus1        , IntAry1d(0,0) , MAX_VPS_NUM_ADD_LAYER_SETS ,   "HighestLayerIdxPlus1")
+  ("DefaultTargetOutputLayerIdc"   , m_defaultOutputLayerIdc       , 0 ,                                             "Specifies output layers of layer sets, 0: output all layers, 1: output highest layer, 2: specified by LayerIdsInDefOutputLayerSet")
+  ("OutputLayerSetIdx"             , m_outputLayerSetIdx           , IntAry1d(0,0)                              ,   "Indices of layer sets used as additional output layer sets")
+  ("LayerIdsInAddOutputLayerSet_%d", m_layerIdsInAddOutputLayerSet , IntAry1d(0,0) , MAX_VPS_ADD_OUTPUT_LAYER_SETS, "Indices in VPS of output layers in additional output layer set")
+  ("LayerIdsInDefOutputLayerSet_%d", m_layerIdsInDefOutputLayerSet , IntAry1d(0,0) , MAX_VPS_OP_SETS_PLUS1,         "Indices in VPS of output layers in layer set")
+  ("AltOutputLayerFlag"            , m_altOutputLayerFlag          , BoolAry1d(1,0),                                "Alt output layer flag")
+  
+  ("ProfileTierLevelIdx_%d"        , m_profileTierLevelIdx         , IntAry1d(0)  , MAX_NUM_LAYERS,                  "Indices to profile level tier for ols")
+  // Layer dependencies
+  ("DirectRefLayers_%d"            , m_directRefLayers               , IntAry1d(0,0), MAX_NUM_LAYERS,                  "LayerIdx in VPS of direct reference layers")
+  ("DependencyTypes_%d"            , m_dependencyTypes               , IntAry1d(0,0), MAX_NUM_LAYERS,                  "Dependency types of direct reference layers, 0: Sample 1: Motion 2: Sample+Motion")
+  ("ShareParameterSets"            , m_shareParameterSets            , false        ,                                  "Signal parameter sets only in the base layer.")
+  ("LayerIdxInVpsToGopDefIdx"      , m_layerIdxInVpsToGopDefIdx      , IntAry1d(0,0),                                  "Maps the layers to the GOP definitions in the cfg-file.")
+  ("LayerIdxInVpsToRepFormatIdx"   , m_layerIdxInVpsToRepFormatIdx   , IntAry1d(0,0),                                  "Maps the layers to the vps representation formats, i.e. values of SourceWidth, SourceHeight, InternalBitDepth, ChromaFormatIDC, InputBitDepth, OutputBitDepth, MSBExtendedBitDepth, InputChromaFormat, ConfWinBottom, ConfWinTop, ConfWinRight, ConfWinLeft, VerticalPadding, HorizontalPadding." )
+#endif
+#if NH_MV
+  ("SourceWidth,-wdt",                                m_iSourceWidths,                            IntAry1d(1,0), "Source picture width")
+  ("SourceHeight,-hgt",                               m_iSourceHeights,                           IntAry1d(1,0), "Source picture height")
+#if JVET_AE0295
+  ("InputBitDepth",                                   tmpInputBitDepth      [CHANNEL_TYPE_LUMA  ], IntAry1d(1,8), "Bit-depth of input file")
+  ("OutputBitDepth",                                  tmpOutputBitDepth     [CHANNEL_TYPE_LUMA  ], IntAry1d(1,8), "Bit-depth of output file (default:InternalBitDepth)")
+  ("MSBExtendedBitDepth",                             tmpMSBExtendedBitDepth[CHANNEL_TYPE_LUMA  ], IntAry1d(1,0), "bit depth of luma component after addition of MSBs of value 0 (used for synthesising High Dynamic Range source material). (default:InputBitDepth)")
+  ("InternalBitDepth",                                tmpInternalBitDepth   [CHANNEL_TYPE_LUMA  ], IntAry1d(1,0), "Bit-depth the codec operates at. (default:MSBExtendedBitDepth). If different to MSBExtendedBitDepth, source data will be converted")
+  ("InputBitDepthC",                                  tmpInputBitDepth      [CHANNEL_TYPE_CHROMA], IntAry1d(1,0), "As per InputBitDepth but for chroma component. (default:InputBitDepth)")
+  ("OutputBitDepthC",                                 tmpOutputBitDepth     [CHANNEL_TYPE_CHROMA], IntAry1d(1,0), "As per OutputBitDepth but for chroma component. (default:InternalBitDepthC)")
+  ("MSBExtendedBitDepthC",                            tmpMSBExtendedBitDepth[CHANNEL_TYPE_CHROMA], IntAry1d(1,0), "As per MSBExtendedBitDepth but for chroma component. (default:MSBExtendedBitDepth)")
+  ("InternalBitDepthC",                               tmpInternalBitDepth   [CHANNEL_TYPE_CHROMA], IntAry1d(1,0), "As per InternalBitDepth but for chroma component. (default:InternalBitDepth)")
+#else
+  ("InputBitDepth",                                   tmpInputBitDepth      [CHANNEL_TYPE_LUMA  ], IntAry1d(1,8), "Bit-depth of input file")
+  ("OutputBitDepth",                                  tmpOutputBitDepth     [CHANNEL_TYPE_LUMA  ], IntAry1d(1,0), "Bit-depth of output file (default:InternalBitDepth)")
+  ("MSBExtendedBitDepth",                             tmpMSBExtendedBitDepth[CHANNEL_TYPE_LUMA  ], IntAry1d(1,0), "bit depth of luma component after addition of MSBs of value 0 (used for synthesising High Dynamic Range source material). (default:InputBitDepth)")
+  ("InternalBitDepth",                                tmpInternalBitDepth   [CHANNEL_TYPE_LUMA  ], IntAry1d(1,0), "Bit-depth the codec operates at. (default:MSBExtendedBitDepth). If different to MSBExtendedBitDepth, source data will be converted")
+  ("InputBitDepthC",                                  tmpInputBitDepth      [CHANNEL_TYPE_CHROMA], IntAry1d(1,0), "As per InputBitDepth but for chroma component. (default:InputBitDepth)")
+  ("OutputBitDepthC",                                 tmpOutputBitDepth     [CHANNEL_TYPE_CHROMA], IntAry1d(1,0), "As per OutputBitDepth but for chroma component. (default:InternalBitDepthC)")
+  ("MSBExtendedBitDepthC",                            tmpMSBExtendedBitDepth[CHANNEL_TYPE_CHROMA], IntAry1d(1,0), "As per MSBExtendedBitDepth but for chroma component. (default:MSBExtendedBitDepth)")
+  ("InternalBitDepthC",                               tmpInternalBitDepth   [CHANNEL_TYPE_CHROMA], IntAry1d(1,0), "As per InternalBitDepth but for chroma component. (default:InternalBitDepth)")
+#endif //JVET_AE0295
+#else
   ("SourceWidth,-wdt",                                m_sourceWidth,                                        0, "Source picture width")
   ("SourceHeight,-hgt",                               m_sourceHeight,                                       0, "Source picture height")
   ("InputBitDepth",                                   m_inputBitDepth[CHANNEL_TYPE_LUMA],                   8, "Bit-depth of input file")
@@ -792,12 +1032,17 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("OutputBitDepthC",                                 m_outputBitDepth[CHANNEL_TYPE_CHROMA],                0, "As per OutputBitDepth but for chroma component. (default:InternalBitDepthC)")
   ("MSBExtendedBitDepthC",                            m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA],           0, "As per MSBExtendedBitDepth but for chroma component. (default:MSBExtendedBitDepth)")
   ("InternalBitDepthC",                               m_internalBitDepth[CHANNEL_TYPE_CHROMA],              0, "As per InternalBitDepth but for chroma component. (default:InternalBitDepth)")
+#endif
   ("ExtendedPrecision",                               m_extendedPrecisionProcessingFlag,                false, "Increased internal accuracies to support high bit depths (not valid in V1 profiles)")
   ("HighPrecisionPredictionWeighting",                m_highPrecisionOffsetsEnabledFlag,                false, "Use high precision option for weighted prediction (not valid in V1 profiles)")
   ("InputColourSpaceConvert",                         inputColourSpaceConvert,                     string(""), "Colour space conversion to apply to input video. Permitted values are (empty string=UNCHANGED) " + getListOfColourSpaceConverts(true))
   ("SNRInternalColourSpace",                          m_snrInternalColourSpace,                         false, "If true, then no colour space conversion is applied prior to SNR, otherwise inverse of input is applied.")
   ("OutputInternalColourSpace",                       m_outputInternalColourSpace,                      false, "If true, then no colour space conversion is applied for reconstructed video, otherwise inverse of input is applied.")
+#if NH_MV
+  ("InputChromaFormat",                               tmpInputChromaFormat,                   IntAry1d(1,420), "InputChromaFormatIDC")
+#else
   ("InputChromaFormat",                               tmpInputChromaFormat,                               420, "InputChromaFormatIDC")
+#endif
   ("MSEBasedSequencePSNR",                            m_printMSEBasedSequencePSNR,                      false, "0 (default) emit sequence PSNR only as a linear average of the frame PSNRs, 1 = also emit a sequence PSNR based on an average of the frame MSEs")
   ("PrintHexPSNR",                                    m_printHexPsnr,                                   false, "0 (default) don't emit hexadecimal PSNR for each frame, 1 = also emit hexadecimal PSNR values")
   ("PrintFrameMSE",                                   m_printFrameMSE,                                  false, "0 (default) emit only bit count and PSNRs for each frame, 1 = also emit MSE values")
@@ -808,14 +1053,32 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("xPSNRCbWeight,-xPS1",                             m_dXPSNRWeight[COMPONENT_Cb],            ( Double )1.0, "xPSNR weighting factor for Cb (default: 1.0)")
   ("xPSNRCrWeight,-xPS2",                             m_dXPSNRWeight[COMPONENT_Cr],            ( Double )1.0, "xPSNR weighting factor for Cr (default: 1.0)")
   ("CabacZeroWordPaddingEnabled",                     m_cabacZeroWordPaddingEnabled,                     true, "0 do not add conforming cabac-zero-words to bit streams, 1 (default) = add cabac-zero-words as required")
+#if NH_MV
+  ("ChromaFormatIDC,-cf",                             tmpChromaFormat,                          IntAry1d(1,0), "ChromaFormatIDC (400|420|422|444 or set 0 (default) for same as InputChromaFormat)")
+#else
   ("ChromaFormatIDC,-cf",                             tmpChromaFormat,                                      0, "ChromaFormatIDC (400|420|422|444 or set 0 (default) for same as InputChromaFormat)")
+#endif
   ("ConformanceWindowMode",                           m_conformanceWindowMode,                              0, "Window conformance mode (0: no window, 1:automatic padding, 2:padding parameters specified, 3:conformance window parameters specified")
+#if NH_MV
+  ("HorizontalPadding,-pdx",                          tmpPad[0] ,                               IntAry1d(1,0), "Horizontal source padding for conformance window mode 2")
+  ("VerticalPadding,-pdy",                            tmpPad[1] ,                               IntAry1d(1,0), "Vertical source padding for conformance window mode 2")
+#else
   ("HorizontalPadding,-pdx",                          m_sourcePadding[0],                                   0, "Horizontal source padding for conformance window mode 2")
   ("VerticalPadding,-pdy",                            m_sourcePadding[1],                                   0, "Vertical source padding for conformance window mode 2")
+#endif
+    
+#if NH_MV
+  ("ConfWinLeft",                                     m_confWinLefts,                         IntAry1d(1, 0) , "Left offset for window conformance mode 3")
+  ("ConfWinRight",                                    m_confWinRights,                        IntAry1d(1, 0) , "Right offset for window conformance mode 3")
+  ("ConfWinTop",                                      m_confWinTops,                          IntAry1d(1, 0) , "Top offset for window conformance mode 3")
+  ("ConfWinBottom",                                   m_confWinBottoms,                       IntAry1d(1, 0) , "Bottom offset for window conformance mode 3")
+#else
   ("ConfWinLeft",                                     m_confWinLeft,                                        0, "Left offset for window conformance mode 3")
   ("ConfWinRight",                                    m_confWinRight,                                       0, "Right offset for window conformance mode 3")
   ("ConfWinTop",                                      m_confWinTop,                                         0, "Top offset for window conformance mode 3")
   ("ConfWinBottom",                                   m_confWinBottom,                                      0, "Bottom offset for window conformance mode 3")
+#endif
+
   ("AccessUnitDelimiter",                             m_AccessUnitDelimiter,                            false, "Enable Access Unit Delimiter NALUs")
   ("FrameRate,-fr",                                   m_iFrameRate,                                         0, "Frame rate")
   ("FrameSkip,-fs",                                   m_FrameSkip,                                         0u, "Number of frames to skip at start of input YUV")
@@ -834,6 +1097,23 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("HarmonizeGopFirstFieldCoupleEnabled",             m_bHarmonizeGopFirstFieldCoupleEnabled,            true, "Enables harmonization of Gop first field couple")
 
   // Profile and level
+#if NH_MV
+  ("Profile" ,                                        cfg_profiles,                                string(""), "Profile in VpsProfileTierLevel (Indication only)")
+  ("Level"   ,                                        cfg_levels ,                                 string(""), "Level indication in VpsProfileTierLevel (Indication only)")
+  ("Tier"    ,                                        cfg_tiers  ,                                 string(""), "Tier indication in VpsProfileTierLevel (Indication only)")
+  ("InblFlag",                                        m_inblFlag ,                       std::vector<Bool>(0), "InblFlags in VpsProfileTierLevel (Indication only)" )
+
+  ("MaxBitDepthConstraint",                           m_bitDepthConstraints,           std::vector<Int>( 1,0u) , "Bit depth to use for profile-constraint for RExt profiles. 0=automatically choose based upon other parameters")
+  ("MaxChromaFormatConstraint",                       m_tmpConstraintChromaFormats,    IntAry1d(1,     0)       , "Chroma-format to use for the profile-constraint for RExt profiles. 0=automatically choose based upon other parameters")
+  ("IntraConstraintFlag",                             m_intraConstraintFlags,          BoolAry1d(1,false)       , "Value of general_intra_constraint_flag to use for RExt profiles (not used if an explicit RExt sub-profile is specified)")
+  ("OnePictureOnlyConstraintFlag",                    m_onePictureOnlyConstraintFlags, BoolAry1d(1,false)       , "Value of general_one_picture_only_constraint_flag to use for RExt profiles (not used if an explicit RExt sub-profile is specified)")
+  ("LowerBitRateConstraintFlag",                      m_lowerBitRateConstraintFlags,   BoolAry1d(1,true)        , "Value of general_lower_bit_rate_constraint_flag to use for RExt profiles")
+  ("ProgressiveSource",                               m_progressiveSourceFlags,        BoolAry1d(1,false)       , "Indicate that source is progressive")
+  ("InterlacedSource",                                m_interlacedSourceFlags,         BoolAry1d(1,false)       , "Indicate that source is interlaced")
+  ("NonPackedSource",                                 m_nonPackedConstraintFlags,      BoolAry1d(1,false)       , "Indicate that source does not contain frame packing")
+  ("FrameOnly",                                       m_frameOnlyConstraintFlags,      BoolAry1d(1,false)       , "Indicate that the bitstream contains only frames")
+
+#else
   ("Profile",                                         UIProfile,                                      UI_NONE, "Profile name to use for encoding. Use main (for main), main10 (for main10), main-still-picture, main-RExt (for Range Extensions profile), any of the RExt specific profile names, or none")
   ("Level",                                           m_level,                                    Level::NONE, "Level limit to be used, eg 5.1, or none")
   ("Tier",                                            m_levelTier,                                Level::MAIN, "Tier to use for interpretation of --Level (main or high only)")
@@ -848,6 +1128,8 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("NonPackedSource",                                 m_nonPackedConstraintFlag,                        false, "Indicate that source does not contain frame packing")
   ("FrameOnly",                                       m_frameOnlyConstraintFlag,                        false, "Indicate that the bitstream contains only frames")
 
+#endif
+    
   // Unit definition parameters
   ("MaxCUWidth",                                      m_uiMaxCUWidth,                                     64u)
   ("MaxCUHeight",                                     m_uiMaxCUHeight,                                    64u)
@@ -862,16 +1144,30 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("QuadtreeTUMaxDepthIntra",                         m_uiQuadtreeTUMaxDepthIntra,                         1u, "Depth of TU tree for intra CUs")
   ("QuadtreeTUMaxDepthInter",                         m_uiQuadtreeTUMaxDepthInter,                         2u, "Depth of TU tree for inter CUs")
 
+#if NH_MV
+  // Coding structure parameters
+  ("IntraPeriod,-ip",                                 m_iIntraPeriod,std::vector<Int>(1,-1)                  , "Intra period in frames, (-1: only first frame), per layer")
+#else
   // Coding structure paramters
   ("IntraPeriod,-ip",                                 m_iIntraPeriod,                                      -1, "Intra period in frames, (-1: only first frame, -N: set to a multiple of N based on frame rate)")
+#endif
   ("DecodingRefreshType,-dr",                         m_iDecodingRefreshType,                               0, "Intra refresh type (0:none 1:CRA 2:IDR 3:RecPointSEI)")
   ("GOPSize,g",                                       m_iGOPSize,                                           1, "GOP size of temporal structure")
+#if NH_MV
+  // To keep compatibility to legacy bit streams.
+  ("ReWriteParamSetsFlag",                            m_bReWriteParamSetsFlag,                           false, "Enable rewriting of Parameter sets before every (intra) random access point")
+#else
   ("ReWriteParamSetsFlag",                            m_bReWriteParamSetsFlag,                           true, "Enable rewriting of Parameter sets before every (intra) random access point")
+#endif
 
   // motion search options
   ("DisableIntraInInter",                             m_bDisableIntraPUsInInterSlices,                  false, "Flag to disable intra PUs in inter slices")
   ("FastSearch",                                      tmpMotionEstimationSearchMethod,  Int(MESEARCH_DIAMOND), "0:Full search 1:Diamond 2:Selective 3:Enhanced Diamond")
   ("SearchRange,-sr",                                 m_iSearchRange,                                      96, "Motion search range")
+#if NH_MV
+  ("DispSearchRangeRestriction",  m_bUseDisparitySearchRangeRestriction, false, "restrict disparity search range")
+  ("VerticalDispSearchRange",     m_iVerticalDisparitySearchRange, 56, "vertical disparity search range")
+#endif
   ("BipredSearchRange",                               m_bipredSearchRange,                                  4, "Motion search range for bipred refinement")
   ("MinSearchWindow",                                 m_minSearchWindow,                                    8, "Minimum motion search window size for the adaptive window ME")
   ("RestrictMESampling",                              m_bRestrictMESampling,                            false, "Restrict ME Sampling for selective inter motion search")
@@ -894,8 +1190,13 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("IQPFactor,-IQF",                                  m_dIntraQpFactor,                                  -1.0, "Intra QP Factor for Lambda Computation. If negative, the default will scale lambda based on GOP size (unless LambdaFromQpEnable then IntraQPOffset is used instead)")
 
   /* Quantization parameters */
+#if NH_MV
+  ("QP,q",                                            m_iQP,                                               std::vector<Int>(1,30)  , "Qp value")
+  ("QPIncrementFrame,-qpif",                          m_qpIncrementAtSourceFrame,                          std::vector<Int>( 0 ), "If a source file frame number is specified, the internal QP will be incremented for all POCs associated with source frames >= frame number. If empty, do not increment.")
+#else
   ("QP,q",                                            m_iQP,                                               30, "Qp value")
   ("QPIncrementFrame,-qpif",                          m_qpIncrementAtSourceFrame,       OptionalValue<UInt>(), "If a source file frame number is specified, the internal QP will be incremented for all POCs associated with source frames >= frame number. If empty, do not increment.")
+#endif
   ("IntraQPOffset",                                   m_intraQPOffset,                                      0, "Qp offset value for intra slice, typically determined based on GOP size")
   ("LambdaFromQpEnable",                              m_lambdaFromQPEnable,                             false, "Enable flag for derivation of lambda from QP")
   ("DeltaQpRD,-dqr",                                  m_uiDeltaQpRD,                                       0u, "max dQp offset for slice")
@@ -940,7 +1241,11 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("RDpenalty",                                       m_rdPenalty,                                          0,  "RD-penalty for 32x32 TU for intra in non-intra slices. 0:disabled  1:RD-penalty  2:maximum RD-penalty")
 
   // Deblocking filter parameters
+#if NH_MV
+  ("LoopFilterDisable",                               m_bLoopFilterDisable,                             std::vector<Bool>(1,false), "Disable Loop Filter per Layer" )
+#else
   ("LoopFilterDisable",                               m_bLoopFilterDisable,                             false)
+#endif
   ("LoopFilterOffsetInPPS",                           m_loopFilterOffsetInPPS,                           true)
   ("LoopFilterBetaOffset_div2",                       m_loopFilterBetaOffsetDiv2,                           0)
   ("LoopFilterTcOffset_div2",                         m_loopFilterTcOffsetDiv2,                             0)
@@ -960,7 +1265,11 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("SingleSignificanceMapContext",                    m_transformSkipContextEnabledFlag,                false, "Enable, for transform-skipped and transquant-bypassed TUs, the selection of a single significance map context variable for all coefficients (not valid in V1 profiles)")
   ("GolombRiceParameterAdaptation",                   m_persistentRiceAdaptationEnabledFlag,            false, "Enable the adaptation of the Golomb-Rice parameter over the course of each slice")
   ("AlignCABACBeforeBypass",                          m_cabacBypassAlignmentEnabledFlag,                false, "Align the CABAC engine to a defined fraction of a bit prior to coding bypass data. Must be 1 in high bit rate profile, 0 otherwise" )
+#if NH_MV
+  ("SAO",                      m_bUseSAO, std::vector<Bool>(1,true), "Enable Sample Adaptive Offset per Layer")
+#else
   ("SAO",                                             m_bUseSAO,                                         true, "Enable Sample Adaptive Offset")
+#endif
   ("TestSAODisableAtPictureLevel",                    m_bTestSAODisableAtPictureLevel,                  false, "Enables the testing of disabling SAO at the picture level after having analysed all blocks")
   ("SaoEncodingRate",                                 m_saoEncodingRate,                                 0.75, "When >0 SAO early picture termination is enabled for luma and chroma")
   ("SaoEncodingRateChroma",                           m_saoEncodingRateChroma,                            0.5, "The SAO early picture termination rate to use for chroma (when m_SaoEncodingRate is >0). If <=0, use results for luma")
@@ -1032,6 +1341,42 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ( "RCCpbSaturation",                                m_RCCpbSaturationEnabled,                         false, "Rate control: enable target bits saturation to avoid CPB overflow and underflow" )
   ( "RCCpbSize",                                      m_RCCpbSize,                                         0u, "Rate control: CPB size" )
   ( "RCInitialCpbFullness",                           m_RCInitialCpbFullness,                             0.9, "Rate control: initial CPB fullness" )
+#if KWU_RC_VIEWRC_E0227
+  ("ViewWiseTargetBits, -vtbr" ,  m_viewTargetBits,  std::vector<Int>(1, 32), "View-wise target bit-rate setting")
+  ("TargetBitAssign, -ta", m_viewWiseRateCtrl, false, "View-wise rate control on/off")
+#endif
+#if KWU_RC_MADPRED_E0227
+  ("DepthMADPred, -dm", m_depthMADPred, (UInt)0, "Depth based MAD prediction on/off")
+#endif
+#if NH_MV
+// A lot of this stuff could should actually be derived by the encoder.
+  // VPS VUI
+  ("VpsVuiPresentFlag"            , m_vpsVuiPresentFlag            , false                                , "VpsVuiPresentFlag           ")
+  ("CrossLayerPicTypeAlignedFlag" , m_crossLayerPicTypeAlignedFlag , false                                , "CrossLayerPicTypeAlignedFlag")  // Could actually be derived by the encoder
+  ("CrossLayerIrapAlignedFlag"    , m_crossLayerIrapAlignedFlag    , false                                , "CrossLayerIrapAlignedFlag   ")  // Could actually be derived by the encoder
+  ("AllLayersIdrAlignedFlag"      , m_allLayersIdrAlignedFlag      , false                                , "CrossLayerIrapAlignedFlag   ")  // Could actually be derived by the encoder
+  ("BitRatePresentVpsFlag"        , m_bitRatePresentVpsFlag        , false                                , "BitRatePresentVpsFlag       ")
+  ("PicRatePresentVpsFlag"        , m_picRatePresentVpsFlag        , false                                , "PicRatePresentVpsFlag       ")
+  ("BitRatePresentFlag"           , m_bitRatePresentFlag           , BoolAry1d(1,0), MAX_VPS_OP_SETS_PLUS1, "BitRatePresentFlag per sub layer for the N-th layer set")
+  ("PicRatePresentFlag"           , m_picRatePresentFlag           , BoolAry1d(1,0), MAX_VPS_OP_SETS_PLUS1, "PicRatePresentFlag per sub layer for the N-th layer set")
+  ("AvgBitRate"                   , m_avgBitRate                   , IntAry1d (1,0), MAX_VPS_OP_SETS_PLUS1, "AvgBitRate         per sub layer for the N-th layer set")
+  ("MaxBitRate"                   , m_maxBitRate                   , IntAry1d (1,0), MAX_VPS_OP_SETS_PLUS1, "MaxBitRate         per sub layer for the N-th layer set")
+  ("ConstantPicRateIdc"           , m_constantPicRateIdc           , IntAry1d (1,0), MAX_VPS_OP_SETS_PLUS1, "ConstantPicRateIdc per sub layer for the N-th layer set")
+  ("AvgPicRate"                   , m_avgPicRate                   , IntAry1d (1,0), MAX_VPS_OP_SETS_PLUS1, "AvgPicRate         per sub layer for the N-th layer set")
+  ("TilesNotInUseFlag"            , m_tilesNotInUseFlag            , true                                 , "TilesNotInUseFlag            ")
+  ("TilesInUseFlag"               , m_tilesInUseFlag               , BoolAry1d(1,false)                   , "TilesInUseFlag               ")
+  ("LoopFilterNotAcrossTilesFlag" , m_loopFilterNotAcrossTilesFlag , BoolAry1d(1,false)                   , "LoopFilterNotAcrossTilesFlag ")
+  ("WppNotInUseFlag"              , m_wppNotInUseFlag              , true                                 , "WppNotInUseFlag              ")
+  ("WppInUseFlag"                 , m_wppInUseFlag                 , BoolAry1d(1,0)                       , "WppInUseFlag                 ")
+  ("TileBoundariesAlignedFlag"    , m_tileBoundariesAlignedFlag    , BoolAry1d(1,0)  ,MAX_NUM_LAYERS      , "TileBoundariesAlignedFlag    per direct reference for the N-th layer")
+  ("IlpRestrictedRefLayersFlag"   , m_ilpRestrictedRefLayersFlag   , false                                , "IlpRestrictedRefLayersFlag")
+  ("MinSpatialSegmentOffsetPlus1" , m_minSpatialSegmentOffsetPlus1 , IntAry1d (1,0), MAX_NUM_LAYERS       , "MinSpatialSegmentOffsetPlus1 per direct reference for the N-th layer")
+  ("CtuBasedOffsetEnabledFlag"    , m_ctuBasedOffsetEnabledFlag    , BoolAry1d(1,0)  ,MAX_NUM_LAYERS      , "CtuBasedOffsetEnabledFlag    per direct reference for the N-th layer")
+  ("MinHorizontalCtuOffsetPlus1"  , m_minHorizontalCtuOffsetPlus1  , IntAry1d (1,0), MAX_NUM_LAYERS       , "MinHorizontalCtuOffsetPlus1  per direct reference for the N-th layer")
+  ("SingleLayerForNonIrapFlag"    , m_singleLayerForNonIrapFlag    , false                                , "SingleLayerForNonIrapFlag")
+  ("HigherLayerIrapSkipFlag"      , m_higherLayerIrapSkipFlag      , false                                , "HigherLayerIrapSkipFlag  ")
+#endif
+
   ("TransquantBypassEnable",                          m_TransquantBypassEnabledFlag,                    false, "transquant_bypass_enabled_flag indicator in PPS")
   ("TransquantBypassEnableFlag",                      m_TransquantBypassEnabledFlag,                    false, "deprecated alias for TransquantBypassEnable")
   ("CUTransquantBypassFlagForce",                     m_CUTransquantBypassFlagForce,                    false, "Force transquant bypass mode, when transquant_bypass_enabled_flag is enabled")
@@ -1188,6 +1533,14 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("SEIPreferredTransferCharacteristics",             m_preferredTransferCharacteristics,                   -1, "Value for the preferred_transfer_characteristics field of the Alternative transfer characteristics SEI which will override the corresponding entry in the VUI. If negative, do not produce the respective SEI message")
   ("SEIGreenMetadataType",                            m_greenMetadataType,                   0u, "Value for the green_metadata_type specifies the type of metadata that is present in the SEI message. If green_metadata_type is 1, then metadata enabling quality recovery after low-power encoding is present")
   ("SEIXSDMetricType",                                m_xsdMetricType,                      0u, "Value for the xsd_metric_type indicates the type of the objective quality metric. PSNR is the only type currently supported")
+#if NH_MV
+  ("SeiCfgFileName_%d",                               m_seiCfgFileNames,             (TChar *) 0 ,MAX_NUM_SEIS , "SEI cfg file name %d")
+  ("OutputVpsInfo",                                   m_outputVpsInfo,                false                     ,"Output information about the layer dependencies and layer sets")
+
+/* Camera parameters */
+  ("BaseViewCameraNumbers",                           m_pchBaseViewCameraNumbers,   (TChar *) 0                 , "Numbers of base views")
+#endif
+
   ("SEICCVEnabled",                                   m_ccvSEIEnabled,                       false,                                    "Enables the Content Colour Volume SEI message")
   ("SEICCVCancelFlag",                                m_ccvSEICancelFlag,                    true,                                     "Specifies the persistence of any previous content colour volume SEI message in output order.")
   ("SEICCVPersistenceFlag",                           m_ccvSEIPersistenceFlag,               false,                                    "Specifies the persistence of the content colour volume SEI message for the current layer.")
@@ -1387,12 +1740,57 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   m_ext360.addOptions(opts, ext360CfgContext);
 #endif
 
+#if NH_MV
+  for( Int k = 0; k < MAX_NUM_LAYERS; k++ )
+  {
+    m_GOPListMvc.push_back( new GOPEntry[MAX_GOP + 1] );
+    if( k == 0 )
+    {
+      m_GOPListMvc[0][0].m_sliceType = 'I';
+      for( Int i = 1; i < MAX_GOP + 1; i++ )
+      {
+        std::ostringstream cOSS;
+        cOSS<<"Frame"<<i;
+        opts.addOptions()( cOSS.str(), m_GOPListMvc[k][i-1], GOPEntry() );
+        if ( i != 1 )
+        {
+          opts.opt_list.back()->opt->opt_duplicate = true;
+        }
+      }
+    }
+    else
+    {
+      std::ostringstream cOSS1;
+      cOSS1<<"FrameI"<<"_l"<<k;
+
+      opts.addOptions()(cOSS1.str(), m_GOPListMvc[k][MAX_GOP], GOPEntry());
+      if ( k > 1 )
+      {
+        opts.opt_list.back()->opt->opt_duplicate = true;
+      }
+
+
+  for(Int i=1; i<MAX_GOP+1; i++)
+  {
+        std::ostringstream cOSS2;
+        cOSS2<<"Frame"<<i<<"_l"<<k;
+        opts.addOptions()(cOSS2.str(), m_GOPListMvc[k][i-1], GOPEntry());
+        if ( i != 1 || k > 0 )
+        {
+          opts.opt_list.back()->opt->opt_duplicate = true;
+        }
+      }
+    }
+  }
+#else
   for(Int i=1; i<MAX_GOP+1; i++)
   {
     std::ostringstream cOSS;
     cOSS<<"Frame"<<i;
     opts.addOptions()(cOSS.str(), m_GOPList[i-1], GOPEntry());
   }
+#endif
+
   po::setDefaults(opts);
   po::ErrorReporter err;
   const list<const TChar*>& argv_unhandled = po::scanArgv(opts, argc, (const TChar**) argv, err);
@@ -1418,12 +1816,46 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     }
   }
 
+#if NH_MV
+  if ( m_layerIdxInVpsToRepFormatIdx.size() == 0 )
+  {
+    m_layerIdxInVpsToRepFormatIdx.push_back( 0 );
+  }
+
+  xResizeVector( m_layerIdxInVpsToRepFormatIdx );
+
+  // parse coding structure
+  if ( m_layerIdxInVpsToGopDefIdx.size() == 0 )
+  {
+    for( Int k = 0; k < m_numberOfLayers; k++ )
+    {
+      m_layerIdxInVpsToGopDefIdx.push_back( k );
+    }
+  }
+
+  xConvertRepFormatParameters(
+    tmpPad                       ,
+    tmpInputBitDepth             ,
+    tmpOutputBitDepth            ,
+    tmpMSBExtendedBitDepth       ,
+    tmpInternalBitDepth          ,
+    tmpInputChromaFormat         ,
+    tmpChromaFormat
+    );
+#endif
+
   /*
    * Set any derived parameters
    */
+#if NH_MV
+  m_inputFileWidths  = m_iSourceWidths;
+  m_inputFileHeights = m_iSourceHeights;
+#else
   m_inputFileWidth  = m_sourceWidth;
   m_inputFileHeight = m_sourceHeight;
+#endif
 
+#if !NH_MV
   if (m_iIntraPeriod < -1)
   {
     // Set IntraPeriod to a multiple of -m_intraPeriod according to frame rate of source
@@ -1444,6 +1876,7 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     inputPathPrefix += "/";
   }
   m_inputFileName   = inputPathPrefix + m_inputFileName;
+#endif
 
   if (m_firstValidFrame < 0)
   {
@@ -1456,12 +1889,26 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
 
   m_framesToBeEncoded = ( m_framesToBeEncoded + m_temporalSubsampleRatio - 1 ) / m_temporalSubsampleRatio;
   m_adIntraLambdaModifier = cfg_adIntraLambdaModifier.values;
+
+#if NH_MV
+  m_iSourceHeightOrgs = m_iSourceHeights;
+#endif
   if(m_isField)
   {
+#if NH_MV
+    //Frame height
+    m_iSourceHeightOrgs = m_iSourceHeights;
+    //Field height
+    for (Int i = 0; i < m_iSourceHeights.size(); i++ )
+    {
+      m_iSourceHeights[i] = m_iSourceHeights[i] >> 1;
+    }
+#else
     //Frame height
     m_sourceHeightOrg = m_sourceHeight;
     //Field height
     m_sourceHeight = m_sourceHeight >> 1;
+#endif
     //number of fields to encode
     m_framesToBeEncoded *= 2;
   }
@@ -1518,6 +1965,14 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     m_tileRowHeight.clear();
   }
 
+#if NH_MV
+  for (Int i = 0; i < m_numRepFormats; i++ )
+  {
+    Int* m_MSBExtendedBitDepth   = &m_MSBExtendedBitDepths[i][0];
+    Int* m_internalBitDepth      = &m_internalBitDepths   [i][0];
+    Int* m_outputBitDepth        = &m_outputBitDepths     [i][0];
+    Int* m_inputBitDepth         = &m_inputBitDepths      [i][0];
+#endif
   /* rules for input, output and internal bitdepths as per help text */
   if (m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA  ] == 0)
   {
@@ -1548,8 +2003,20 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     m_outputBitDepth     [CHANNEL_TYPE_CHROMA] = m_internalBitDepth   [CHANNEL_TYPE_CHROMA];
   }
 
+#if NH_MV
+  }
+#endif
   m_InputChromaFormatIDC = numberToChromaFormat(tmpInputChromaFormat);
+
+#if NH_MV
+  std::vector<ChromaFormat> tempChromaFormatIdc = numberToChromaFormat(tmpChromaFormat);
+  for(Int i = 0 ; i < m_InputChromaFormatIDC.size(); i++)
+  {
+    m_chromaFormatIDCs.push_back( ((tmpChromaFormat[i] == 0) ? (m_InputChromaFormatIDC[i]) : tempChromaFormatIdc[i] ) ); 
+  }
+#else
   m_chromaFormatIDC      = ((tmpChromaFormat == 0) ? (m_InputChromaFormatIDC) : (numberToChromaFormat(tmpChromaFormat)));
+#endif
 
 #if EXTENSION_360_VIDEO
   m_ext360.processOptions(ext360CfgContext);
@@ -1576,6 +2043,59 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   }
   m_motionEstimationSearchMethod=MESearchMethod(tmpMotionEstimationSearchMethod);
 
+#if NH_MV
+
+  Bool anyEmpty = false;
+  if( cfg_profiles.empty() )
+  {
+    cfg_profiles = string("main main multiview-main");
+#if JVET_AH0046
+    fprintf(stderr, "\nWarning: No profiles given, using defaults: main main multiview-extended10 or %s", cfg_profiles.c_str() );
+#else
+#if JVET_AE0295
+    fprintf(stderr, "\nWarning: No profiles given, using defaults: main main multiview-main10 or %s", cfg_profiles.c_str() );
+#else
+    fprintf(stderr, "\nWarning: No profiles given, using defaults: %s", cfg_profiles.c_str() );
+#endif //JVET_AE0295
+#endif  // JVET_AH0046
+    anyEmpty = true;
+  }
+
+  if( cfg_levels.empty() )
+  {
+    cfg_levels = string("5.1 5.1 5.1");
+    fprintf(stderr, "\nWarning: No levels given, using defaults: %s", cfg_levels.c_str() );
+    anyEmpty = true;
+  }
+
+  if( cfg_tiers.empty() )
+  {
+    cfg_tiers = string("main main main");
+    fprintf(stderr, "\nWarning: No tiers given, using defaults: %s", cfg_tiers.c_str());
+    anyEmpty = true;
+  }
+
+  if( m_inblFlag.empty() )
+  {
+    fprintf(stderr, "\nWarning: No inblFlags given, using defaults:");
+    for( Int i = 0; i < 3; i++)
+    {
+      m_inblFlag.push_back( false );
+      fprintf(stderr," %d", (Int) m_inblFlag[i]);
+    }
+    anyEmpty = true;
+  }
+
+  if ( anyEmpty )
+  {
+    fprintf( stderr, "\n" );
+  }
+
+  xReadStrToEnum( cfg_profiles, m_uiProfiles  );
+  xReadStrToEnum( cfg_levels,   m_level     );
+  xReadStrToEnum( cfg_tiers ,   m_levelTier );
+   
+#else
   switch (UIProfile)
   {
     case UI_NONE:
@@ -1733,13 +2253,96 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
       exit(EXIT_FAILURE);
       break;
   }
+#endif
 
   m_inputColourSpaceConvert = stringToInputColourSpaceConvert(inputColourSpaceConvert, true);
 
   // Picture width and height must be multiples of 8 and minCuSize
   const Int minCuSize = m_uiMaxCUHeight >> (m_uiMaxCUDepth - 1);
+#if !NH_MV
   const Int minResolutionMultiple = std::max(8, minCuSize);
+#endif
 
+#if NH_MV
+  for (Int i = 0; i < m_numRepFormats; i++ )
+  {
+    Int*          m_aiPad            = &m_aiPads[i][0];
+    ChromaFormat &m_chromaFormatIDC  = m_chromaFormatIDCs [i];
+    Int          &m_confWinRight     = m_confWinRights    [i];
+    Int          &m_confWinBottom    = m_confWinBottoms   [i];
+    Int          &m_confWinLeft      = m_confWinLefts     [i];
+    Int          &m_confWinTop       = m_confWinTops      [i];
+    Int          &m_iSourceHeight    = m_iSourceHeights   [i];
+    Int          &m_iSourceWidth     = m_iSourceWidths    [i];
+    Int          &m_iSourceHeightOrg = m_iSourceHeightOrgs[i];
+#endif
+
+#if NH_MV // Because of m_aiPad[] vs. m_sourcePadding[]
+    switch (m_conformanceWindowMode)
+    {
+        case 0:
+        {
+            // no conformance or padding
+            m_confWinLeft = m_confWinRight = m_confWinTop = m_confWinBottom = 0;
+            m_aiPad[1] = m_aiPad[0] = 0;
+            break;
+        }
+        case 1:
+        {
+            // automatic padding to minimum CU size
+            Int minCuSize = m_uiMaxCUHeight >> (m_uiMaxCUDepth - 1);
+            if (m_iSourceWidth % minCuSize)
+            {
+                m_aiPad[0] = m_confWinRight  = ((m_iSourceWidth / minCuSize) + 1) * minCuSize - m_iSourceWidth;
+                m_iSourceWidth  += m_confWinRight;
+            }
+            if (m_iSourceHeight % minCuSize)
+            {
+                m_aiPad[1] = m_confWinBottom = ((m_iSourceHeight / minCuSize) + 1) * minCuSize - m_iSourceHeight;
+                m_iSourceHeight += m_confWinBottom;
+                if ( m_isField )
+                {
+                    m_iSourceHeightOrg += m_confWinBottom << 1;
+                    m_aiPad[1] = m_confWinBottom << 1;
+                }
+            }
+            if (m_aiPad[0] % TComSPS::getWinUnitX(m_chromaFormatIDC) != 0)
+            {
+                fprintf(stderr, "Error: picture width is not an integer multiple of the specified chroma subsampling\n");
+                exit(EXIT_FAILURE);
+            }
+            if (m_aiPad[1] % TComSPS::getWinUnitY(m_chromaFormatIDC) != 0)
+            {
+                fprintf(stderr, "Error: picture height is not an integer multiple of the specified chroma subsampling\n");
+                exit(EXIT_FAILURE);
+            }
+            break;
+        }
+        case 2:
+        {
+            //padding
+            m_iSourceWidth  += m_aiPad[0];
+            m_iSourceHeight += m_aiPad[1];
+            m_confWinRight  = m_aiPad[0];
+            m_confWinBottom = m_aiPad[1];
+            break;
+        }
+        case 3:
+        {
+            // conformance
+            if ((m_confWinLeft == 0) && (m_confWinRight == 0) && (m_confWinTop == 0) && (m_confWinBottom == 0))
+            {
+                fprintf(stderr, "Warning: Conformance window enabled, but all conformance window parameters set to zero\n");
+            }
+            if ((m_aiPad[1] != 0) || (m_aiPad[0]!=0))
+            {
+                fprintf(stderr, "Warning: Conformance window enabled, padding parameters will be ignored\n");
+            }
+            m_aiPad[1] = m_aiPad[0] = 0;
+            break;
+        }
+    }
+#else
   switch (m_conformanceWindowMode)
   {
   case 0:
@@ -1816,6 +2419,11 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     fprintf(stderr, "Picture width or height (after padding) is not a multiple of 8 or minCuSize, please use ConformanceWindowMode=1 for automatic adjustment or ConformanceWindowMode=2 to specify padding manually!\n");
     exit(EXIT_FAILURE);
   }
+#endif
+      
+#if NH_MV
+  }
+#endif
 
   if (tmpSliceMode<0 || tmpSliceMode>=Int(NUMBER_OF_SLICE_CONSTRAINT_MODES))
   {
@@ -1846,6 +2454,95 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   }
 
   // allocate slice-based dQP values
+#if NH_MV
+  for (Int i = (Int)m_layerIdInNuh.size(); i < m_numberOfLayers; i++ )
+  {
+    m_layerIdInNuh.push_back( i == 0 ? 0 : m_layerIdInNuh[ i - 1 ] + 1 );
+  }
+  xResizeVector( m_layerIdInNuh );
+
+  xResizeVector( m_viewOrderIndex    );
+
+  std::vector<Int> uniqueViewOrderIndices;
+  for( Int layer = 0; layer < m_numberOfLayers; layer++ )
+  {
+    Bool isIn = false;
+    for ( Int i = 0 ; i < uniqueViewOrderIndices.size(); i++ )
+    {
+      isIn = isIn || ( m_viewOrderIndex[ layer ] == uniqueViewOrderIndices[ i ] );
+    }
+    if ( !isIn )
+    {
+      uniqueViewOrderIndices.push_back( m_viewOrderIndex[ layer ] );
+    }
+  }
+  m_iNumberOfViews = (Int) uniqueViewOrderIndices.size();
+  xResizeVector( m_auxId );
+
+  if ( !m_qpIncrementAtSourceFrame.empty() )
+  {
+    xResizeVector( m_qpIncrementAtSourceFrame );
+  }
+  xResizeVector( m_iQP );
+
+  for( Int layer = 0; layer < m_numberOfLayers; layer++ )
+  {
+    m_aidQP.push_back( new Int[ m_framesToBeEncoded + m_iGOPSize + 1 ] );
+    ::memset( m_aidQP[layer], 0, sizeof(Int)*( m_framesToBeEncoded + m_iGOPSize + 1 ) );
+
+    if ( !m_qpIncrementAtSourceFrame.empty() )
+    {
+      UInt switchingPOC=0;
+      if (m_qpIncrementAtSourceFrame[layer] > m_FrameSkip)
+      {
+        // if switch source frame (ssf) = 10, and frame skip (fs)=2 and temporal subsample ratio (tsr) =1, then
+        //    for this simulation switch at POC 8 (=10-2).
+        // if ssf=10, fs=2, tsr=2, then for this simulation, switch at POC 4 (=(10-2)/2): POC0=Src2, POC1=Src4, POC2=Src6, POC3=Src8, POC4=Src10
+        switchingPOC = (m_qpIncrementAtSourceFrame[layer] - m_FrameSkip) / m_temporalSubsampleRatio;
+      }
+      for(UInt i=switchingPOC; i<( m_framesToBeEncoded + m_iGOPSize + 1 ); i++)
+      {
+        m_aidQP[layer][i]=1;
+      }
+    }
+
+    for(UInt ch=0; ch<MAX_NUM_CHANNEL_TYPE; ch++)
+    {
+      if (saoOffsetBitShift[ch]<0)
+      {
+#if NH_MV
+        Int repFormatIdx = m_layerIdxInVpsToRepFormatIdx[ layer ];
+        if (m_internalBitDepths[repFormatIdx][ch]>10)
+#else
+        if (m_internalBitDepth[ch]>10)
+#endif
+        {
+          m_log2SaoOffsetScale[layer][ch]=UInt(Clip3<Int>(0, m_internalBitDepths[repFormatIdx][ch]-10, Int(m_internalBitDepths[repFormatIdx][ch]-10 + 0.165*m_iQP[layer] - 3.22 + 0.5) ) );
+        }
+        else
+        {
+          m_log2SaoOffsetScale[layer][ch]=0;
+        }
+      }
+      else
+      {
+        m_log2SaoOffsetScale[layer][ch]=UInt(saoOffsetBitShift[ch]);
+      }
+    }
+  }
+
+  xResizeVector( m_bLoopFilterDisable );
+  xResizeVector( m_bUseSAO );
+  xResizeVector( m_iIntraPeriod );
+  xResizeVector( m_tilesInUseFlag );
+  xResizeVector( m_loopFilterNotAcrossTilesFlag );
+  xResizeVector( m_wppInUseFlag );
+
+  for (Int olsIdx = 0; olsIdx < m_vpsNumLayerSets + m_numAddLayerSets + (Int) m_outputLayerSetIdx.size(); olsIdx++)
+  {
+    m_altOutputLayerFlag.push_back( false );
+  }
+#else
   m_aidQP = new Int[ m_framesToBeEncoded + m_iGOPSize + 1 ];
   ::memset( m_aidQP, 0, sizeof(Int)*( m_framesToBeEncoded + m_iGOPSize + 1 ) );
 
@@ -1884,6 +2581,8 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     }
   }
 
+#endif
+
   assert(lumaLevelToDeltaQPMode<LUMALVL_TO_DQP_NUM_MODES);
   if (lumaLevelToDeltaQPMode>=LUMALVL_TO_DQP_NUM_MODES)
   {
@@ -1907,6 +2606,10 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     FILE* fpt=fopen( m_dQPFileName.c_str(), "r" );
     if ( fpt )
     {
+#if NH_MV
+      for( Int layer = 0; layer < m_numberOfLayers; layer++ )
+      {
+#endif
       Int iValue;
       Int iPOC = 0;
       while ( iPOC < m_framesToBeEncoded )
@@ -1915,13 +2618,22 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
         {
           break;
         }
+#if NH_MV
+        m_aidQP[layer][ iPOC ] = iValue;
+        iPOC++;
+      }
+#else
         m_aidQP[ iPOC ] = iValue;
         iPOC++;
+#endif
       }
       fclose(fpt);
     }
   }
 
+#if NH_MV
+  xParseSeiCfg();
+#endif
   if( m_masteringDisplay.colourVolumeSEIEnabled )
   {
     for(UInt idx=0; idx<6; idx++)
@@ -2085,6 +2797,17 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
       info.m_fisheyeCircularRegionRadius            = cfg_fviSEIFisheyeCircularRegionRadius.values[i];
       info.m_fisheyeSceneRadius                     = cfg_fviSEIFisheyeSceneRadius.values[i];
 
+#if NH_MV
+      // NOTE: Referenced TAppEncCfg::parseCfg() to access the parameters to avoid the build error for MV-HEVC encoding.
+      for (Int i = 0; i < m_numRepFormats; i++ ) {
+        Int  &m_confWinRight  = m_confWinRights    [i];
+        Int  &m_confWinBottom = m_confWinBottoms   [i];
+        Int  &m_confWinLeft   = m_confWinLefts     [i];
+        Int  &m_confWinTop    = m_confWinTops      [i];
+        Int  &m_sourceHeight  = m_iSourceHeights   [i];
+        Int  &m_sourceWidth   = m_iSourceWidths    [i];
+#endif
+
       // check rectangular region is within the conformance window.
       if ( (!( info.m_fisheyeRectRegionHeight >= 1 && m_confWinTop  <= info.m_fisheyeRectRegionTop  && info.m_fisheyeRectRegionTop  + info.m_fisheyeRectRegionHeight < m_sourceHeight -m_confWinBottom ) ) ||
            (!( info.m_fisheyeRectRegionWidth  >= 1 && m_confWinLeft <= info.m_fisheyeRectRegionLeft && info.m_fisheyeRectRegionLeft + info.m_fisheyeRectRegionWidth  < m_sourceWidth  -m_confWinRight  ) ) )
@@ -2092,6 +2815,9 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
         fprintf(stderr, "Fisheye region is not within visible area\n");
         exit (EXIT_FAILURE);
       }
+#if NH_MV
+      }
+#endif
 
       info.m_fisheyeCameraCentreAzimuth             = cfg_fviSEIFisheyeCameraCentreAzimuth.values[i];
       info.m_fisheyeCameraCentreElevation           = cfg_fviSEIFisheyeCameraCentreElevation.values[i];
@@ -2248,7 +2974,15 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     uiAddCUDepth++;
   }
 
+#if NH_MV
+  for (Int i = 0; i < m_numRepFormats; i++ )
+  {
+    m_uiMaxTotalCUDepth               .push_back( m_uiMaxCUDepth + uiAddCUDepth + getMaxCUDepthOffset(m_chromaFormatIDCs[i], m_uiQuadtreeTULog2MinSize) ); // if minimum TU larger than 4x4, allow for additional part indices for 4:2:2 SubTUs.
+  }
+#else
   m_uiMaxTotalCUDepth = m_uiMaxCUDepth + uiAddCUDepth + getMaxCUDepthOffset(m_chromaFormatIDC, m_uiQuadtreeTULog2MinSize); // if minimum TU larger than 4x4, allow for additional part indices for 4:2:2 SubTUs.
+#endif
+
   m_uiLog2DiffMaxMinCodingBlockSize = m_uiMaxCUDepth - 1;
 
   // print-out parameters
@@ -2257,10 +2991,506 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   return true;
 }
 
+#if NH_MV
+Void TAppEncCfg::xDeriveProfAndConstrFlags( const TComVPS& vps )
+{
+
+  UInt numPtl = (Int) m_uiProfiles.size();
+  m_profiles.resize( numPtl );
+  m_chromaFormatConstraints.resize( m_uiProfiles.size() );
+  
+  xResizeVector( m_onePictureOnlyConstraintFlags , numPtl );
+  xResizeVector( m_bitDepthConstraints           , numPtl );
+  xResizeVector( m_frameOnlyConstraintFlags      , numPtl );
+  xResizeVector( m_nonPackedConstraintFlags      , numPtl );
+  xResizeVector( m_intraConstraintFlags          , numPtl );
+  xResizeVector( m_interlacedSourceFlags         , numPtl );
+  xResizeVector( m_progressiveSourceFlags        , numPtl );
+  xResizeVector( m_lowerBitRateConstraintFlags   , numPtl );
+  xResizeVector( m_tmpConstraintChromaFormats    , numPtl );
+
+  for (Int i = 0; i < m_profiles.size(); i++)
+  {
+    UIProfileName UIProfile = m_uiProfiles[i];
+
+    ChromaFormat maxChromaFormatIdc       ;
+    Int          maxInternalBitDepthLuma  ;
+    Int          maxInternalBitDepthChroma;
+    Int          maxNumRefLayers          ;
+
+    xGetMaxValuesOfApplicableLayers(vps, i, maxInternalBitDepthLuma,maxInternalBitDepthChroma, maxChromaFormatIdc, maxNumRefLayers );
+
+    switch ( UIProfile )
+    {
+    case UI_MULTIVIEWMAIN:
+      m_profiles[i] = Profile::MULTIVIEWMAIN;
+      m_onePictureOnlyConstraintFlags[i] = false;
+#if JVET_AE0295
+      m_bitDepthConstraints[i] = 1;
+#endif  // JVET_AE0295
+      break;
+#if JVET_AH0046
+    case UI_MULTIVIEWEXTENDED:
+      m_profiles[i] = Profile::MULTIVIEWEXTENDED;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      break;
+
+    case UI_MULTIVIEWEXTENDED10:
+      m_profiles[i] = Profile::MULTIVIEWEXTENDED10;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      break;
+#else
+#if JVET_AE0295
+    case UI_MULTIVIEWMAIN10:
+      m_profiles[i] = Profile::MULTIVIEWMAIN;
+      m_onePictureOnlyConstraintFlags[i] = false;
+#if JVET_AE0295
+      m_bitDepthConstraints[i] = 10;
+#endif
+      break;
+#endif //JVET_AE0295
+#endif  // JVET_AH0046
+#if JVET_AM1080
+    case UI_MULTIVIEWREXT:
+      m_profiles[i] = Profile::MULTIVIEWREXT;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      break;
+#endif //  JVET_AM1080
+    case UI_NONE:
+      m_profiles[i] = Profile::NONE;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      break;
+    case UI_MAIN:
+      m_profiles[i] = Profile::MAIN;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      break;
+    case UI_MAIN10:
+      m_profiles[i] = Profile::MAIN10;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      break;
+    case UI_MAINSTILLPICTURE:
+      m_profiles[i] = Profile::MAINSTILLPICTURE;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      break;
+    case UI_MAIN10_STILL_PICTURE:
+      m_profiles[i] = Profile::MAIN10;
+      m_onePictureOnlyConstraintFlags[i] = true;
+      break;
+    case UI_MAINREXT:
+      m_profiles[i] = Profile::MAINREXT;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      break;
+    case UI_HIGHTHROUGHPUTREXT:
+      m_profiles[i] = Profile::HIGHTHROUGHPUTREXT;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      break;
+#if NH_MV_ALLOW_NON_CONFORMING
+    case UI_MULTIVIEWMAIN_NONCONF:
+      m_profiles[i] = Profile::MULTIVIEWMAIN_NONCONFORMING;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      break;
+#endif
+
+    default:
+      if (UIProfile >= 1000 && UIProfile <= 12316)
+      {
+        m_profiles[i] = Profile::MAINREXT;
+        if (m_bitDepthConstraints[i] != 0 || m_tmpConstraintChromaFormats[i] != 0)
+        {
+          fprintf(stderr, "Error: The bit depth and chroma format constraints are not used when an explicit RExt profile is specified\n");
+          exit(EXIT_FAILURE);
+        }
+        m_bitDepthConstraints[i]           = (UIProfile%100);
+        m_intraConstraintFlags[i]          = ((UIProfile%10000)>=2000);
+        m_onePictureOnlyConstraintFlags[i] = (UIProfile >= 10000);
+        switch ((UIProfile/100)%10)
+        {
+        case 0:  m_tmpConstraintChromaFormats[i]=400; break;
+        case 1:  m_tmpConstraintChromaFormats[i]=420; break;
+        case 2:  m_tmpConstraintChromaFormats[i]=422; break;
+        default: m_tmpConstraintChromaFormats[i]=444; break;
+        }
+      }
+      else if (UIProfile >= 21308 && UIProfile <= 22316)
+      {
+        m_profiles[i] = Profile::HIGHTHROUGHPUTREXT;
+        if (m_bitDepthConstraints[i] != 0 || m_tmpConstraintChromaFormats[i] != 0)
+        {
+          fprintf(stderr, "Error: The bit depth and chroma format constraints are not used when an explicit RExt profile is specified\n");
+          exit(EXIT_FAILURE);
+        }
+        m_bitDepthConstraints[i]           = (UIProfile%100);
+        m_intraConstraintFlags[i]          = ((UIProfile%10000)>=2000);
+        m_onePictureOnlyConstraintFlags[i] = 0;
+        if((UIProfile == UI_HIGHTHROUGHPUT_444) || (UIProfile == UI_HIGHTHROUGHPUT_444_10) )
+        {
+          assert(m_cabacBypassAlignmentEnabledFlag==0);
+        }
+        switch ((UIProfile/100)%10)
+        {
+        case 0:  m_tmpConstraintChromaFormats[i]=400; break;
+        case 1:  m_tmpConstraintChromaFormats[i]=420; break;
+        case 2:  m_tmpConstraintChromaFormats[i]=422; break;
+        default: m_tmpConstraintChromaFormats[i]=444; break;
+        }
+      }
+      else
+      {
+        fprintf(stderr, "Error: Unprocessed UI profile\n");
+        assert(0);
+        exit(EXIT_FAILURE);
+      }
+      break;
+    }
+
+    switch (m_profiles[i])
+    {
+    case Profile::HIGHTHROUGHPUTREXT:
+      {
+        if (m_bitDepthConstraints[i] == 0)
+        {
+          m_bitDepthConstraints[i] = 16;
+        }
+        m_chromaFormatConstraints[i] = (m_tmpConstraintChromaFormats[i] == 0) ? CHROMA_444 : numberToChromaFormat(m_tmpConstraintChromaFormats[i]);
+      }
+      break;
+    case Profile::MAINREXT:
+
+      {
+        if (m_bitDepthConstraints[i] == 0 && m_tmpConstraintChromaFormats[i] == 0)
+        {
+          // produce a valid combination, if possible.
+          const Bool bUsingGeneralRExtTools  = m_transformSkipRotationEnabledFlag        ||
+            m_transformSkipContextEnabledFlag         ||
+            m_rdpcmEnabledFlag[RDPCM_SIGNAL_IMPLICIT] ||
+            m_rdpcmEnabledFlag[RDPCM_SIGNAL_EXPLICIT] ||
+            !m_enableIntraReferenceSmoothing         ||
+            m_persistentRiceAdaptationEnabledFlag     ||
+            m_log2MaxTransformSkipBlockSize!=2;
+          const Bool bUsingChromaQPAdjustment= m_diffCuChromaQpOffsetDepth >= 0;
+          const Bool bUsingExtendedPrecision = m_extendedPrecisionProcessingFlag;
+          if (m_onePictureOnlyConstraintFlags[i])
+          {
+            m_chromaFormatConstraints[i] = CHROMA_444;
+            if (m_intraConstraintFlags[i] != true)
+            {
+              fprintf(stderr, "Error: Intra constraint flag must be true when one_picture_only_constraint_flag is true\n");
+              exit(EXIT_FAILURE);
+            }
+            const Int maxBitDepth = maxChromaFormatIdc==CHROMA_400 ? maxInternalBitDepthLuma : std::max( maxInternalBitDepthLuma, maxInternalBitDepthChroma);
+            m_bitDepthConstraints[i] = maxBitDepth>8 ? 16:8;
+          }
+          else
+          {
+            m_chromaFormatConstraints[i] = NUM_CHROMA_FORMAT;
+
+            UInt tempBitDepthConstraint = (UInt) m_bitDepthConstraints[i];
+
+            automaticallySelectRExtProfile(bUsingGeneralRExtTools,
+              bUsingChromaQPAdjustment,
+              bUsingExtendedPrecision,
+              m_intraConstraintFlags[i],
+              tempBitDepthConstraint,
+              m_chromaFormatConstraints[i],
+              maxChromaFormatIdc==CHROMA_400 ? maxInternalBitDepthLuma : std::max(maxInternalBitDepthLuma, maxInternalBitDepthChroma),
+              maxChromaFormatIdc);
+
+            m_bitDepthConstraints[i] = (Int) tempBitDepthConstraint;
+          }
+        }
+        else if (m_bitDepthConstraints[i] == 0 || m_tmpConstraintChromaFormats[i] == 0)
+        {
+          fprintf(stderr, "Error: The bit depth and chroma format constraints must either both be specified or both be configured automatically\n");
+          exit(EXIT_FAILURE);
+        }
+        else
+        {
+          m_chromaFormatConstraints[i] = numberToChromaFormat(m_tmpConstraintChromaFormats[i]);
+        }
+      }
+      break;
+    case Profile::MAIN:
+    case Profile::MAIN10:
+    case Profile::MAINSTILLPICTURE:
+      m_chromaFormatConstraints[i] = (m_tmpConstraintChromaFormats[i] == 0) ? maxChromaFormatIdc : numberToChromaFormat(m_tmpConstraintChromaFormats[i]);
+      m_bitDepthConstraints[i] = (m_profiles[i] == Profile::MAIN10?10:8);
+      break;
+#if NH_MV_ALLOW_NON_CONFORMING
+    case Profile::MULTIVIEWMAIN_NONCONFORMING:
+#endif
+    case Profile::NONE:
+
+      m_chromaFormatConstraints[i] = maxChromaFormatIdc;
+      m_bitDepthConstraints[i]     = maxChromaFormatIdc==CHROMA_400 ? maxInternalBitDepthLuma : std::max(maxInternalBitDepthLuma, maxInternalBitDepthChroma);
+      break;
+    case Profile::MULTIVIEWMAIN:
+      m_chromaFormatConstraints[i] = CHROMA_420;
+#if !JVET_AE0295
+      m_bitDepthConstraints[i]     = 8;
+#endif  // !JVET_AE0295
+      break;
+#if JVET_AH0046
+    case Profile::MULTIVIEWEXTENDED:
+      m_chromaFormatConstraints[i] = CHROMA_420;
+      m_bitDepthConstraints[i]     = 8;
+      break;
+    case Profile::MULTIVIEWEXTENDED10:
+      m_chromaFormatConstraints[i] = CHROMA_420;
+      m_bitDepthConstraints[i]     = 10;
+      break;
+#endif  // JVET_AH046
+      break;
+#if JVET_AM1080
+    case Profile::MULTIVIEWREXT:
+      // Assume that the profile for each layer is identical during MV-HEVC encoding.
+      switch ((m_uiProfiles[0]/100)%10)
+      {
+        case 0:  m_chromaFormatConstraints[i]=CHROMA_400; break;
+        case 1:  m_chromaFormatConstraints[i]=CHROMA_420; break;
+        case 2:  m_chromaFormatConstraints[i]=CHROMA_422; break;
+        default: m_chromaFormatConstraints[i]=CHROMA_444; break;
+      }
+      break;
+#endif //  JVET_AM1080
+
+    default:
+      fprintf(stderr, "Unknown profile selected\n");
+      exit(EXIT_FAILURE);
+      break;
+    }
+  }
+}
+#endif
 
 // ====================================================================================================================
 // Private member functions
 // ====================================================================================================================
+
+#if NH_MV
+Void TAppEncCfg::xCheckProfiles( const TComVPS& vps )
+{
+  Bool check_failed = false;
+
+
+#define xConfirmPara(a,b) check_failed |= confirmPara(a,b)
+
+  // TBD: disallow 3D tools when 3D Main profile is not used.
+
+  for (Int i = 0; i < m_profiles.size(); i++ )
+  {
+    ChromaFormat maxChromaFormatIdc;
+    Int          maxBitDepthLuma   ;
+    Int          maxBitDepthChroma ;
+    Int          maxNumRefLayers   ;
+
+    xGetMaxValuesOfApplicableLayers(vps, i, maxBitDepthLuma, maxBitDepthChroma , maxChromaFormatIdc, maxNumRefLayers );
+
+    const UInt maxBitDepth=(maxChromaFormatIdc==CHROMA_400) ? maxBitDepthLuma : std::max(maxBitDepthLuma, maxBitDepthChroma);
+
+    xConfirmPara(m_bitDepthConstraints[i] > maxBitDepth       , "The internalBitDepth must not be greater than the bitDepthConstraint value herer"      );
+    xConfirmPara(m_chromaFormatConstraints[i] < maxChromaFormatIdc, "The chroma format used must not be greater than the chromaFormatConstraint value");
+
+    switch (m_profiles[i] )
+    {
+    case Profile::MAINREXT:
+    case Profile::HIGHTHROUGHPUTREXT:
+
+      {
+        xConfirmPara(m_lowerBitRateConstraintFlags[i] == false  &&  m_intraConstraintFlags[i] == false                        , "The lowerBitRateConstraint flag cannot be false when intraConstraintFlag is false");
+        xConfirmPara(m_cabacBypassAlignmentEnabledFlag          &&              m_profiles[i] != Profile::HIGHTHROUGHPUTREXT  , "AlignCABACBeforeBypass must not be enabled unless the high throughput profile is being used.");
+
+        if (m_profiles[i] == Profile::MAINREXT)
+        {
+          const UInt intraIdx        = m_intraConstraintFlags[i] ? 1:0;
+          const UInt bitDepthIdx     = (m_bitDepthConstraints[i] == 8 ? 0 : (m_bitDepthConstraints[i] ==10 ? 1 : (m_bitDepthConstraints[i] == 12 ? 2 : (m_bitDepthConstraints[i] == 16 ? 3 : 4 ))));
+          const UInt chromaFormatIdx = UInt(m_chromaFormatConstraints[i]);
+          const Bool bValidProfile   = (bitDepthIdx > 3 || chromaFormatIdx>3) ? false : (validRExtProfileNames[intraIdx][bitDepthIdx][chromaFormatIdx] != UI_NONE);
+
+          xConfirmPara(!bValidProfile, "Invalid intra constraint flag, bit depth constraint flag and chroma format constraint flag combination for a RExt profile");
+          const Bool bUsingGeneralRExtTools  = m_transformSkipRotationEnabledFlag   ||
+            m_transformSkipContextEnabledFlag                                       ||
+            m_rdpcmEnabledFlag[RDPCM_SIGNAL_IMPLICIT]                               ||
+            m_rdpcmEnabledFlag[RDPCM_SIGNAL_EXPLICIT]                               ||
+            !m_enableIntraReferenceSmoothing                                        ||
+            m_persistentRiceAdaptationEnabledFlag                                   ||
+            m_log2MaxTransformSkipBlockSize!=2;
+          const Bool bUsingChromaQPTool      = m_diffCuChromaQpOffsetDepth >= 0;
+          const Bool bUsingExtendedPrecision = m_extendedPrecisionProcessingFlag;
+
+          xConfirmPara((m_chromaFormatConstraints[i]==CHROMA_420 || m_chromaFormatConstraints[i]==CHROMA_400) && bUsingChromaQPTool, "CU Chroma QP adjustment cannot be used for 4:0:0 or 4:2:0 RExt profiles");
+          xConfirmPara(m_bitDepthConstraints[i] != 16 && bUsingExtendedPrecision, "Extended precision can only be used in 16-bit RExt profiles");
+          if (!(m_chromaFormatConstraints[i] == CHROMA_400 && m_bitDepthConstraints[i] == 16) && m_chromaFormatConstraints[i]!=CHROMA_444)
+          {
+            xConfirmPara(bUsingGeneralRExtTools, "Combination of tools and profiles are not possible in the specified RExt profile.");
+          }
+          xConfirmPara( m_onePictureOnlyConstraintFlags[i] && m_chromaFormatConstraints[i]!=CHROMA_444, "chroma format constraint must be 4:4:4 when one-picture-only constraint flag is 1");
+          xConfirmPara( m_onePictureOnlyConstraintFlags[i] && m_bitDepthConstraints[i] != 8 && m_bitDepthConstraints[i] != 16, "bit depth constraint must be 8 or 16 when one-picture-only constraint flag is 1");
+          xConfirmPara( m_onePictureOnlyConstraintFlags[i] && m_framesToBeEncoded > 1, "Number of frames to be encoded must be 1 when one-picture-only constraint flag is 1.");
+
+          if (!m_intraConstraintFlags[i] && m_bitDepthConstraints[i]==16 && m_chromaFormatConstraints[i]==CHROMA_444)
+          {
+            fprintf(stderr, "********************************************************************************************************\n");
+            fprintf(stderr, "** WARNING: The RExt constraint flags describe a non standard combination (used for development only) **\n");
+            fprintf(stderr, "********************************************************************************************************\n");
+          }
+        }
+        else
+        {
+          xConfirmPara( m_chromaFormatConstraints[i] != CHROMA_444, "chroma format constraint must be 4:4:4 in the High Throughput 4:4:4 16-bit Intra profile.");
+          const UInt intraIdx      =   m_intraConstraintFlags[i]     ? 1     : 0;
+          const UInt bitDepthIdx   = ( m_bitDepthConstraints[i] == 8 ? 0     : (m_bitDepthConstraints[i] == 10 ? 1 : (m_bitDepthConstraints[i] == 14 ? 2 : (m_bitDepthConstraints[i] == 16 ? 3 : 4 ))));
+          const Bool bValidProfile = ( bitDepthIdx > 3)              ? false : (validRExtHighThroughPutProfileNames[intraIdx][bitDepthIdx] != UI_NONE);
+          xConfirmPara(!bValidProfile, "Invalid intra constraint flag and bit depth constraint flag combination for a RExt high profile throughput profile");
+          if(bitDepthIdx < 2)
+          {
+            xConfirmPara((m_extendedPrecisionProcessingFlag || m_cabacBypassAlignmentEnabledFlag), "Invalid configuration for a RExt high throughput 8 and 10 bit profile");
+          }
+          if(bitDepthIdx == 3)
+          {
+            xConfirmPara(!m_cabacBypassAlignmentEnabledFlag, "Cabac Bypass Alignment flag must be 1 in the High Throughput 4:4:4 16-bit Intra profile");
+          }
+          else if(bitDepthIdx < 3)
+          {
+            xConfirmPara(!m_entropyCodingSyncEnabledFlag, "WPP flag must be 1 in the High Throughput 4:4:4 non 16-bit Intra profile");
+          }
+        }
+      }
+      break;
+#if JVET_AH0046
+    case Profile::MULTIVIEWEXTENDED:
+      xConfirmPara(m_bitDepthConstraints        [i] != 8, "BitDepthConstraint must be 8 for Multiview Extended.");
+      break;
+        
+    case Profile::MULTIVIEWEXTENDED10:
+      xConfirmPara(m_bitDepthConstraints        [i] != 10,"BitDepthConstraint must be 8 for MAIN profile and Multiview Extended main profile, and 10 for MAIN 10 profile and Multiview Extended Main 10.");
+           xConfirmPara(m_chromaFormatConstraints    [i] != CHROMA_420   , "ChromaFormatConstraint must be 420 for non main-RExt profiles.");
+       break;
+#endif  // JVET_AH0046
+
+#if JVET_AM1080
+    case Profile::MULTIVIEWREXT:
+    // Assume that the profile for each layer is identical during MV-HEVC encoding.
+    {
+       ChromaFormat  chromaFormat = CHROMA_400;
+       switch ((m_uiProfiles[0]/100)%10)
+       {
+           case 0:  chromaFormat=CHROMA_400; break;
+           case 1:  chromaFormat=CHROMA_420; break;
+           case 2:  chromaFormat=CHROMA_422; break;
+           default: chromaFormat=CHROMA_444; break;
+       }
+
+       xConfirmPara(m_chromaFormatConstraints    [i] != chromaFormat   , "ChromaFormatConstraint must be a right format for multi-RExt profiles.");
+     }
+      break;
+#endif  // JVET_AM1080
+
+    case Profile::MAIN:
+    case Profile::MAIN10:
+    case Profile::MAINSTILLPICTURE:
+    case Profile::MULTIVIEWMAIN:
+
+      {
+#if JVET_AE0295
+        if(m_profiles[i]==Profile::MAIN10)
+        {
+          xConfirmPara(m_bitDepthConstraints        [i] != 10,"BitDepthConstraint must be 8 for MAIN profile, Multiview main profile, and 3D Main profile and 10 for MAIN10 profile.");
+        }
+        else if(m_profiles[i]==Profile::MAIN)
+        {
+          xConfirmPara(m_bitDepthConstraints        [i] != 8,"BitDepthConstraint must be 8 for MAIN profile, Multiview main profile, and 3D Main profile and 10 for MAIN10 profile.");
+        }
+        else if(m_profiles[i]==Profile::MULTIVIEWMAIN)
+        {
+#if !JVET_AE0295
+          xConfirmPara(m_bitDepthConstraints        [i] != 8,"BitDepthConstraint must be 8 for MAIN profile, Multiview main profile, and 3D Main profile and 10 for MAIN10 profile and Multiview Main 10.");
+#endif  // !JVET_AE0295
+        }
+#else
+        xConfirmPara(m_bitDepthConstraints        [i] != ((m_profiles[i]==Profile::MAIN10)?10:8), "BitDepthConstraint must be 8 for MAIN profile, Multiview main profile, and 3D Main profile and 10 for MAIN10 profile.");
+#endif//JVET_AE0295
+        {
+          xConfirmPara(m_chromaFormatConstraints    [i] != CHROMA_420   , "ChromaFormatConstraint must be 420 for non main-RExt profiles.");
+        }
+       
+        xConfirmPara(m_intraConstraintFlags       [i] == true         , "IntraConstraintFlag must be false for non main_RExt profiles.");
+        xConfirmPara(m_lowerBitRateConstraintFlags[i] == false        , "LowerBitrateConstraintFlag must be true for non main-RExt profiles.");
+        xConfirmPara(m_profiles[i] == Profile::MAINSTILLPICTURE && m_framesToBeEncoded > 1, "Number of frames to be encoded must be 1 when main still picture profile is used.");
+
+        xConfirmPara(m_crossComponentPredictionEnabledFlag    == true , "CrossComponentPrediction must not be used for non main-RExt profiles.");
+        xConfirmPara(m_log2MaxTransformSkipBlockSize          != 2    , "Transform Skip Log2 Max Size must be 2 for V1 profiles.");
+        xConfirmPara(m_transformSkipRotationEnabledFlag       == true , "UseResidualRotation must not be enabled for non main-RExt profiles.");
+        xConfirmPara(m_transformSkipContextEnabledFlag        == true , "UseSingleSignificanceMapContext must not be enabled for non main-RExt profiles.");
+        xConfirmPara(m_rdpcmEnabledFlag[RDPCM_SIGNAL_IMPLICIT]== true , "ImplicitResidualDPCM must not be enabled for non main-RExt profiles.");
+        xConfirmPara(m_rdpcmEnabledFlag[RDPCM_SIGNAL_EXPLICIT]== true , "ExplicitResidualDPCM must not be enabled for non main-RExt profiles.");
+        xConfirmPara(m_persistentRiceAdaptationEnabledFlag    == true , "GolombRiceParameterAdaption must not be enabled for non main-RExt profiles.");
+        xConfirmPara(m_extendedPrecisionProcessingFlag        == true , "UseExtendedPrecision must not be enabled for non main-RExt profiles.");
+        xConfirmPara(m_highPrecisionOffsetsEnabledFlag        == true , "UseHighPrecisionPredictionWeighting must not be enabled for non main-RExt profiles.");
+        xConfirmPara(m_enableIntraReferenceSmoothing          == false, "EnableIntraReferenceSmoothing must be enabled for non main-RExt profiles.");
+        xConfirmPara(m_cabacBypassAlignmentEnabledFlag                , "AlignCABACBeforeBypass cannot be enabled for non main-RExt profiles.");
+
+        if ( m_profiles[i] == Profile::MULTIVIEWMAIN )
+        {
+          xConfirmPara( maxNumRefLayers > 4, "When using the MV-Main profile, NumRefLayers must be less than or equal to 4 for all layers in the subBitstream"  );
+          // -  For a layer with nuh_layer_id iNuhLId equal to any value included in layerIdListTarget that was used to derive subBitstream,
+          //    the value of NumRefLayers[ iNuhLId ], which specifies the total number of direct and indirect reference layers and is derived as
+          //    specified in F.7.4.3.1, shall be less than or equal to 4.
+        }
+
+      }
+      break;
+#if NH_MV_ALLOW_NON_CONFORMING
+    case Profile::MULTIVIEWMAIN_NONCONFORMING:
+#endif
+    case Profile::NONE:
+      // Non-conforming configuration, so all settings are valid.
+      break;
+    default:
+      xConfirmPara( 1, "Unknown profile selected.");
+      break;
+    }
+
+    if ( check_failed )
+    {
+      printf("Error: Checking VpsProfileTierLevel[%d]. \n", i );
+      exit(EXIT_FAILURE);
+    }
+
+  }
+  #undef xConfirmPara
+
+  Bool anyMultiLayerProfile = false;
+
+  for (Int i = 0; i < m_profiles.size(); i++ )
+  {
+    anyMultiLayerProfile = ( anyMultiLayerProfile
+       
+      ||  (m_profiles[i] == Profile::MULTIVIEWMAIN)
+#if JVET_AH0046
+      ||  (m_profiles[i] == Profile::MULTIVIEWEXTENDED)
+      ||  (m_profiles[i] == Profile::MULTIVIEWEXTENDED10)
+#endif  // JVET_AH0046
+      ) ;
+  }
+  
+#if JVET_AE0295
+  if ((( anyMultiLayerProfile && ( m_profiles[0] != Profile::MAIN || m_profiles[1] != Profile::MAIN  ) ))&&(( anyMultiLayerProfile && ( m_profiles[0] != Profile::MAIN10 || m_profiles[1] != Profile::MAIN10  ) )))
+  {
+    fprintf(stderr, "Error: The base layer must conform to the Main profile or MAIN 10 for Multilayer coding.\n");
+    exit(EXIT_FAILURE);
+  }
+#else
+  if ( anyMultiLayerProfile && ( m_profiles[0] != Profile::MAIN || m_profiles[1] != Profile::MAIN  ) )
+  {
+    fprintf(stderr, "Error: The base layer must conform to the Main profile for Multilayer coding.\n");
+    exit(EXIT_FAILURE);
+  }
+#endif//JVET_AE0295
+
+}
+
+#endif
+
 
 Void TAppEncCfg::xCheckParameter()
 {
@@ -2272,6 +3502,8 @@ Void TAppEncCfg::xCheckParameter()
     fprintf(stderr, "**          decoder requires this option to be enabled.         **\n");
     fprintf(stderr, "******************************************************************\n");
   }
+
+#if !NH_MV
   if( m_profile==Profile::NONE )
   {
     fprintf(stderr, "***************************************************************************\n");
@@ -2284,11 +3516,13 @@ Void TAppEncCfg::xCheckParameter()
     fprintf(stderr, "** WARNING: For conforming bitstreams a valid Level value must be set!   **\n");
     fprintf(stderr, "***************************************************************************\n");
   }
+#endif
 
   Bool check_failed = false; /* abort if there is a fatal configuration problem */
 #define xConfirmPara(a,b) check_failed |= confirmPara(a,b)
 
   xConfirmPara(m_bitstreamFileName.empty(), "A bitstream file name must be specified (BitstreamFile)");
+#if !NH_MV
   const UInt maxBitDepth=(m_chromaFormatIDC==CHROMA_400) ? m_internalBitDepth[CHANNEL_TYPE_LUMA] : std::max(m_internalBitDepth[CHANNEL_TYPE_LUMA], m_internalBitDepth[CHANNEL_TYPE_CHROMA]);
   xConfirmPara(m_bitDepthConstraint<maxBitDepth, "The internalBitDepth must not be greater than the bitDepthConstraint value");
   xConfirmPara(m_chromaFormatConstraint<m_chromaFormatIDC, "The chroma format used must not be greater than the chromaFormatConstraint value");
@@ -2386,7 +3620,15 @@ Void TAppEncCfg::xCheckParameter()
       xConfirmPara( 1, "Unknown profile selected.");
       break;
   }
+#endif
 
+#if NH_MV
+  for (Int i = 0; i < m_numRepFormats; i++ )
+  {
+    Int* m_internalBitDepth    = &m_internalBitDepths   [i][0];
+    Int* m_inputBitDepth       = &m_inputBitDepths      [i][0];
+    Int* m_MSBExtendedBitDepth = &m_MSBExtendedBitDepths[i][0];
+#endif
   // check range of parameters
   xConfirmPara( m_inputBitDepth[CHANNEL_TYPE_LUMA  ] < 8,                                   "InputBitDepth must be at least 8" );
   xConfirmPara( m_inputBitDepth[CHANNEL_TYPE_CHROMA] < 8,                                   "InputBitDepthC must be at least 8" );
@@ -2418,19 +3660,237 @@ Void TAppEncCfg::xCheckParameter()
   xConfirmPara( (m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA  ] < m_inputBitDepth[CHANNEL_TYPE_LUMA  ]), "MSB-extended bit depth for luma channel (--MSBExtendedBitDepth) must be greater than or equal to input bit depth for luma channel (--InputBitDepth)" );
   xConfirmPara( (m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA] < m_inputBitDepth[CHANNEL_TYPE_CHROMA]), "MSB-extended bit depth for chroma channel (--MSBExtendedBitDepthC) must be greater than or equal to input bit depth for chroma channel (--InputBitDepthC)" );
 
+#if NH_MV
+  }
+  for (Int i = 0; i < m_numberOfLayers; i++)
+  {
+    Int repFormatIdx = m_layerIdxInVpsToRepFormatIdx[i];
+    xConfirmPara( m_log2SaoOffsetScale[i][CHANNEL_TYPE_LUMA]   > (m_internalBitDepths[repFormatIdx][CHANNEL_TYPE_LUMA  ]<10?0:(m_internalBitDepths[repFormatIdx][CHANNEL_TYPE_LUMA  ]-10)), "SaoLumaOffsetBitShift must be in the range of 0 to InternalBitDepth-10, inclusive");
+    xConfirmPara( m_log2SaoOffsetScale[i][CHANNEL_TYPE_CHROMA] > (m_internalBitDepths[repFormatIdx][CHANNEL_TYPE_CHROMA]<10?0:(m_internalBitDepths[repFormatIdx][CHANNEL_TYPE_CHROMA]-10)), "SaoChromaOffsetBitShift must be in the range of 0 to InternalBitDepthC-10, inclusive");
+  }
+
+  for (Int i = 0; i < m_numRepFormats; i++)
+  {
+    xConfirmPara( m_chromaFormatIDCs[i] >= NUM_CHROMA_FORMAT,                                     "ChromaFormatIDC must be either 400, 420, 422 or 444" );
+  }
+#else
   xConfirmPara( m_log2SaoOffsetScale[CHANNEL_TYPE_LUMA]   > (m_internalBitDepth[CHANNEL_TYPE_LUMA  ]<10?0:(m_internalBitDepth[CHANNEL_TYPE_LUMA  ]-10)), "SaoLumaOffsetBitShift must be in the range of 0 to InternalBitDepth-10, inclusive");
   xConfirmPara( m_log2SaoOffsetScale[CHANNEL_TYPE_CHROMA] > (m_internalBitDepth[CHANNEL_TYPE_CHROMA]<10?0:(m_internalBitDepth[CHANNEL_TYPE_CHROMA]-10)), "SaoChromaOffsetBitShift must be in the range of 0 to InternalBitDepthC-10, inclusive");
 
   xConfirmPara( m_chromaFormatIDC >= NUM_CHROMA_FORMAT,                                     "ChromaFormatIDC must be either 400, 420, 422 or 444" );
+#endif
+
   std::string sTempIPCSC="InputColourSpaceConvert must be empty, "+getListOfColourSpaceConverts(true);
   xConfirmPara( m_inputColourSpaceConvert >= NUMBER_INPUT_COLOUR_SPACE_CONVERSIONS,         sTempIPCSC.c_str() );
+#if NH_MV
+  for (Int i = 0 ; i < m_InputChromaFormatIDC.size(); i++ )
+  {
+    xConfirmPara( m_InputChromaFormatIDC[i] >= NUM_CHROMA_FORMAT,                                "InputChromaFormatIDC must be either 400, 420, 422 or 444" );
+  }
+#else
   xConfirmPara( m_InputChromaFormatIDC >= NUM_CHROMA_FORMAT,                                "InputChromaFormatIDC must be either 400, 420, 422 or 444" );
+#endif
   xConfirmPara( m_iFrameRate <= 0,                                                          "Frame rate must be more than 1" );
   xConfirmPara( m_temporalSubsampleRatio < 1,                                               "Temporal subsample rate must be no less than 1" );
   xConfirmPara( m_framesToBeEncoded <= 0,                                                   "Total Number Of Frames encoded must be more than 0" );
+
+#if NH_MV
+  xConfirmPara( m_numberOfLayers > MAX_NUM_LAYER_IDS ,                                      "NumberOfLayers must be less than or equal to MAX_NUM_LAYER_IDS");
+
+
+  xConfirmPara( m_layerIdInNuh[0] != 0      , "LayerIdInNuh must be 0 for the first layer. ");
+  xConfirmPara( (m_layerIdInNuh.size()!=1) && (m_layerIdInNuh.size() < m_numberOfLayers) , "LayerIdInNuh must be given for all layers. ");
+
+#if NH_MV
+  xConfirmPara( !m_shareParameterSets && (m_numberOfLayers > 16)                            , "When NumberOfLayers is greater than 16, ShareParameterSets must be 1.");
+  xConfirmPara( ! (m_layerIdxInVpsToGopDefIdx.size() == 0     || m_layerIdxInVpsToGopDefIdx.size() == m_numberOfLayers), "The number of entries in LayerIdxInVpsToGopDefIdx must zero or equal to NumberOfLayers.");
+  xConfirmPara( ! (m_layerIdxInVpsToRepFormatIdx.size() == 0  || m_layerIdxInVpsToRepFormatIdx.size() == m_numberOfLayers), "The number of entries in LayerIdxInVpsToRepFormatIdx must zero or equal to NumberOfLayers.");
+  
+#endif
+
+  xConfirmPara( m_scalabilityMask != 2 && m_scalabilityMask != 8 && m_scalabilityMask != 10, "Scalability Mask must be equal to 2, 8 or 10");
+
+  m_dimIds.push_back( m_viewOrderIndex );
+  for (Int i = 0; i < m_auxId.size(); i++)
+  {
+    xConfirmPara( !( ( m_auxId[i] >= 0 && m_auxId[i] <= 2 ) || ( m_auxId[i] >= 128 && m_auxId[i] <= 159 ) ) , "AuxId shall be in the range of 0 to 2, inclusive, or 128 to 159, inclusive");
+  }
+  if ( m_scalabilityMask & ( 1 << AUX_ID ) )
+  {
+    m_dimIds.push_back ( m_auxId );
+  }
+  xConfirmPara(  m_dimensionIdLen.size() < m_dimIds.size(), "DimensionIdLen must be given for all dimensions. "   );
+  Int dimBitOffset[MAX_NUM_SCALABILITY_TYPES+1];
+
+  dimBitOffset[ 0 ] = 0;
+  for (Int j = 1; j <= (((Int) m_dimIds.size() - m_splittingFlag) ? 1 : 0); j++ )
+  {
+    dimBitOffset[ j ] = dimBitOffset[ j - 1 ] + m_dimensionIdLen[ j - 1];
+  }
+
+  if ( m_splittingFlag )
+  {
+    dimBitOffset[ (Int) m_dimIds.size() ] = 6;
+  }
+
+  for( Int j = 0; j < m_dimIds.size(); j++ )
+  {
+    xConfirmPara( m_dimIds[j].size() < m_numberOfLayers,  "DimensionId must be given for all layers and all dimensions. ");
+    xConfirmPara( (m_dimIds[j][0] != 0)                 , "DimensionId of layer 0 must be 0. " );
+    xConfirmPara( m_dimensionIdLen[j] < 1 || m_dimensionIdLen[j] > 8, "DimensionIdLen must be greater than 0 and less than 9 in all dimensions. " );
+
+
+    for( Int i = 1; i < m_numberOfLayers; i++ )
+    {
+      xConfirmPara(  ( m_dimIds[j][i] < 0 ) || ( m_dimIds[j][i] > ( ( 1 << m_dimensionIdLen[j] ) - 1 ) )   , "DimensionId shall be in the range of 0 to 2^DimensionIdLen - 1. " );
+      if ( m_splittingFlag )
+      {
+        Int layerIdInNuh = (m_layerIdInNuh.size()!=1) ? m_layerIdInNuh[i] :  i;
+        xConfirmPara( ( ( layerIdInNuh & ( (1 << dimBitOffset[ j + 1 ] ) - 1) ) >> dimBitOffset[ j ] )  != m_dimIds[j][ i ]  , "When Splitting Flag is equal to 1 dimension ids shall match values derived from layer ids. ");
+      }
+    }
+  }
+
+  for( Int i = 0; i < m_numberOfLayers; i++ )
+  {
+    for( Int j = 0; j < i; j++ )
+    {
+      Int numDiff  = 0;
+      Int lastDiff = -1;
+      for( Int dim = 0; dim < m_dimIds.size(); dim++ )
+      {
+        if ( m_dimIds[dim][i] != m_dimIds[dim][j] )
+        {
+          numDiff ++;
+          lastDiff = dim;
+        }
+      }
+
+      Bool allEqual = ( numDiff == 0 );
+
+      if ( allEqual )
+      {
+        printf( "\nError: Positions of Layers %d and %d are identical in scalability space\n", i, j);
+      }
+
+      xConfirmPara( allEqual , "Each layer shall have a different position in scalability space." );
+
+      if ( numDiff  == 1 )
+      {
+        Bool inc = m_dimIds[ lastDiff ][ i ] > m_dimIds[ lastDiff ][ j ];
+        Bool shallBeButIsNotIncreasing = ( !inc  ) ;
+        if ( shallBeButIsNotIncreasing )
+        {
+          printf( "\nError: Positions of Layers %d and %d is not increasing in dimension %d \n", i, j, lastDiff);
+        }
+        xConfirmPara( shallBeButIsNotIncreasing,  "DimensionIds shall be increasing within one dimension. " );
+      }
+    }
+  }
+
+  /// ViewId
+  xConfirmPara( m_viewId.size() != m_iNumberOfViews, "The number of ViewIds must be equal to the number of views." );
+
+  /// Layer sets
+  xConfirmPara( m_vpsNumLayerSets < 0 || m_vpsNumLayerSets > 1024, "VpsNumLayerSets must be greater than 0 and less than 1025. ") ;
+  for( Int lsIdx = 0; lsIdx < m_vpsNumLayerSets; lsIdx++ )
+  {
+    if (lsIdx == 0)
+    {
+      xConfirmPara( m_layerIdxInVpsInSets[lsIdx].size() != 1 || m_layerIdxInVpsInSets[lsIdx][0] != 0 , "0-th layer shall only include layer 0. ");
+    }
+    for ( Int i = 0; i < m_layerIdxInVpsInSets[lsIdx].size(); i++ )
+    {
+      xConfirmPara( m_layerIdxInVpsInSets[lsIdx][i] < 0 || m_layerIdxInVpsInSets[lsIdx][i] >= MAX_NUM_LAYER_IDS, "LayerIdsInSet must be greater than 0 and less than MAX_NUM_LAYER_IDS" );
+    }
+  }
+
+  // Output layer sets
+  xConfirmPara( m_outputLayerSetIdx.size() > 1024, "The number of output layer set indices must be less than 1025.") ;
+  for (Int lsIdx = 0; lsIdx < m_outputLayerSetIdx.size(); lsIdx++)
+  {
+    Int refLayerSetIdx = m_outputLayerSetIdx[ lsIdx ];
+    xConfirmPara(  refLayerSetIdx < 0 || refLayerSetIdx >= m_vpsNumLayerSets + m_numAddLayerSets, "Output layer set idx must be greater or equal to 0 and less than the VpsNumLayerSets plus NumAddLayerSets." );
+  }
+
+  xConfirmPara( m_defaultOutputLayerIdc < 0 || m_defaultOutputLayerIdc > 2, "Default target output layer idc must greater than or equal to 0 and less than or equal to 2." );
+
+  if( m_defaultOutputLayerIdc != 2 )
+  {
+    Bool anyDefaultOutputFlag = false;
+    for (Int lsIdx = 0; lsIdx < m_vpsNumLayerSets; lsIdx++)
+    {
+      anyDefaultOutputFlag = anyDefaultOutputFlag || ( m_layerIdsInDefOutputLayerSet[lsIdx].size() != 0 );
+    }
+    if ( anyDefaultOutputFlag )
+    {
+      printf( "\nWarning: Ignoring LayerIdsInDefOutputLayerSet parameters, since defaultTargetOuputLayerIdc is not equal 2.\n" );
+    }
+  }
+  else
+  {
+    for (Int lsIdx = 0; lsIdx < m_vpsNumLayerSets; lsIdx++)
+    {
+      for (Int i = 0; i < m_layerIdsInDefOutputLayerSet[ lsIdx ].size(); i++)
+      {
+        Bool inLayerSetFlag = false;
+        for (Int j = 0; j < m_layerIdxInVpsInSets[ lsIdx].size(); j++ )
+        {
+          if ( m_layerIdxInVpsInSets[ lsIdx ][ j ] == m_layerIdsInDefOutputLayerSet[ lsIdx ][ i ] )
+          {
+            inLayerSetFlag = true;
+            break;
+          }
+        }
+        xConfirmPara( !inLayerSetFlag, "All output layers of a output layer set must be included in corresponding layer set.");
+      }
+    }
+  }
+
+  xConfirmPara( m_altOutputLayerFlag.size() < m_vpsNumLayerSets + m_numAddLayerSets + m_outputLayerSetIdx.size(), "The number of alt output layer flags must be equal to the number of layer set additional output layer sets plus the number of output layer set indices" );
+
+  // PTL
+  xConfirmPara( ( m_uiProfiles.size() != m_inblFlag.size() || m_uiProfiles.size() != m_level.size()  ||  m_uiProfiles.size() != m_levelTier.size() ), "The number of Profiles, Levels, Tiers and InblFlags must be equal." );
+
+  if ( m_numberOfLayers > 1)
+  {
+    xConfirmPara( m_uiProfiles.size() <= 1, "The number of profiles, tiers, levels, and inblFlags must be greater than 1.");
+    xConfirmPara( m_inblFlag[0], "VpsProfileTierLevel[0] must have inblFlag equal to 0");
+    if (m_uiProfiles.size() > 1 )
+    {
+      xConfirmPara( m_uiProfiles[0]  != m_uiProfiles[1], "The profile in VpsProfileTierLevel[1] must be equal to the profile in VpsProfileTierLevel[0].");
+      xConfirmPara( m_inblFlag[0] != m_inblFlag[1], "inblFlag in VpsProfileTierLevel[1] must be equal to the inblFlag in VpsProfileTierLevel[0].");
+    }
+  }
+
+  // Layer Dependencies
+  for (Int i = 0; i < m_numberOfLayers; i++ )
+  {
+    xConfirmPara( (i == 0)  && m_directRefLayers[0].size() != 0, "Layer 0 shall not have reference layers." );
+    xConfirmPara( m_directRefLayers[i].size() != m_dependencyTypes[ i ].size(), "Each reference layer shall have a reference type." );
+    for (Int j = 0; j < m_directRefLayers[i].size(); j++)
+    {
+      if ( m_directRefLayers[i][j] < 0 || m_directRefLayers[i][j] >= i )
+      {
+        printf( "Error: Reference layer id (%d) shall be greater than or equal to 0 and less than dependent layer id (%d). ", m_directRefLayers[i][j],  i );
+        check_failed = true;
+      }
+
+      xConfirmPara( m_dependencyTypes[i][j] < 0 || m_dependencyTypes[i][j] >  6 , "Dependency type shall be greater than or equal to 0 and less than 7");
+    }
+  }
+#endif
+
   xConfirmPara( m_iGOPSize < 1 ,                                                            "GOP Size must be greater or equal to 1" );
   xConfirmPara( m_iGOPSize > 1 &&  m_iGOPSize % 2,                                          "GOP Size must be a multiple of 2, if GOP Size is greater than 1" );
+#if NH_MV
+  for( Int layer = 0; layer < m_numberOfLayers; layer++ )
+  {
+    xConfirmPara( (m_iIntraPeriod[layer] > 0 && m_iIntraPeriod[layer] < m_iGOPSize) || m_iIntraPeriod[layer] == 0, "Intra period must be more than GOP size, or -1 , not 0" );
+  }
+#else
   xConfirmPara( (m_iIntraPeriod > 0 && m_iIntraPeriod < m_iGOPSize) || m_iIntraPeriod == 0, "Intra period must be more than GOP size, or -1 , not 0" );
+#endif
   xConfirmPara( m_iDecodingRefreshType < 0 || m_iDecodingRefreshType > 3,                   "Decoding Refresh Type must be comprised between 0 and 3 included" );
   if(m_iDecodingRefreshType == 3)
   {
@@ -2447,7 +3907,13 @@ Void TAppEncCfg::xCheckParameter()
     }
   }
 
+#if NH_MV
+  for (Int i = 0; i < m_numRepFormats; i++)
+  {
+    if(m_crossComponentPredictionEnabledFlag && (m_chromaFormatIDCs[i] != CHROMA_444))
+#else
   if(m_crossComponentPredictionEnabledFlag && (m_chromaFormatIDC != CHROMA_444))
+#endif
   {
     fprintf(stderr, "****************************************************************************\n");
     fprintf(stderr, "** WARNING: Cross-component prediction is specified for 4:4:4 format only **\n");
@@ -2455,6 +3921,9 @@ Void TAppEncCfg::xCheckParameter()
 
     m_crossComponentPredictionEnabledFlag = false;
   }
+#if NH_MV
+  }
+#endif
 
   if ( m_CUTransquantBypassFlagForce && m_bUseHADME )
   {
@@ -2476,14 +3945,25 @@ Void TAppEncCfg::xCheckParameter()
     fprintf(stderr, "**          It may be better to disable transform skip fast mode         **\n");
     fprintf(stderr, "***************************************************************************\n");
   }
-
+#if NH_MV
+  for( Int layer = 0; layer < m_numberOfLayers; layer++ )
+  {
+    Int repFormatIdx = m_layerIdxInVpsToRepFormatIdx[layer];
+    xConfirmPara( m_iQP[layer] <  -6 * (m_internalBitDepths[repFormatIdx][CHANNEL_TYPE_LUMA] - 8) || m_iQP[layer] > 51,      "QP exceeds supported range (-QpBDOffsety to 51)" );
+    xConfirmPara( m_deblockingFilterMetric!=0 && (m_bLoopFilterDisable[layer] || m_loopFilterOffsetInPPS), "If DeblockingFilterMetric is true then both LoopFilterDisable and LoopFilterOffsetInPPS must be 0");
+  }
+#else
   xConfirmPara( m_iQP <  -6 * (m_internalBitDepth[CHANNEL_TYPE_LUMA] - 8) || m_iQP > 51,    "QP exceeds supported range (-QpBDOffsety to 51)" );
   xConfirmPara( m_deblockingFilterMetric!=0 && (m_bLoopFilterDisable || m_loopFilterOffsetInPPS), "If DeblockingFilterMetric is non-zero then both LoopFilterDisable and LoopFilterOffsetInPPS must be 0");
+#endif
   xConfirmPara( m_loopFilterBetaOffsetDiv2 < -6 || m_loopFilterBetaOffsetDiv2 > 6,        "Loop Filter Beta Offset div. 2 exceeds supported range (-6 to 6)");
   xConfirmPara( m_loopFilterTcOffsetDiv2 < -6 || m_loopFilterTcOffsetDiv2 > 6,            "Loop Filter Tc Offset div. 2 exceeds supported range (-6 to 6)");
   xConfirmPara( m_iSearchRange < 0 ,                                                        "Search Range must be more than 0" );
   xConfirmPara( m_bipredSearchRange < 0 ,                                                   "Bi-prediction refinement search range must be more than 0" );
   xConfirmPara( m_minSearchWindow < 0,                                                      "Minimum motion search window size for the adaptive window ME must be greater than or equal to 0" );
+#if NH_MV
+  xConfirmPara( m_iVerticalDisparitySearchRange <= 0 ,                                      "Vertical Disparity Search Range must be more than 0" );
+#endif
   xConfirmPara( m_iMaxDeltaQP > 7,                                                          "Absolute Delta QP exceeds supported range (0 to 7)" );
   xConfirmPara(m_lumaLevelToDeltaQPMapping.mode &&  m_uiDeltaQpRD > 0, "Luma-level-based Delta QP cannot be used together with slice level multiple-QP optimization\n" );
   xConfirmPara( m_iMaxCuDQPDepth > m_uiMaxCUDepth - 1,                                          "Absolute depth for a minimum CuDQP exceeds maximum coding unit depth" );
@@ -2494,17 +3974,35 @@ Void TAppEncCfg::xCheckParameter()
   xConfirmPara( m_crQpOffset >  12,   "Max. Chroma Cr QP Offset is  12" );
 
   xConfirmPara( m_iQPAdaptationRange <= 0,                                                  "QP Adaptation Range must be more than 0" );
+#if NH_MV
+  for (Int i = 0; i < m_numberOfLayers; i++ )
+  {
+    if (m_iDecodingRefreshType == 2 || m_resetEncoderStateAfterIRAP)
+    {
+      xConfirmPara( m_iIntraPeriod[i] > 0 && m_iIntraPeriod[i] <= m_iGOPSize ,                      "Intra period must be larger than GOP size for periodic IDR pictures");
+    }
+  }
+#else
   if (m_iDecodingRefreshType == 2)
   {
     xConfirmPara( m_iIntraPeriod > 0 && m_iIntraPeriod <= m_iGOPSize ,                      "Intra period must be larger than GOP size for periodic IDR pictures");
   }
+#endif
   xConfirmPara( m_uiMaxCUDepth < 1,                                                         "MaxPartitionDepth must be greater than zero");
   xConfirmPara( (m_uiMaxCUWidth  >> m_uiMaxCUDepth) < 4,                                    "Minimum partition width size should be larger than or equal to 8");
   xConfirmPara( (m_uiMaxCUHeight >> m_uiMaxCUDepth) < 4,                                    "Minimum partition height size should be larger than or equal to 8");
   xConfirmPara( m_uiMaxCUWidth < 16,                                                        "Maximum partition width size should be larger than or equal to 16");
   xConfirmPara( m_uiMaxCUHeight < 16,                                                       "Maximum partition height size should be larger than or equal to 16");
+#if NH_MV
+  for (Int i = 0; i < m_numRepFormats; i++ )
+  {
+    xConfirmPara( (m_iSourceWidths[i]  % (m_uiMaxCUWidth  >> (m_uiMaxCUDepth-1)))!=0,             "Resulting coded frame width must be a multiple of the minimum CU size");
+    xConfirmPara( (m_iSourceHeights[i] % (m_uiMaxCUHeight >> (m_uiMaxCUDepth-1)))!=0,             "Resulting coded frame height must be a multiple of the minimum CU size");
+  }
+#else
   xConfirmPara( (m_sourceWidth  % (m_uiMaxCUWidth  >> (m_uiMaxCUDepth-1)))!=0,             "Resulting coded frame width must be a multiple of the minimum CU size");
   xConfirmPara( (m_sourceHeight % (m_uiMaxCUHeight >> (m_uiMaxCUDepth-1)))!=0,             "Resulting coded frame height must be a multiple of the minimum CU size");
+#endif
 
   xConfirmPara( m_uiQuadtreeTULog2MinSize < 2,                                        "QuadtreeTULog2MinSize must be 2 or greater.");
   xConfirmPara( m_uiQuadtreeTULog2MaxSize > 5,                                        "QuadtreeTULog2MaxSize must be 5 or smaller.");
@@ -2521,7 +4019,14 @@ Void TAppEncCfg::xCheckParameter()
   xConfirmPara(  m_maxNumMergeCand > 5,  "MaxNumMergeCand must be 5 or smaller.");
 
 #if ADAPTIVE_QP_SELECTION
+#if NH_MV
+  for( Int layer = 0; layer < m_numberOfLayers; layer++ )
+  {
+    xConfirmPara( m_bUseAdaptQpSelect == true && m_iQP[layer] < 0,                                     "AdaptiveQpSelection must be disabled when QP < 0.");
+  }
+#else
   xConfirmPara( m_bUseAdaptQpSelect == true && m_iQP < 0,                                              "AdaptiveQpSelection must be disabled when QP < 0.");
+#endif
   xConfirmPara( m_bUseAdaptQpSelect == true && (m_cbQpOffset !=0 || m_crQpOffset != 0 ),               "AdaptiveQpSelection must be disabled when ChromaQpOffset is not equal to 0.");
 #endif
 
@@ -2529,7 +4034,14 @@ Void TAppEncCfg::xCheckParameter()
   {
     for (UInt channelType = 0; channelType < MAX_NUM_CHANNEL_TYPE; channelType++)
     {
+#if NH_MV
+      for (Int i = 0; i < m_numRepFormats; i++)
+      {
+        xConfirmPara(((m_MSBExtendedBitDepths[i][channelType] > m_internalBitDepths[i][channelType]) && m_bPCMInputBitDepthFlag), "PCM bit depth cannot be greater than internal bit depth (PCMInputBitDepthFlag cannot be used when InputBitDepth or MSBExtendedBitDepth > InternalBitDepth)");
+      }
+#else
       xConfirmPara(((m_MSBExtendedBitDepth[channelType] > m_internalBitDepth[channelType]) && m_bPCMInputBitDepthFlag), "PCM bit depth cannot be greater than internal bit depth (PCMInputBitDepthFlag cannot be used when InputBitDepth or MSBExtendedBitDepth > InternalBitDepth)");
+#endif
     }
     xConfirmPara(  m_uiPCMLog2MinSize < 3,                                      "PCMLog2MinSize must be 3 or greater.");
     xConfirmPara(  m_uiPCMLog2MinSize > 5,                                      "PCMLog2MinSize must be 5 or smaller.");
@@ -2547,6 +4059,8 @@ Void TAppEncCfg::xCheckParameter()
   }
 
   Bool tileFlag = (m_numTileColumnsMinus1 > 0 || m_numTileRowsMinus1 > 0 );
+
+#if !NH_MV
   if (m_profile!=Profile::HIGHTHROUGHPUTREXT)
   {
     xConfirmPara( tileFlag && m_entropyCodingSyncEnabledFlag, "Tiles and entropy-coding-sync (Wavefronts) can not be applied together, except in the High Throughput Intra 4:4:4 16 profile");
@@ -2557,6 +4071,25 @@ Void TAppEncCfg::xCheckParameter()
 
   xConfirmPara( m_sourcePadding[0] % TComSPS::getWinUnitX(m_chromaFormatIDC) != 0, "Horizontal padding must be an integer multiple of the specified chroma subsampling");
   xConfirmPara( m_sourcePadding[1] % TComSPS::getWinUnitY(m_chromaFormatIDC) != 0, "Vertical padding must be an integer multiple of the specified chroma subsampling");
+
+#else
+  for (Int i = 0; i < m_numRepFormats; i++)
+  {
+    ChromaFormat m_chromaFormatIDC  = m_chromaFormatIDCs[i];
+    Int*         m_aiPad            = &m_aiPads          [i][0];
+    Int          m_confWinLeft      = m_confWinLefts    [i];
+    Int          m_confWinRight     = m_confWinRights   [i];
+    Int          m_confWinTop       = m_confWinTops     [i];
+    Int          m_confWinBottom    = m_confWinBottoms  [i];
+    Int          m_iSourceWidth     = m_iSourceWidths   [i];
+    Int          m_iSourceHeight    = m_iSourceHeights  [i];
+      
+    xConfirmPara( m_iSourceWidth  % TComSPS::getWinUnitX(m_chromaFormatIDC) != 0, "Picture width must be an integer multiple of the specified chroma subsampling");
+    xConfirmPara( m_iSourceHeight % TComSPS::getWinUnitY(m_chromaFormatIDC) != 0, "Picture height must be an integer multiple of the specified chroma subsampling");
+
+    xConfirmPara( m_aiPad[0] % TComSPS::getWinUnitX(m_chromaFormatIDC) != 0, "Horizontal padding must be an integer multiple of the specified chroma subsampling");
+    xConfirmPara( m_aiPad[1] % TComSPS::getWinUnitY(m_chromaFormatIDC) != 0, "Vertical padding must be an integer multiple of the specified chroma subsampling");
+#endif
 
   xConfirmPara( m_confWinLeft   % TComSPS::getWinUnitX(m_chromaFormatIDC) != 0, "Left conformance window offset must be an integer multiple of the specified chroma subsampling");
   xConfirmPara( m_confWinRight  % TComSPS::getWinUnitX(m_chromaFormatIDC) != 0, "Right conformance window offset must be an integer multiple of the specified chroma subsampling");
@@ -2572,6 +4105,10 @@ Void TAppEncCfg::xCheckParameter()
     xConfirmPara( m_defDispWinTopOffset    % TComSPS::getWinUnitY(m_chromaFormatIDC) != 0, "Top default display window offset must be an integer multiple of the specified chroma subsampling");
     xConfirmPara( m_defDispWinBottomOffset % TComSPS::getWinUnitY(m_chromaFormatIDC) != 0, "Bottom default display window offset must be an integer multiple of the specified chroma subsampling");
   }
+
+#if NH_MV
+  }
+#endif
 
   // max CU width and height should be power of 2
   UInt ui = m_uiMaxCUWidth;
@@ -2593,9 +4130,162 @@ Void TAppEncCfg::xCheckParameter()
     }
   }
 
+#if NH_MV
+  // validate that POC of same frame is identical across multiple layers
+  Bool bErrorMvePoc = false;
+  if( m_numberOfLayers > 1 )
+  {
+    for( Int k = 1; k < m_numberOfLayers; k++ )
+    {
+      for( Int i = 0; i < MAX_GOP; i++ )
+      {
+        if( xGetGopEntries(k)[i].m_POC != xGetGopEntries(0)[i].m_POC )
+        {
+          printf( "\nError: Frame%d_l%d POC %d is not identical to Frame%d POC\n", i, k, xGetGopEntries(k)[i].m_POC, i );
+          bErrorMvePoc = true;
+        }
+      }
+    }
+  }
+  xConfirmPara( bErrorMvePoc,  "Invalid inter-layer POC structure given" );
+
+  // validate that baseview has no inter-view refs
+  Bool bErrorIvpBase = false;
+  for( Int i = 0; i < MAX_GOP; i++ )
+  {
+    if( xGetGopEntries(0)[i].m_numActiveRefLayerPics != 0 )
+    {
+      printf( "\nError: Frame%d inter_layer refs not available in layer 0\n", i );
+      bErrorIvpBase = true;
+    }
+  }
+  xConfirmPara( bErrorIvpBase, "Inter-layer refs not possible in base layer" );
+
+  // validate inter-view refs
+  Bool bErrorIvpEnhV = false;
+  if( m_numberOfLayers > 1 )
+  {
+    for( Int layer = 1; layer < m_numberOfLayers; layer++ )
+    {
+      for( Int i = 0; i < MAX_GOP+1; i++ )
+      {
+        GOPEntry gopEntry = xGetGopEntries(layer)[i];
+        for( Int j = 0; j < gopEntry.m_numActiveRefLayerPics; j++ )
+        {
+          Int ilPredLayerIdc = gopEntry.m_interLayerPredLayerIdc[j];
+          if( ilPredLayerIdc < 0 || ilPredLayerIdc >= m_directRefLayers[layer].size() )
+          {
+            printf( "\nError: inter-layer ref idc %d is not available for Frame%d_l%d\n", gopEntry.m_interLayerPredLayerIdc[j], i, layer );
+            bErrorIvpEnhV = true;
+          }
+          if( gopEntry.m_interViewRefPosL[0][j] < -1 || gopEntry.m_interViewRefPosL[0][j] > gopEntry.m_numRefPicsActive )
+          {
+            printf( "\nError: inter-layer ref pos %d on L0 is not available for Frame%d_l%d\n", gopEntry.m_interViewRefPosL[0][j], i, layer );
+            bErrorIvpEnhV = true;
+          }
+          if( gopEntry.m_interViewRefPosL[1][j] < -1  || gopEntry.m_interViewRefPosL[1][j] > gopEntry.m_numRefPicsActive )
+          {
+            printf( "\nError: inter-layer ref pos %d on L1 is not available for Frame%d_l%d\n", gopEntry.m_interViewRefPosL[1][j], i, layer );
+            bErrorIvpEnhV = true;
+          }
+        }
+        if( i == MAX_GOP ) // inter-view refs at I pic position in base view
+        {
+          if( gopEntry.m_sliceType != 'B' && gopEntry.m_sliceType != 'P' && gopEntry.m_sliceType != 'I' )
+          {
+            printf( "\nError: slice type of FrameI_l%d must be equal to B or P or I\n", layer );
+            bErrorIvpEnhV = true;
+          }
+
+          if( gopEntry.m_POC != 0 )
+          {
+            printf( "\nError: POC %d not possible for FrameI_l%d, must be 0\n", gopEntry.m_POC, layer );
+            bErrorIvpEnhV = true;
+          }
+
+          if( gopEntry.m_temporalId != 0 )
+          {
+            printf( "\nWarning: Temporal id of FrameI_l%d must be 0 (cp. I-frame in base layer)\n", layer );
+            gopEntry.m_temporalId = 0;
+          }
+
+          if( gopEntry.m_numRefPics != 0 )
+          {
+            printf( "\nWarning: temporal references not possible for FrameI_l%d\n", layer );
+            for( Int j = 0; j < xGetGopEntries(layer)[MAX_GOP].m_numRefPics; j++ )
+            {
+              gopEntry.m_referencePics[j] = 0;
+            }
+            gopEntry.m_numRefPics = 0;
+          }
+
+          if( gopEntry.m_interRPSPrediction )
+          {
+            printf( "\nError: inter RPS prediction not possible for FrameI_l%d, must be 0\n", layer );
+            bErrorIvpEnhV = true;
+          }
+
+          if( gopEntry.m_sliceType == 'I' && gopEntry.m_numActiveRefLayerPics != 0 )
+          {
+            printf( "\nError: inter-layer prediction not possible for FrameI_l%d with slice type I, #IL_ref_pics must be 0\n", layer );
+            bErrorIvpEnhV = true;
+          }
+
+          if( gopEntry.m_numRefPicsActive > gopEntry.m_numActiveRefLayerPics )
+          {
+            gopEntry.m_numRefPicsActive = gopEntry.m_numActiveRefLayerPics;
+          }
+
+          if( gopEntry.m_sliceType == 'P' )
+          {
+            if( gopEntry.m_numActiveRefLayerPics < 1 )
+            {
+              printf( "\nError: #IL_ref_pics must be at least one for FrameI_l%d with slice type P\n", layer );
+              bErrorIvpEnhV = true;
+            }
+            else
+            {
+              for( Int j = 0; j < gopEntry.m_numActiveRefLayerPics; j++ )
+              {
+                if( gopEntry.m_interViewRefPosL[1][j] != -1 )
+                {
+                  printf( "\nError: inter-layer ref pos %d on L1 not possible for FrameI_l%d with slice type P\n", gopEntry.m_interViewRefPosL[1][j], layer );
+                  bErrorIvpEnhV = true;
+                }
+              }
+            }
+          }
+
+          if( gopEntry.m_sliceType == 'B' && gopEntry.m_numActiveRefLayerPics < 1 )
+          {
+            printf( "\nError: #IL_ref_pics must be at least one for FrameI_l%d with slice type B\n", layer );
+            bErrorIvpEnhV = true;
+          }
+        }
+      }
+    }
+  }
+  xConfirmPara( bErrorIvpEnhV, "Invalid inter-layer coding structure for enhancement layers given" );
+
+  // validate temporal coding structure
+  if( !bErrorMvePoc && !bErrorIvpBase && !bErrorIvpEnhV )
+  {
+    for( Int layer = 0; layer < m_numberOfLayers; layer++ )
+    {
+      GOPEntry* m_GOPList            = xGetGopEntries         (layer); // It is not a member, but this name helps avoiding code duplication !!!
+      Int&      m_extraRPSs          = m_extraRPSsMvc         [layer]; // It is not a member, but this name helps avoiding code duplication !!!
+      Int&      m_maxTempLayer       = m_maxTempLayerMvc      [layer]; // It is not a member, but this name helps avoiding code duplication !!!
+      Int*      m_maxDecPicBuffering = m_maxDecPicBufferingMvc[layer]; // It is not a member, but this name helps avoiding code duplication !!!
+      Int*      m_numReorderPics     = m_numReorderPicsMvc    [layer]; // It is not a member, but this name helps avoiding code duplication !!!
+#endif
+
   /* if this is an intra-only sequence, ie IntraPeriod=1, don't verify the GOP structure
    * This permits the ability to omit a GOP structure specification */
+#if NH_MV
+  if (m_iIntraPeriod[layer] == 1 && m_GOPList[0].m_POC == -1)
+#else
   if (m_iIntraPeriod == 1 && m_GOPList[0].m_POC == -1)
+#endif
   {
     m_GOPList[0] = GOPEntry();
     m_GOPList[0].m_QPFactor = 1;
@@ -2606,7 +4296,9 @@ Void TAppEncCfg::xCheckParameter()
   }
   else
   {
+#if !NH_MV
     xConfirmPara( m_intraConstraintFlag, "IntraConstraintFlag cannot be 1 for inter sequences");
+#endif
   }
 
   Bool verifiedGOP=false;
@@ -2625,7 +4317,11 @@ Void TAppEncCfg::xCheckParameter()
     isOK[i]=false;
   }
   Int numOK=0;
+#if NH_MV
+  xConfirmPara( m_iIntraPeriod[layer] >=0&&(m_iIntraPeriod[layer]%m_iGOPSize!=0), "Intra period must be a multiple of GOPSize, or -1" );
+#else
   xConfirmPara( m_iIntraPeriod >=0&&(m_iIntraPeriod%m_iGOPSize!=0), "Intra period must be a multiple of GOPSize, or -1" );
+#endif
 
   for(Int i=0; i<m_iGOPSize; i++)
   {
@@ -2635,7 +4331,11 @@ Void TAppEncCfg::xCheckParameter()
     }
   }
 
+#if NH_MV
+  if ( (m_iIntraPeriod[layer] != 1) && !m_loopFilterOffsetInPPS && (!m_bLoopFilterDisable[layer]) )
+#else
   if ( (m_iIntraPeriod != 1) && !m_loopFilterOffsetInPPS && (!m_bLoopFilterDisable) )
+#endif
   {
     for(Int i=0; i<m_iGOPSize; i++)
     {
@@ -2664,7 +4364,11 @@ Void TAppEncCfg::xCheckParameter()
     Int curPOC = ((checkGOP-1)/m_iGOPSize)*m_iGOPSize + m_GOPList[curGOP].m_POC;
     if(m_GOPList[curGOP].m_POC<0)
     {
+#if NH_MV
+      printf("\nError: found fewer Reference Picture Sets than GOPSize for layer %d\n", layer );
+#else
       printf("\nError: found fewer Reference Picture Sets than GOPSize\n");
+#endif
       errorGOP=true;
     }
     else
@@ -2701,7 +4405,11 @@ Void TAppEncCfg::xCheckParameter()
           }
           if(!found)
           {
+#if NH_MV
+            printf("\nError: ref pic %d is not available for GOP frame %d of layer %d\n", m_GOPList[curGOP].m_referencePics[i], curGOP+1, layer);
+#else
             printf("\nError: ref pic %d is not available for GOP frame %d\n",m_GOPList[curGOP].m_referencePics[i],curGOP+1);
+#endif
             errorGOP=true;
           }
         }
@@ -2938,6 +4646,87 @@ Void TAppEncCfg::xCheckParameter()
 
   if(m_vuiParametersPresentFlag && m_bitstreamRestrictionFlag)
   {
+#if NH_MV // Because of m_iSourceWidths[] vs. m_sourceWidth
+    if( m_numRepFormats > 1 )
+    {
+        AOT( true ); //TBD
+    }
+
+    Int m_iSourceWidth  = m_iSourceWidths [0];
+    Int m_iSourceHeight = m_iSourceHeights[0];
+    Int PicSizeInSamplesY =  m_iSourceWidth * m_iSourceHeight;
+    if(tileFlag)
+    {
+      Int maxTileWidth = 0;
+      Int maxTileHeight = 0;
+      Int widthInCU = (m_iSourceWidth % m_uiMaxCUWidth) ? m_iSourceWidth/m_uiMaxCUWidth + 1: m_iSourceWidth/m_uiMaxCUWidth;
+      Int heightInCU = (m_iSourceHeight % m_uiMaxCUHeight) ? m_iSourceHeight/m_uiMaxCUHeight + 1: m_iSourceHeight/m_uiMaxCUHeight;
+      if(m_tileUniformSpacingFlag)
+      {
+        maxTileWidth = m_uiMaxCUWidth*((widthInCU+m_numTileColumnsMinus1)/(m_numTileColumnsMinus1+1));
+        maxTileHeight = m_uiMaxCUHeight*((heightInCU+m_numTileRowsMinus1)/(m_numTileRowsMinus1+1));
+        // if only the last tile-row is one treeblock higher than the others
+        // the maxTileHeight becomes smaller if the last row of treeblocks has lower height than the others
+        if(!((heightInCU-1)%(m_numTileRowsMinus1+1)))
+        {
+          maxTileHeight = maxTileHeight - m_uiMaxCUHeight + (m_iSourceHeight % m_uiMaxCUHeight);
+        }
+        // if only the last tile-column is one treeblock wider than the others
+        // the maxTileWidth becomes smaller if the last column of treeblocks has lower width than the others
+        if(!((widthInCU-1)%(m_numTileColumnsMinus1+1)))
+        {
+          maxTileWidth = maxTileWidth - m_uiMaxCUWidth + (m_iSourceWidth % m_uiMaxCUWidth);
+        }
+      }
+      else // not uniform spacing
+      {
+        if(m_numTileColumnsMinus1<1)
+        {
+          maxTileWidth = m_iSourceWidth;
+        }
+        else
+        {
+          Int accColumnWidth = 0;
+          for(Int col=0; col<(m_numTileColumnsMinus1); col++)
+          {
+            maxTileWidth = m_tileColumnWidth[col]>maxTileWidth ? m_tileColumnWidth[col]:maxTileWidth;
+            accColumnWidth += m_tileColumnWidth[col];
+          }
+          maxTileWidth = (widthInCU-accColumnWidth)>maxTileWidth ? m_uiMaxCUWidth*(widthInCU-accColumnWidth):m_uiMaxCUWidth*maxTileWidth;
+        }
+        if(m_numTileRowsMinus1<1)
+        {
+          maxTileHeight = m_iSourceHeight;
+        }
+        else
+        {
+          Int accRowHeight = 0;
+          for(Int row=0; row<(m_numTileRowsMinus1); row++)
+          {
+            maxTileHeight = m_tileRowHeight[row]>maxTileHeight ? m_tileRowHeight[row]:maxTileHeight;
+            accRowHeight += m_tileRowHeight[row];
+          }
+          maxTileHeight = (heightInCU-accRowHeight)>maxTileHeight ? m_uiMaxCUHeight*(heightInCU-accRowHeight):m_uiMaxCUHeight*maxTileHeight;
+        }
+      }
+      Int maxSizeInSamplesY = maxTileWidth*maxTileHeight;
+      m_minSpatialSegmentationIdc = 4*PicSizeInSamplesY/maxSizeInSamplesY-4;
+    }
+    else if(m_entropyCodingSyncEnabledFlag)
+    {
+      m_minSpatialSegmentationIdc = 4*PicSizeInSamplesY/((2*m_iSourceHeight+m_iSourceWidth)*m_uiMaxCUHeight)-4;
+    }
+    else if(m_sliceMode == FIXED_NUMBER_OF_CTU)
+    {
+      m_minSpatialSegmentationIdc = 4*PicSizeInSamplesY/(m_sliceArgument*m_uiMaxCUWidth*m_uiMaxCUHeight)-4;
+    }
+    else
+    {
+      m_minSpatialSegmentationIdc = 0;
+    }
+  }
+
+#else
     Int PicSizeInSamplesY =  m_sourceWidth * m_sourceHeight;
     if(tileFlag)
     {
@@ -3009,6 +4798,7 @@ Void TAppEncCfg::xCheckParameter()
       m_minSpatialSegmentationIdc = 0;
     }
   }
+#endif
 
   if (m_toneMappingInfoSEIEnabled)
   {
@@ -3042,7 +4832,14 @@ Void TAppEncCfg::xCheckParameter()
 
   if (m_chromaResamplingFilterSEIenabled)
   {
+#if NH_MV
+    for (Int i = 0 ; i < m_numRepFormats; i++ )
+    {
+      xConfirmPara( (m_chromaFormatIDCs[i] == CHROMA_400 ), "chromaResamplingFilterSEI is not allowed to be present when ChromaFormatIDC is equal to zero (4:0:0)" );
+    }
+#else
     xConfirmPara( (m_chromaFormatIDC == CHROMA_400 ), "chromaResamplingFilterSEI is not allowed to be present when ChromaFormatIDC is equal to zero (4:0:0)" );
+#endif
     xConfirmPara(m_vuiParametersPresentFlag && m_chromaLocInfoPresentFlag && (m_chromaSampleLocTypeTopField != m_chromaSampleLocTypeBottomField ), "When chromaResamplingFilterSEI is enabled, ChromaSampleLocTypeTopField has to be equal to ChromaSampleLocTypeBottomField" );
   }
 
@@ -3057,6 +4854,8 @@ Void TAppEncCfg::xCheckParameter()
       }
     }
     xConfirmPara( m_uiDeltaQpRD > 0, "Rate control cannot be used together with slice level multiple-QP optimization!\n" );
+    // NOTE: DPB_ENCODER_USAGE_CHECK being 0 for MV-HEVC encoding still results in the build errors below. Added #if !NH_MV.
+#if !NH_MV
 #if DPB_ENCODER_USAGE_CHECK
     if ((m_RCCpbSaturationEnabled) && profileLevelTierFeatures.getCpbSizeInBits()!=0)
     {
@@ -3073,6 +4872,7 @@ Void TAppEncCfg::xCheckParameter()
 #endif
       xConfirmPara(m_RCInitialCpbFullness > 1, "RCInitialCpbFullness should be smaller than or equal to 1");
     }
+#endif
   }
   else
   {
@@ -3088,6 +4888,29 @@ Void TAppEncCfg::xCheckParameter()
     }
   }
 
+#if NH_MV
+  // VPS VUI
+  for(Int i = 0; i < MAX_VPS_OP_SETS_PLUS1; i++ )
+  {
+    for (Int j = 0; j < MAX_TLAYER; j++)
+    {
+      if ( j < m_avgBitRate        [i].size() ) xConfirmPara( m_avgBitRate[i][j]         <  0 || m_avgBitRate[i][j]         > 65535, "avg_bit_rate            must be more than or equal to     0 and less than 65536" );
+      if ( j < m_maxBitRate        [i].size() ) xConfirmPara( m_maxBitRate[i][j]         <  0 || m_maxBitRate[i][j]         > 65535, "max_bit_rate            must be more than or equal to     0 and less than 65536" );
+      if ( j < m_constantPicRateIdc[i].size() ) xConfirmPara( m_constantPicRateIdc[i][j] <  0 || m_constantPicRateIdc[i][j] >     3, "constant_pic_rate_idc   must be more than or equal to     0 and less than     4" );
+      if ( j < m_avgPicRate        [i].size() ) xConfirmPara( m_avgPicRate[i][j]         <  0 || m_avgPicRate[i][j]         > 65535, "avg_pic_rate            must be more than or equal to     0 and less than 65536" );
+    }
+  }
+  // todo: replace value of 100 with requirement in spec
+  for(Int i = 0; i < MAX_NUM_LAYERS; i++ )
+  {
+    for (Int j = 0; j < MAX_NUM_LAYERS; j++)
+    {
+      if ( j < m_minSpatialSegmentOffsetPlus1[i].size() ) xConfirmPara( m_minSpatialSegmentOffsetPlus1[i][j] < 0 || m_minSpatialSegmentOffsetPlus1[i][j] >   100, "min_spatial_segment_offset_plus1 must be more than or equal to     0 and less than   101" );
+      if ( j < m_minHorizontalCtuOffsetPlus1[i] .size() ) xConfirmPara( m_minHorizontalCtuOffsetPlus1[i][j]  < 0 || m_minHorizontalCtuOffsetPlus1[i][j]  >   100, "min_horizontal_ctu_offset_plus1  must be more than or equal to     0 and less than   101" );
+    }
+  }
+#endif
+
   xConfirmPara(!m_TransquantBypassEnabledFlag && m_CUTransquantBypassFlagForce, "CUTransquantBypassFlagForce cannot be 1 when TransquantBypassEnableFlag is 0");
 
   xConfirmPara(m_log2ParallelMergeLevel < 2, "Log2ParallelMergeLevel should be larger than or equal to 2");
@@ -3096,6 +4919,10 @@ Void TAppEncCfg::xCheckParameter()
   {
     xConfirmPara(m_framePackingSEIType < 3 || m_framePackingSEIType > 5 , "SEIFramePackingType must be in rage 3 to 5");
   }
+#if NH_MV
+  }
+  }
+#endif
 
   if (m_segmentedRectFramePackingSEIEnabled)
   {
@@ -3154,12 +4981,14 @@ Void TAppEncCfg::xCheckParameter()
 
   xConfirmPara(m_preferredTransferCharacteristics > 255, "transfer_characteristics_idc should not be greater than 255.");
 
+#if !NH_MV
   if( m_erpSEIEnabled && !m_erpSEICancelFlag )
   {
     xConfirmPara( m_erpSEIGuardBandType < 0 || m_erpSEIGuardBandType > 8, "SEIEquirectangularprojectionGuardBandType must be in the range of 0 to 7");
     xConfirmPara( (m_chromaFormatIDC == CHROMA_420 || m_chromaFormatIDC == CHROMA_422) && (m_erpSEILeftGuardBandWidth%2 == 1), "SEIEquirectangularprojectionLeftGuardBandWidth must be an even number for 4:2:0 or 4:2:2 chroma format");
     xConfirmPara( (m_chromaFormatIDC == CHROMA_420 || m_chromaFormatIDC == CHROMA_422) && (m_erpSEIRightGuardBandWidth%2 == 1), "SEIEquirectangularprojectionRightGuardBandWidth must be an even number for 4:2:0 or 4:2:2 chroma format");
   }
+#endif
 
   if( m_sphereRotationSEIEnabled && !m_sphereRotationSEICancelFlag )
   {
@@ -3232,6 +5061,98 @@ const TChar *profileToString(const Profile::Name profile)
   exit(1);
   return "";
 }
+
+#if NH_MV
+Void TAppEncCfg::xPrintProfiles()
+{
+  printf("Profiles                          :");
+  for (Int i = 0; i < m_profiles.size(); i++)
+  {
+    if (m_profiles[i] == Profile::MAINREXT)
+    {
+      UIProfileName validProfileName;
+      if (m_onePictureOnlyConstraintFlags[i])
+      {
+        validProfileName = m_bitDepthConstraints[i] == 8 ? UI_MAIN_444_STILL_PICTURE : (m_bitDepthConstraints[i] == 16 ? UI_MAIN_444_16_STILL_PICTURE : UI_NONE);
+      }
+      else
+      {
+        const UInt intraIdx        =  m_intraConstraintFlags[i] ? 1:0;
+        const UInt bitDepthIdx     = (m_bitDepthConstraints[i] == 8 ? 0 : (m_bitDepthConstraints[i] ==10 ? 1 : (m_bitDepthConstraints[i] == 12 ? 2 : (m_bitDepthConstraints[i] == 16 ? 3 : 4 ))));
+        const UInt chromaFormatIdx = UInt(m_chromaFormatConstraints[i]);
+        validProfileName = (bitDepthIdx > 3 || chromaFormatIdx>3) ? UI_NONE : validRExtProfileNames[intraIdx][bitDepthIdx][chromaFormatIdx];
+      }
+      std::string rextSubProfile;
+      if (validProfileName!=UI_NONE)
+      {
+        rextSubProfile=enumToString(strToUIProfileName, sizeof(strToUIProfileName)/sizeof(*strToUIProfileName), validProfileName);
+      }
+      if (rextSubProfile == "main_444_16")
+      {
+        rextSubProfile="main_444_16 [NON STANDARD]";
+      }
+      printf(" %s (%s) ", profileToString(m_profiles[i]), (rextSubProfile.empty())?"INVALID REXT PROFILE":rextSubProfile.c_str() );
+
+    }
+    else if (m_profiles[i] == Profile::HIGHTHROUGHPUTREXT)
+    {
+      UIProfileName validProfileName;
+      const UInt intraIdx    = m_intraConstraintFlags[i] ? 1 : 0;
+      const UInt bitDepthIdx = (m_bitDepthConstraints[i] == 8 ? 0 : (m_bitDepthConstraints[i] ==10 ? 1 : (m_bitDepthConstraints[i] == 12 ? 2 : (m_bitDepthConstraints[i] == 16 ? 3 : 4 ))));
+      validProfileName = (bitDepthIdx > 3) ? UI_NONE : validRExtHighThroughPutProfileNames[intraIdx][bitDepthIdx];
+      std::string subProfile;
+      if (validProfileName!=UI_NONE)
+      {
+        subProfile=enumToString(strToUIProfileName, sizeof(strToUIProfileName)/sizeof(*strToUIProfileName), validProfileName);
+      }
+      printf(" : %s (%s)\n", profileToString(m_profiles[i]), (subProfile.empty())?"INVALID HIGH THROUGHPUT REXT PROFILE":subProfile.c_str() );
+    }
+    else if (m_profiles[i] == Profile::MAIN10 && m_onePictureOnlyConstraintFlags[i])
+    {
+      printf(" : %s (main10-still-picture)\n", profileToString(m_profiles[i]) );
+    }
+    else
+    {
+#if JVET_AM1080
+      if (m_profiles[i] == Profile::MULTIVIEWREXT)
+      {
+        printf(" multiview-rext");
+      }
+#else
+#if JVET_AE0295
+#if JVET_AH0046
+      if(m_profiles[i] == Profile::MULTIVIEWEXTENDED10 &&    m_bitDepthConstraints[i] == 10)
+      {
+        printf(" multiview-extended10");
+      }
+      else if (m_profiles[i] == Profile::MULTIVIEWEXTENDED &&    m_bitDepthConstraints[i] == 8)
+      {
+        printf(" multiview-extended");
+      }
+      else
+      {
+        printf(" %s ", profileToString(m_profiles[i]) );
+      }
+#else
+      if(m_profiles[i] == Profile::MULTIVIEWMAIN && m_bitDepthConstraints[i] == 10)
+      {
+        printf(" multiview-main10 ");
+      }
+      else
+      {
+        printf(" %s ", profileToString(m_profiles[i]) );
+      }
+#endif  // JVET_AH0046
+#else
+      printf(" %s ", profileToString(m_profiles[i]) );
+#endif // JVET_AE0295
+#endif // JVET_AM1080
+    }
+  }
+  printf("\n\n");
+
+}
+#endif
 
 #if DPB_ENCODER_USAGE_CHECK
 
@@ -3314,17 +5235,63 @@ Int TAppEncCfg::xDPBUsage(std::ostream *pOs)
 Void TAppEncCfg::xPrintParameter()
 {
   printf("\n");
+#if NH_MV
+  for( Int layer = 0; layer < m_numberOfLayers; layer++)
+  {
+    printf("Input          File %i             : %s\n", layer, m_pchInputFileList[layer]);
+  }
+#else
   printf("Input          File                    : %s\n", m_inputFileName.c_str()          );
+#endif
   printf("Bitstream      File                    : %s\n", m_bitstreamFileName.c_str()      );
+#if NH_MV
+  for( Int layer = 0; layer < m_numberOfLayers; layer++)
+  {
+    printf("Reconstruction File %i             : %s\n", layer, m_pchReconFileList[layer]);
+  }
+#else
   printf("Reconstruction File                    : %s\n", m_reconFileName.c_str()          );
+#endif
+#if NH_MV
+  xPrintParaVector( "NuhLayerId"     , m_layerIdInNuh );
+  if ( m_targetEncLayerIdList.size() > 0)
+  {
+    xPrintParaVector( "TargetEncLayerIdList"     , m_targetEncLayerIdList );
+  }
+  xPrintParaVector( "ViewIdVal"     , m_viewId );
+  xPrintParaVector( "ViewOrderIdx"  , m_viewOrderIndex );
+  xPrintParaVector( "AuxId", m_auxId );
+#endif
 #if SHUTTER_INTERVAL_SEI_PROCESSING
   if (m_ShutterFilterEnable && !m_shutterIntervalPreFileName.empty())
   {
     printf("SII Pre-processed File                 : %s\n", m_shutterIntervalPreFileName.c_str());
   }
 #endif
+#if NH_MV
+  xPrintParaVector( "LoopFilterDisable", m_bLoopFilterDisable );
+  xPrintParaVector( "SAO"              , m_bUseSAO            );
+  printf("ShareParameterSets                : %d\n",  m_shareParameterSets ?  1  : 0  );
+#endif
+
+#if NH_MV
+  printf("Real     Format                   :");
+  for(Int i = 0; i < m_numRepFormats; i++ )
+  {
+    printf(" (%dx%d %gHz)", m_iSourceWidths[i] - m_confWinLefts[i] - m_confWinRights[i], m_iSourceHeights[i] - m_confWinTops[i] - m_confWinBottoms[i], (Double)m_iFrameRate/m_temporalSubsampleRatio );
+  }
+
+  printf("\nInternal Format                   :" );
+  for(Int i = 0; i < m_numRepFormats; i++ )
+  {
+
+    printf(" (%dx%d %gHz)", m_iSourceWidths[i], m_iSourceHeights[i], (Double)m_iFrameRate/m_temporalSubsampleRatio );
+  }
+  printf("\n");
+#else
   printf("Real     Format                        : %dx%d %gHz\n", m_sourceWidth - m_confWinLeft - m_confWinRight, m_sourceHeight - m_confWinTop - m_confWinBottom, (Double)m_iFrameRate/m_temporalSubsampleRatio );
   printf("Internal Format                        : %dx%d %gHz\n", m_sourceWidth, m_sourceHeight, (Double)m_iFrameRate/m_temporalSubsampleRatio );
+#endif
   printf("Sequence PSNR output                   : %s\n", (m_printMSEBasedSequencePSNR ? "Linear average, MSE-based" : "Linear average only") );
   printf("Sequence MSE output                    : %s\n", (m_printSequenceMSE ? "Enabled" : "Disabled") );
   printf("Frame MSE output                       : %s\n", (m_printFrameMSE    ? "Enabled" : "Disabled") );
@@ -3347,6 +5314,7 @@ Void TAppEncCfg::xPrintParameter()
     printf("Frame/Field                            : Frame based coding\n");
     printf("Frame index                            : %u - %d (%d frames)\n", m_FrameSkip, m_FrameSkip+m_framesToBeEncoded-1, m_framesToBeEncoded );
   }
+#if !NH_MV
   if (m_profile == Profile::MAINREXT)
   {
     UIProfileName validProfileName;
@@ -3393,14 +5361,40 @@ Void TAppEncCfg::xPrintParameter()
   {
     printf("Profile                                : %s\n", profileToString(m_profile) );
   }
+#endif
+
+#if NH_MV
+  printf("CU size / depth / total-depth     : %d / %d / %d\n", m_uiMaxCUWidth, m_uiMaxCUDepth, m_uiMaxTotalCUDepth[0] );
+#else
   printf("CU size / depth / total-depth          : %d / %d / %d\n", m_uiMaxCUWidth, m_uiMaxCUDepth, m_uiMaxTotalCUDepth );
+#endif
   printf("RQT trans. size (min / max)            : %d / %d\n", 1 << m_uiQuadtreeTULog2MinSize, 1 << m_uiQuadtreeTULog2MaxSize );
   printf("Max RQT depth inter                    : %d\n", m_uiQuadtreeTUMaxDepthInter);
   printf("Max RQT depth intra                    : %d\n", m_uiQuadtreeTUMaxDepthIntra);
   printf("Min PCM size                           : %d\n", 1 << m_uiPCMLog2MinSize);
   printf("Motion search range                    : %d\n", m_iSearchRange );
+#if NH_MV
+  printf("Disp search range restriction     : %d\n", m_bUseDisparitySearchRangeRestriction );
+  printf("Vertical disp search range        : %d\n", m_iVerticalDisparitySearchRange );
+#endif
+#if NH_MV
+  xPrintParaVector( "Intra period", m_iIntraPeriod );
+#else
   printf("Intra period                           : %d\n", m_iIntraPeriod );
+#endif
   printf("Decoding refresh type                  : %d\n", m_iDecodingRefreshType );
+
+
+#if NH_MV
+  if ( !m_qpIncrementAtSourceFrame.empty() )
+  {
+    xPrintParaVector( "QPIncrementFrame", m_qpIncrementAtSourceFrame );
+  }
+  else
+  {
+    xPrintParaVector( "QP", m_iQP );
+  }
+#else
   if (m_qpIncrementAtSourceFrame.bPresent)
   {
     printf("QP                                     : %d (incrementing internal QP at source frame %d)\n", m_iQP, m_qpIncrementAtSourceFrame.value );
@@ -3409,17 +5403,48 @@ Void TAppEncCfg::xPrintParameter()
   {
     printf("QP                                     : %d\n", m_iQP );
   }
+#endif
+
   printf("Max dQP signaling depth                : %d\n", m_iMaxCuDQPDepth);
 
   printf("Cb QP Offset                           : %d\n", m_cbQpOffset   );
   printf("Cr QP Offset                           : %d\n", m_crQpOffset);
   printf("QP adaptation                          : %d (range=%d)\n", m_bUseAdaptiveQP, (m_bUseAdaptiveQP ? m_iQPAdaptationRange : 0) );
   printf("GOP size                               : %d\n", m_iGOPSize );
+
+#if NH_MV
+  printf("Input bit depth                   :");
+  for (Int i = 0; i < m_numRepFormats; i++ )
+  {
+    printf(" (Y:%d, C:%d)", m_inputBitDepths[i][CHANNEL_TYPE_LUMA], m_inputBitDepths[i][CHANNEL_TYPE_CHROMA] );
+  }
+
+  printf("\nMSB-extended bit depth            :");
+  for (Int i = 0; i < m_numRepFormats; i++ )
+  {
+    printf(" (Y:%d, C:%d)", m_MSBExtendedBitDepths[i][CHANNEL_TYPE_LUMA], m_MSBExtendedBitDepths[i][CHANNEL_TYPE_CHROMA] );
+  }
+
+  printf("\nInternal bit depth                :");
+  for (Int i = 0; i < m_numRepFormats; i++ )
+  {
+    printf(" (Y:%d, C:%d)", m_internalBitDepths[i][CHANNEL_TYPE_LUMA], m_internalBitDepths[i][CHANNEL_TYPE_CHROMA] );
+  }
+  
+  printf("\nPCM sample bit depth              :");
+  for (Int i = 0; i < m_numRepFormats; i++ )
+  {
+    printf(" (Y:%d, C:%d)", m_bPCMInputBitDepthFlag ? m_MSBExtendedBitDepths[i][CHANNEL_TYPE_LUMA]   : m_internalBitDepths[i][CHANNEL_TYPE_LUMA],
+                             m_bPCMInputBitDepthFlag ? m_MSBExtendedBitDepths[i][CHANNEL_TYPE_CHROMA] : m_internalBitDepths[i][CHANNEL_TYPE_CHROMA] );
+  }
+  printf("\n" );
+#else
   printf("Input bit depth                        : (Y:%d, C:%d)\n", m_inputBitDepth[CHANNEL_TYPE_LUMA], m_inputBitDepth[CHANNEL_TYPE_CHROMA] );
   printf("MSB-extended bit depth                 : (Y:%d, C:%d)\n", m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA], m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA] );
   printf("Internal bit depth                     : (Y:%d, C:%d)\n", m_internalBitDepth[CHANNEL_TYPE_LUMA], m_internalBitDepth[CHANNEL_TYPE_CHROMA] );
   printf("PCM sample bit depth                   : (Y:%d, C:%d)\n", m_bPCMInputBitDepthFlag ? m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA] : m_internalBitDepth[CHANNEL_TYPE_LUMA],
                                                                     m_bPCMInputBitDepthFlag ? m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA] : m_internalBitDepth[CHANNEL_TYPE_CHROMA] );
+#endif
   printf("Intra reference smoothing              : %s\n", (m_enableIntraReferenceSmoothing           ? "Enabled" : "Disabled") );
   printf("diff_cu_chroma_qp_offset_depth         : %d\n", m_diffCuChromaQpOffsetDepth);
   printf("extended_precision_processing_flag     : %s\n", (m_extendedPrecisionProcessingFlag         ? "Enabled" : "Disabled") );
@@ -3431,11 +5456,37 @@ Void TAppEncCfg::xPrintParameter()
   printf("high_precision_offsets_enabled_flag    : %s\n", (m_highPrecisionOffsetsEnabledFlag         ? "Enabled" : "Disabled") );
   printf("persistent_rice_adaptation_enabled_flag: %s\n", (m_persistentRiceAdaptationEnabledFlag     ? "Enabled" : "Disabled") );
   printf("cabac_bypass_alignment_enabled_flag    : %s\n", (m_cabacBypassAlignmentEnabledFlag         ? "Enabled" : "Disabled") );
+#if NH_MV
+  Bool anySAO = false;
+  IntAry1d saoOffBitShiftL;
+  IntAry1d saoOffBitShiftC;
+
+  for (Int i = 0; i < m_numberOfLayers; i++)
+  {
+    if ( m_bUseSAO[i] )
+    {
+      anySAO = true;
+      saoOffBitShiftL.push_back( m_log2SaoOffsetScale[i][CHANNEL_TYPE_LUMA] );
+      saoOffBitShiftC.push_back( m_log2SaoOffsetScale[i][CHANNEL_TYPE_CHROMA] );
+    }
+    else
+    {
+      saoOffBitShiftL.push_back( -1 );
+      saoOffBitShiftC.push_back( -1 );
+    }
+  }
+  if (anySAO)
+  {
+    xPrintParaVector( "Sao Luma Offset bit shifts"  , saoOffBitShiftL );
+    xPrintParaVector( "Sao Chroma Offset bit shifts", saoOffBitShiftC );
+  }
+#else
   if (m_bUseSAO)
   {
     printf("log2_sao_offset_scale_luma             : %d\n", m_log2SaoOffsetScale[CHANNEL_TYPE_LUMA]);
     printf("log2_sao_offset_scale_chroma           : %d\n", m_log2SaoOffsetScale[CHANNEL_TYPE_CHROMA]);
   }
+#endif
 
   switch (m_costMode)
   {
@@ -3463,13 +5514,43 @@ Void TAppEncCfg::xPrintParameter()
       printf("CpbSize                                : %d\n", m_RCCpbSize);
       printf("InitalCpbFullness                      : %.2f\n", m_RCInitialCpbFullness);
     }
+
+#if KWU_RC_MADPRED_E0227
+    printf("Depth based MAD prediction   : %d\n", m_depthMADPred);
+#endif
+#if KWU_RC_VIEWRC_E0227
+    printf("View-wise Rate control       : %d\n", m_viewWiseRateCtrl);
+    if(m_viewWiseRateCtrl)
+    {
+
+      printf("ViewWiseTargetBits           : ");
+      for (Int i = 0 ; i < m_iNumberOfViews ; i++)
+        printf("%d ", m_viewTargetBits[i]);
+      printf("\n");
+    }
+    else
+    {
+      printf("TargetBitrate                : %d\n", m_RCTargetBitrate );
+    }
+#endif
+
   }
 
   printf("Max Num Merge Candidates               : %d\n", m_maxNumMergeCand);
   printf("\n");
 
+#if NH_MV
+  printf("TOOL CFG General: ");
+
+  for( Int i = 0; i < m_numRepFormats; i++)
+  {
+    printf("IBD(%d):%d ", i, ((m_internalBitDepths[i][CHANNEL_TYPE_LUMA] > m_MSBExtendedBitDepths[i][CHANNEL_TYPE_LUMA]) || (m_internalBitDepths[i][CHANNEL_TYPE_CHROMA] > m_MSBExtendedBitDepths[i][CHANNEL_TYPE_CHROMA])));
+  }
+#else
   printf("TOOL CFG: ");
   printf("IBD:%d ", ((m_internalBitDepth[CHANNEL_TYPE_LUMA] > m_MSBExtendedBitDepth[CHANNEL_TYPE_LUMA]) || (m_internalBitDepth[CHANNEL_TYPE_CHROMA] > m_MSBExtendedBitDepth[CHANNEL_TYPE_CHROMA])));
+#endif
+
   printf("HAD:%d ", m_bUseHADME                          );
   printf("RDQ:%d ", m_useRDOQ                            );
   printf("RDQTS:%d ", m_useRDOQTS                        );
@@ -3499,7 +5580,9 @@ Void TAppEncCfg::xPrintParameter()
     printf("A=%d ", m_sliceSegmentArgument);
   }
   printf("CIP:%d ", m_bUseConstrainedIntraPred);
+#if !NH_MV
   printf("SAO:%d ", (m_bUseSAO)?(1):(0));
+#endif
   printf("PCM:%d ", (m_usePCM && (1<<m_uiPCMLog2MinSize) <= m_uiMaxCUWidth)? 1 : 0);
 
   if (m_TransquantBypassEnabledFlag && m_CUTransquantBypassFlagForce)
@@ -3514,8 +5597,16 @@ Void TAppEncCfg::xPrintParameter()
   printf("WPP:%d ", (Int)m_useWeightedPred);
   printf("WPB:%d ", (Int)m_useWeightedBiPred);
   printf("PME:%d ", m_log2ParallelMergeLevel);
+#if NH_MV
+  for( Int i = 0; i < m_numRepFormats; i++ )
+  {
+    const Int iWaveFrontSubstreams = m_entropyCodingSyncEnabledFlag ? (m_iSourceHeights[i] + m_uiMaxCUHeight - 1) / m_uiMaxCUHeight : 1;
+    printf(" WaveFrontSynchro(%d):%d WaveFrontSubstreams(%d):%d", i, m_entropyCodingSyncEnabledFlag?1:0, i, iWaveFrontSubstreams );
+  }
+#else
   const Int iWaveFrontSubstreams = m_entropyCodingSyncEnabledFlag ? (m_sourceHeight + m_uiMaxCUHeight - 1) / m_uiMaxCUHeight : 1;
   printf(" WaveFrontSynchro:%d WaveFrontSubstreams:%d", m_entropyCodingSyncEnabledFlag?1:0, iWaveFrontSubstreams);
+#endif
   printf(" ScalingList:%d ", m_useScalingListId );
   printf("TMVPMode:%d ", m_TMVPModeId     );
 #if ADAPTIVE_QP_SELECTION
@@ -3534,6 +5625,147 @@ Void TAppEncCfg::xPrintParameter()
   fflush(stdout);
 }
 
+#if NH_MV
+
+Void TAppEncCfg::xConfirmRepFormat(const TComVPS& vps )
+{
+  Bool checkFailed = false;
+
+  // Check reference layers
+  for (Int curLayerId = 0; curLayerId <= vps.getMaxLayersMinus1(); curLayerId++ )
+  {
+
+    const TComRepFormat* curRepFormat = vps.getRepFormat( vps.getVpsRepFormatIdx( curLayerId  ) );
+
+    Int curLayerIdInNuh      = vps.getLayerIdInNuh( curLayerId );
+    
+    for( Int i = 0; i < vps.getNumDirectRefLayers( curLayerIdInNuh ); i++ )
+    {
+      Int refLayerId =  vps.getLayerIdInVps( vps.getIdDirectRefLayer( curLayerIdInNuh, i ));//   refLayers[i];
+      const TComRepFormat* refRepFormat = vps.getRepFormat( vps.getVpsRepFormatIdx( refLayerId ) );
+
+      // Require equal size
+      xConfirmSingleRepFormat( checkFailed, "SourceHeight",curLayerId, refLayerId,  curRepFormat->getPicHeightVpsInLumaSamples(), refRepFormat->getPicHeightVpsInLumaSamples() );
+      xConfirmSingleRepFormat( checkFailed, "SourceWidth" ,curLayerId, refLayerId,  curRepFormat->getPicWidthVpsInLumaSamples() , refRepFormat->getPicWidthVpsInLumaSamples () );
+
+      // Sample dependency -> require same bit depth and chroma format
+      xConfirmSingleRepFormat( checkFailed, "ChromaFormatIDC"          , curLayerId, refLayerId,  curRepFormat->getChromaFormatVpsIdc()     , refRepFormat->getChromaFormatVpsIdc()  );
+      xConfirmSingleRepFormat( checkFailed, "InternalBitDepth (Luma)"  , curLayerId, refLayerId,  curRepFormat->getBitDepthVpsLumaMinus8()  , refRepFormat->getBitDepthVpsLumaMinus8());
+      xConfirmSingleRepFormat( checkFailed, "InternalBitDepth (Chroma)", curLayerId, refLayerId,  curRepFormat->getBitDepthVpsChromaMinus8(), refRepFormat->getBitDepthVpsChromaMinus8());
+    }
+    // TBD: add 3D-HEVC constraints e.g. for VSP, QTL
+  }
+
+  if( checkFailed )
+  {
+    exit(0);
+  }
+}
+
+Void TAppEncCfg::xConvertRepFormatParameters(
+  IntAry2d& tmpPad                       ,
+  IntAry2d& tmpInputBitDepth             ,
+  IntAry2d& tmpOutputBitDepth            ,
+  IntAry2d& tmpMSBExtendedBitDepth       ,
+  IntAry2d& tmpInternalBitDepth          ,
+  IntAry1d& tmpInputChromaFormat         ,
+  IntAry1d& tmpChromaFormat
+  )
+{
+  typedef std::pair< IntAry2d*,  IntAry2d* > ParamMapPair;
+  std::vector< ParamMapPair > paramTwoElem;
+  paramTwoElem.push_back( ParamMapPair( &tmpPad                ,  &m_aiPads               )  );
+  paramTwoElem.push_back( ParamMapPair( &tmpInputBitDepth      ,  &m_inputBitDepths       )  );
+  paramTwoElem.push_back( ParamMapPair( &tmpOutputBitDepth     ,  &m_outputBitDepths      )  );
+  paramTwoElem.push_back( ParamMapPair( &tmpMSBExtendedBitDepth,  &m_MSBExtendedBitDepths )  );
+  paramTwoElem.push_back( ParamMapPair( &tmpInternalBitDepth   ,  &m_internalBitDepths    )  );
+  
+  std::vector< IntAry1d* > paramOneElem;
+  paramOneElem.push_back(  &m_confWinLefts  );
+  paramOneElem.push_back(  &m_confWinRights );
+  paramOneElem.push_back(  &m_confWinTops   );
+  paramOneElem.push_back(  &m_confWinBottoms);
+  paramOneElem.push_back(  &m_iSourceWidths );
+  paramOneElem.push_back(  &m_iSourceHeights);
+  paramOneElem.push_back(  &tmpInputChromaFormat );
+  paramOneElem.push_back(  &tmpChromaFormat );
+
+
+  // Get maximum number of representation formats
+  size_t maxSize = 0;
+
+  for (Int i = 0; i < paramTwoElem.size(); i++)
+  {
+    for (Int j = 0; j < 2; j++ )
+    {
+      IntAry1d& curElems = (* (paramTwoElem[i].first) )[j];
+      maxSize = std::max<size_t>(  maxSize, curElems.size()  );
+    }
+  }
+
+  for (Int i = 0; i < paramOneElem.size(); i++)
+  {
+    maxSize = std::max<size_t>(  maxSize, (paramOneElem[i]->size() ) );
+  }
+
+  // Resize to maximum
+  for (Int i = 0; i < paramTwoElem.size(); i++)
+  {
+    IntAry2d& curElems = (* (paramTwoElem[i].first) );
+    for (Int j = 0; j < 2; j++ )
+    {
+      xResizeVector( curElems[j], (UInt) maxSize );
+    }
+  }
+
+  for (Int i = 0; i < paramOneElem.size(); i++)
+  {
+    xResizeVector( (*paramOneElem[i]), (UInt) maxSize );
+  }
+  
+  // Transpose
+  for (Int i = 0; i < paramTwoElem.size(); i++)
+  {
+    IntAry2d&  curElem  = (* (paramTwoElem[i].first  ) );
+    IntAry2d&  curElemT = (* (paramTwoElem[i].second ) );
+
+    curElemT.resize(maxSize);
+    for (Int k = 0; k < maxSize; k++ )
+    {
+      curElemT[k].resize(2);
+      for (Int j = 0; j < 2; j++ )
+      {
+        curElemT[k][j] = curElem[j][k];
+      }
+    }
+  }
+
+  m_numRepFormats = (Int) maxSize;
+}
+
+
+
+Void TAppEncCfg::xGetMaxValuesOfApplicableLayers(const TComVPS& vps, Int vpsPtlIdx, Int& maxBitDepthLuma, Int& maxBitDepthChroma, ChromaFormat& maxChromaFormatIdc, Int& maxNumRefLayers )
+{
+  maxChromaFormatIdc        = CHROMA_400;
+  maxBitDepthLuma   = -1;
+  maxBitDepthChroma = -1;
+  maxNumRefLayers   = 0;
+
+  IntAry1d applicableLayerIdsInVps = vps.getLayersOfVpsPtl( vpsPtlIdx );
+
+  for (Int i = 0; i < applicableLayerIdsInVps.size(); i++ )
+  {
+    Int curLayerIdInVps       = applicableLayerIdsInVps[ i ];
+    Int repFormatIdx          = m_layerIdxInVpsToRepFormatIdx[ curLayerIdInVps ];
+    maxChromaFormatIdc        = std::max<ChromaFormat> ( m_chromaFormatIDCs[ repFormatIdx], maxChromaFormatIdc );
+    maxBitDepthLuma   = std::max<Int> ( m_internalBitDepths[ repFormatIdx ][CHANNEL_TYPE_LUMA  ], maxBitDepthLuma   );
+    maxBitDepthChroma = std::max<Int> ( m_internalBitDepths[ repFormatIdx ][CHANNEL_TYPE_CHROMA], maxBitDepthChroma );
+    maxNumRefLayers   = std::max<Int> ( vps.getNumRefLayers( vps.getLayerIdInNuh( curLayerIdInVps ) ), maxNumRefLayers ) ;
+  }
+}
+
+#endif
 Bool confirmPara(Bool bflag, const TChar* message)
 {
   if (!bflag)

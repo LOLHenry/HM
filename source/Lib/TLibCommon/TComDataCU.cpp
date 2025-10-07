@@ -2787,6 +2787,21 @@ Void TComDataCU::clipMv    (TComMv&  rcMv) const
   rcMv.setVer( min (iVerMax, max (iVerMin, rcMv.getVer())) );
 }
 
+#if NH_MV
+Void TComDataCU::checkMvVertRest (TComMv&  rcMv,  RefPicList eRefPicList, int iRefIdx )
+{
+  if ( getSlice()->getSPS()->getInterViewMvVertConstraintFlag() )
+  {
+    if ( getSlice()->getRefPic( eRefPicList, iRefIdx )->getPOC() == getSlice()->getPOC() )
+    {
+        //When inter_view_mv_vert_constraint_flag is equal to 1,
+        //the vertical component of the motion vectors used for inter-layer prediction
+        //shall be equal to or less than 56 in units of luma samples
+        assert ( rcMv.getVer() <= (56<<2) );
+    }
+  }
+}
+#endif
 
 UInt TComDataCU::getIntraSizeIdx(UInt uiAbsPartIdx) const
 {

@@ -60,7 +60,9 @@ int main(int argc, char* argv[])
   fprintf( stdout, NVM_COMPILEDBY );
   fprintf( stdout, NVM_BITS );
   fprintf( stdout, "\n\n" );
-
+#if NH_MV
+  fprintf( stdout, "Use the HEVC_EXT define to select between HEVC and MV-HEVC. \n\n" );
+#endif
   // create application encoder class
   cTAppEncTop.create();
 

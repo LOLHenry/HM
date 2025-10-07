@@ -430,6 +430,18 @@ Void TEncSbac::codeMVPIdx ( TComDataCU* pcCU, UInt uiAbsPartIdx, RefPicList eRef
   Int iNum = AMVP_MAX_NUM_CANDS;
 
   xWriteUnaryMaxSymbol(iSymbol, m_cMVPIdxSCModel.get(0), 1, iNum-1);
+#if NH_MV_ENC_DEC_TRAC
+#if ENC_DEC_TRACE
+  if ( eRefList == REF_PIC_LIST_0 )
+  {
+    DTRACE_PU("mvp_l0_flag", iSymbol)
+  }
+  else
+  {
+    DTRACE_PU("mvp_l1_flag", iSymbol)
+  }
+#endif
+#endif
 }
 
 Void TEncSbac::codePartSize( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDepth )
@@ -442,10 +454,15 @@ Void TEncSbac::codePartSize( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDepth )
     if( uiDepth == log2DiffMaxMinCodingBlockSize )
     {
       m_pcBinIf->encodeBin( eSize == SIZE_2Nx2N? 1 : 0, m_cCUPartSizeSCModel.get( 0, 0, 0 ) );
+#if NH_MV_ENC_DEC_TRAC
+      DTRACE_CU("part_mode", eSize == SIZE_2Nx2N? 1 : 0)
+#endif
     }
     return;
   }
-
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_CU("part_mode", eSize )
+#endif
   switch(eSize)
   {
     case SIZE_2Nx2N:
@@ -527,12 +544,18 @@ Void TEncSbac::codePredMode( TComDataCU* pcCU, UInt uiAbsPartIdx )
 {
   // get context function is here
   m_pcBinIf->encodeBin( pcCU->isIntra( uiAbsPartIdx ) ? 1 : 0, m_cCUPredModeSCModel.get( 0, 0, 0 ) );
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_CU("pred_mode_flag", pcCU->isIntra( uiAbsPartIdx ) ? 1 : 0);
+#endif
 }
 
 Void TEncSbac::codeCUTransquantBypassFlag( TComDataCU* pcCU, UInt uiAbsPartIdx )
 {
   UInt uiSymbol = pcCU->getCUTransquantBypass(uiAbsPartIdx);
   m_pcBinIf->encodeBin( uiSymbol, m_CUTransquantBypassFlagSCModel.get( 0, 0, 0 ) );
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_CU("cu_transquant_bypass_flag", uiSymbol);
+#endif
 }
 
 /** code skip flag
@@ -546,6 +569,7 @@ Void TEncSbac::codeSkipFlag( TComDataCU* pcCU, UInt uiAbsPartIdx )
   UInt uiSymbol = pcCU->isSkipped( uiAbsPartIdx ) ? 1 : 0;
   UInt uiCtxSkip = pcCU->getCtxSkipFlag( uiAbsPartIdx ) ;
   m_pcBinIf->encodeBin( uiSymbol, m_cCUSkipFlagSCModel.get( 0, 0, uiCtxSkip ) );
+#if !NH_MV_ENC_DEC_TRAC
   DTRACE_CABAC_VL( g_nSymbolCounter++ );
   DTRACE_CABAC_T( "\tSkipFlag" );
   DTRACE_CABAC_T( "\tuiCtxSkip: ");
@@ -553,6 +577,9 @@ Void TEncSbac::codeSkipFlag( TComDataCU* pcCU, UInt uiAbsPartIdx )
   DTRACE_CABAC_T( "\tuiSymbol: ");
   DTRACE_CABAC_V( uiSymbol );
   DTRACE_CABAC_T( "\n");
+#else
+  DTRACE_CU("cu_skip_flag", uiSymbol);
+#endif
 }
 
 /** code merge flag
@@ -565,6 +592,9 @@ Void TEncSbac::codeMergeFlag( TComDataCU* pcCU, UInt uiAbsPartIdx )
   const UInt uiSymbol = pcCU->getMergeFlag( uiAbsPartIdx ) ? 1 : 0;
   m_pcBinIf->encodeBin( uiSymbol, *m_cCUMergeFlagExtSCModel.get( 0 ) );
 
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_PU("merge_flag", uiSymbol);
+#else
   DTRACE_CABAC_VL( g_nSymbolCounter++ );
   DTRACE_CABAC_T( "\tMergeFlag: " );
   DTRACE_CABAC_V( uiSymbol );
@@ -573,6 +603,7 @@ Void TEncSbac::codeMergeFlag( TComDataCU* pcCU, UInt uiAbsPartIdx )
   DTRACE_CABAC_T( "\tuiAbsPartIdx: " );
   DTRACE_CABAC_V( uiAbsPartIdx );
   DTRACE_CABAC_T( "\n" );
+#endif
 }
 
 /** code merge index
@@ -602,12 +633,17 @@ Void TEncSbac::codeMergeIndex( TComDataCU* pcCU, UInt uiAbsPartIdx )
         break;
       }
     }
+#if NH_MV_ENC_DEC_TRAC
+    DTRACE_PU("merge_idx", uiUnaryIdx);
+#endif
   }
+#if !NH_MV_ENC_DEC_TRAC
   DTRACE_CABAC_VL( g_nSymbolCounter++ );
   DTRACE_CABAC_T( "\tparseMergeIndex()" );
   DTRACE_CABAC_T( "\tuiMRGIdx= " );
   DTRACE_CABAC_V( pcCU->getMergeIndex( uiAbsPartIdx ) );
   DTRACE_CABAC_T( "\n" );
+#endif
 }
 
 Void TEncSbac::codeSplitFlag   ( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDepth )
@@ -622,14 +658,19 @@ Void TEncSbac::codeSplitFlag   ( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDep
 
   assert( uiCtx < 3 );
   m_pcBinIf->encodeBin( uiCurrSplitFlag, m_cCUSplitFlagSCModel.get( 0, 0, uiCtx ) );
+#if !NH_MV_ENC_DEC_TRAC
   DTRACE_CABAC_VL( g_nSymbolCounter++ )
   DTRACE_CABAC_T( "\tSplitFlag\n" )
+#else
+  DTRACE_CU("split_cu_flag", uiCurrSplitFlag );
+#endif
   return;
 }
 
 Void TEncSbac::codeTransformSubdivFlag( UInt uiSymbol, UInt uiCtx )
 {
   m_pcBinIf->encodeBin( uiSymbol, m_cCUTransSubdivFlagSCModel.get( 0, 0, uiCtx ) );
+#if !NH_MV_ENC_DEC_TRAC
   DTRACE_CABAC_VL( g_nSymbolCounter++ )
   DTRACE_CABAC_T( "\tparseTransformSubdivFlag()" )
   DTRACE_CABAC_T( "\tsymbol=" )
@@ -637,6 +678,9 @@ Void TEncSbac::codeTransformSubdivFlag( UInt uiSymbol, UInt uiCtx )
   DTRACE_CABAC_T( "\tctx=" )
   DTRACE_CABAC_V( uiCtx )
   DTRACE_CABAC_T( "\n" )
+#else
+  DTRACE_TU("split_transform_flag", uiSymbol )
+#endif
 }
 
 
@@ -660,6 +704,9 @@ Void TEncSbac::codeIntraDirLumaAng( TComDataCU* pcCU, UInt absPartIdx, Bool isMu
       }
     }
     m_pcBinIf->encodeBin((predIdx[j] != -1)? 1 : 0, m_cCUIntraPredSCModel.get( 0, 0, 0 ) );
+#if NH_MV_ENC_DEC_TRAC
+    DTRACE_CU("prev_intra_luma_pred_flag", (predIdx[j] != -1)? 1 : 0);
+#endif
   }
   for (j=0;j<partNum;j++)
   {
@@ -670,6 +717,9 @@ Void TEncSbac::codeIntraDirLumaAng( TComDataCU* pcCU, UInt absPartIdx, Bool isMu
       {
         m_pcBinIf->encodeBinEP( predIdx[j]-1 );
       }
+#if NH_MV_ENC_DEC_TRAC
+      DTRACE_CU("mpm_idx", predIdx[j] );
+#endif
     }
     else
     {
@@ -690,6 +740,9 @@ Void TEncSbac::codeIntraDirLumaAng( TComDataCU* pcCU, UInt absPartIdx, Bool isMu
         dir[j] = dir[j] > preds[j][i] ? dir[j] - 1 : dir[j];
       }
       m_pcBinIf->encodeBinsEP( dir[j], 5 );
+#if NH_MV_ENC_DEC_TRAC
+      DTRACE_CU("rem_intra_luma_pred_mode", dir[j] );
+#endif
     }
   }
   return;
@@ -702,6 +755,9 @@ Void TEncSbac::codeIntraDirChroma( TComDataCU* pcCU, UInt uiAbsPartIdx )
   if( uiIntraDirChroma == DM_CHROMA_IDX )
   {
     m_pcBinIf->encodeBin( 0, m_cCUChromaPredSCModel.get( 0, 0, 0 ) );
+#if NH_MV_ENC_DEC_TRAC
+    DTRACE_CU("intra_chroma_pred_mode", 0 );
+#endif
   }
   else
   {
@@ -720,6 +776,9 @@ Void TEncSbac::codeIntraDirChroma( TComDataCU* pcCU, UInt uiAbsPartIdx )
     }
 
     m_pcBinIf->encodeBinsEP( uiIntraDirChroma, 2 );
+#if NH_MV_ENC_DEC_TRAC
+    DTRACE_CU("intra_chroma_pred_mode", uiIntraDirChroma );
+#endif
   }
 
   return;
@@ -741,6 +800,9 @@ Void TEncSbac::codeInterDir( TComDataCU* pcCU, UInt uiAbsPartIdx )
   {
     m_pcBinIf->encodeBin( uiInterDir, *( pCtx + 4 ) );
   }
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_PU("inter_pred_idc", uiInterDir );
+#endif
 
   return;
 }
@@ -773,6 +835,19 @@ Void TEncSbac::codeRefFrmIdx( TComDataCU* pcCU, UInt uiAbsPartIdx, RefPicList eR
       }
     }
   }
+#if NH_MV_ENC_DEC_TRAC
+#if ENC_DEC_TRACE
+    iRefFrame = pcCU->getCUMvField( eRefList )->getRefIdx( uiAbsPartIdx );
+    if ( eRefList == REF_PIC_LIST_0 )
+    {
+      DTRACE_PU("ref_idx_l0", iRefFrame)
+    }
+    else
+    {
+      DTRACE_PU("ref_idx_l1", iRefFrame)
+    }
+#endif
+#endif
   return;
 }
 
@@ -957,7 +1032,7 @@ Void TEncSbac::codeQtCbf( TComTU &rTu, const ComponentID compID, const Bool lowe
       const UInt uiCbf           = pcCU->getCbf(subTUAbsPartIdx, compID, subTUDepth);
 
       m_pcBinIf->encodeBin(uiCbf, m_cCUQtCbfSCModel.get(0, contextSet, uiCtx));
-
+#if !NH_MV_ENC_DEC_TRAC
       DTRACE_CABAC_VL( g_nSymbolCounter++ )
       DTRACE_CABAC_T( "\tparseQtCbf()" )
       DTRACE_CABAC_T( "\tsub-TU=" )
@@ -971,6 +1046,20 @@ Void TEncSbac::codeQtCbf( TComTU &rTu, const ComponentID compID, const Bool lowe
       DTRACE_CABAC_T( "\tuiAbsPartIdx=" )
       DTRACE_CABAC_V( subTUAbsPartIdx )
       DTRACE_CABAC_T( "\n" )
+#else
+      if ( compID == COMPONENT_Cb )
+      {
+        DTRACE_TU("cbf_cb", uiCbf )
+      }
+      else if ( compID == COMPONENT_Cr )
+      {
+        DTRACE_TU("cbf_cr", uiCbf )
+      }
+      else
+      {
+        DTRACE_TU("cbf_luma", uiCbf )
+      }
+#endif
     }
   }
   else
@@ -978,7 +1067,7 @@ Void TEncSbac::codeQtCbf( TComTU &rTu, const ComponentID compID, const Bool lowe
     const UInt uiCbf = pcCU->getCbf( absPartIdx, compID, lowestTUDepth );
     m_pcBinIf->encodeBin( uiCbf , m_cCUQtCbfSCModel.get( 0, contextSet, uiCtx ) );
 
-
+#if !NH_MV_ENC_DEC_TRAC
     DTRACE_CABAC_VL( g_nSymbolCounter++ )
     DTRACE_CABAC_T( "\tparseQtCbf()" )
     DTRACE_CABAC_T( "\tsymbol=" )
@@ -990,6 +1079,20 @@ Void TEncSbac::codeQtCbf( TComTU &rTu, const ComponentID compID, const Bool lowe
     DTRACE_CABAC_T( "\tuiAbsPartIdx=" )
     DTRACE_CABAC_V( rTu.GetAbsPartIdxTU(compID) )
     DTRACE_CABAC_T( "\n" )
+#else
+    if ( compID == COMPONENT_Cb )
+    {
+      DTRACE_TU("cbf_cb", uiCbf )
+    }
+    else if ( compID == COMPONENT_Cr )
+    {
+      DTRACE_TU("cbf_cr", uiCbf )
+    }
+    else
+    {
+      DTRACE_TU("cbf_luma", uiCbf )
+    }
+#endif
   }
 }
 
@@ -1012,6 +1115,7 @@ Void TEncSbac::codeTransformSkipFlags (TComTU &rTu, ComponentID component )
   UInt useTransformSkip = pcCU->getTransformSkip( uiAbsPartIdx,component);
   m_pcBinIf->encodeBin( useTransformSkip, m_cTransformSkipSCModel.get( 0, toChannelType(component), 0 ) );
 
+#if !NH_MV_ENC_DEC_TRAC
   DTRACE_CABAC_VL( g_nSymbolCounter++ )
   DTRACE_CABAC_T("\tparseTransformSkip()");
   DTRACE_CABAC_T( "\tsymbol=" )
@@ -1023,6 +1127,7 @@ Void TEncSbac::codeTransformSkipFlags (TComTU &rTu, ComponentID component )
   DTRACE_CABAC_T( "\tuiAbsPartIdx=" )
   DTRACE_CABAC_V( rTu.GetAbsPartIdxTU() )
   DTRACE_CABAC_T( "\n" )
+#endif
 }
 
 
@@ -1038,7 +1143,9 @@ Void TEncSbac::codeIPCMInfo( TComDataCU* pcCU, UInt uiAbsPartIdx )
   Bool writePCMSampleFlag = pcCU->getIPCMFlag(uiAbsPartIdx);
 
   m_pcBinIf->encodeBinTrm (uiIPCM);
-
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_CU("pcm_flag", uiIPCM)
+#endif
   if (writePCMSampleFlag)
   {
     m_pcBinIf->encodePCMAlignBits();
@@ -1073,6 +1180,7 @@ Void TEncSbac::codeQtRootCbf( TComDataCU* pcCU, UInt uiAbsPartIdx )
   UInt uiCbf = pcCU->getQtRootCbf( uiAbsPartIdx );
   UInt uiCtx = 0;
   m_pcBinIf->encodeBin( uiCbf , m_cCUQtRootCbfSCModel.get( 0, 0, uiCtx ) );
+#if !NH_MV_ENC_DEC_TRAC
   DTRACE_CABAC_VL( g_nSymbolCounter++ )
   DTRACE_CABAC_T( "\tparseQtRootCbf()" )
   DTRACE_CABAC_T( "\tsymbol=" )
@@ -1082,6 +1190,9 @@ Void TEncSbac::codeQtRootCbf( TComDataCU* pcCU, UInt uiAbsPartIdx )
   DTRACE_CABAC_T( "\tuiAbsPartIdx=" )
   DTRACE_CABAC_V( uiAbsPartIdx )
   DTRACE_CABAC_T( "\n" )
+#else
+  DTRACE_CU( "rqt_root_cbf", uiCbf )
+#endif
 }
 
 Void TEncSbac::codeQtCbfZero( TComTU & rTu, const ChannelType chType )
@@ -1187,6 +1298,7 @@ Void TEncSbac::codeCoeffNxN( TComTU &rTu, TCoeff* pcCoef, const ComponentID comp
   const UInt uiHeight=tuRect.height;
   const TComSPS &sps=*(pcCU->getSlice()->getSPS());
 
+#if !NH_MV_ENC_DEC_TRAC
   DTRACE_CABAC_VL( g_nSymbolCounter++ )
   DTRACE_CABAC_T( "\tparseCoeffNxN()\teType=" )
   DTRACE_CABAC_V( compID )
@@ -1214,6 +1326,7 @@ Void TEncSbac::codeCoeffNxN( TComTU &rTu, TCoeff* pcCoef, const ComponentID comp
   DTRACE_CABAC_T( "\tpredmode=" )
   DTRACE_CABAC_V(  pcCU->getPredictionMode( uiAbsPartIdx ) )
   DTRACE_CABAC_T( "\n" )
+#endif
 
   //--------------------------------------------------------------------------------------------------
 

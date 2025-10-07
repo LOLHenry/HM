@@ -50,6 +50,10 @@
 #endif
 #include <assert.h>
 
+#if NH_MV
+#include "TLibCommon/SEI.h"
+#endif
+
 struct GOPEntry
 {
   Int m_POC;
@@ -73,6 +77,11 @@ struct GOPEntry
   Int m_numRefIdc;
   Int m_refIdc[MAX_NUM_REF_PICS+1];
   Bool m_isEncoded;
+#if NH_MV
+  Int m_numActiveRefLayerPics;
+  Int m_interLayerPredLayerIdc [MAX_NUM_REF_PICS];
+  Int m_interViewRefPosL[2][MAX_NUM_REF_PICS];
+#endif
   GOPEntry()
   : m_POC(-1)
   , m_QPOffset(0)
@@ -92,10 +101,18 @@ struct GOPEntry
   , m_deltaRPS(0)
   , m_numRefIdc(0)
   , m_isEncoded(false)
+#if NH_MV
+  , m_numActiveRefLayerPics(0)
+#endif
   {
     ::memset( m_referencePics, 0, sizeof(m_referencePics) );
     ::memset( m_usedByCurrPic, 0, sizeof(m_usedByCurrPic) );
     ::memset( m_refIdc,        0, sizeof(m_refIdc) );
+#if NH_MV
+    ::memset( m_interLayerPredLayerIdc,   0, sizeof(m_interLayerPredLayerIdc) );
+    ::memset( m_interViewRefPosL[0], -1, sizeof(m_interViewRefPosL[0]) );
+    ::memset( m_interViewRefPosL[1], -1, sizeof(m_interViewRefPosL[1]) );
+#endif
   }
 };
 
@@ -178,7 +195,11 @@ protected:
   UInt      m_uiDecodingRefreshType;            ///< the type of decoding refresh employed for the random access.
   Bool      m_bReWriteParamSetsFlag;
   Int       m_iGOPSize;
+#if NH_MV
+  GOPEntry  m_GOPList[MAX_GOP+1];
+#else
   GOPEntry  m_GOPList[MAX_GOP];
+#endif
   Int       m_extraRPSs;
   Int       m_maxDecPicBuffering[MAX_TLAYER];
   Int       m_numReorderPics[MAX_TLAYER];
@@ -230,6 +251,10 @@ protected:
   Int       m_minSearchWindow;
   Bool      m_bRestrictMESampling;
 
+#if NH_MV
+  Bool      m_bUseDisparitySearchRangeRestriction;
+  Int       m_iVerticalDisparitySearchRange;
+#endif
   //====== Quality control ========
   Int       m_iMaxDeltaQP;                      //  Max. absolute delta QP (1:default)
   Int       m_iMaxCuDQPDepth;                   //  Max. depth for a minimum CuDQP (0:default)
@@ -409,6 +434,11 @@ protected:
   Bool      m_greenMetadataInfoSEIEnabled;
   UChar     m_greenMetadataType;
   UChar     m_xsdMetricType;
+#if NH_MV
+  SEIMessages* m_seiMessages;
+  Bool         m_sendParameterSets;
+  Int          m_parameterSetId;
+#endif
   Bool      m_ccvSEIEnabled;
   Bool      m_ccvSEICancelFlag;
   Bool      m_ccvSEIPersistenceFlag;
@@ -538,12 +568,25 @@ protected:
   Bool      m_RCCpbSaturationEnabled;
   UInt      m_RCCpbSize;
   Double    m_RCInitialCpbFullness;
+#if KWU_RC_MADPRED_E0227
+  UInt       m_depthMADPred;
+#endif
+#if KWU_RC_VIEWRC_E0227
+  Bool      m_bViewWiseRateCtrl;
+#endif
   Bool      m_TransquantBypassEnabledFlag;                    ///< transquant_bypass_enabled_flag setting in PPS.
   Bool      m_CUTransquantBypassFlagForce;                    ///< if transquant_bypass_enabled_flag, then, if true, all CU transquant bypass flags will be set to true.
 
   CostMode  m_costMode;                                       ///< The cost function to use, primarily when considering lossless coding.
 
+#if NH_MV
+  TComVPS*  m_cVPS;                                           ///< pointer to VPS, same for all layers
+  TComSPS   m_activeSps;                                      /// Keep local copy; since syntax elements can be changed by layer specific inference.
+  TComPPS   m_activePps;                                      /// Keep local copy; since syntax elements can be changed by layer specific inference.
+#else
   TComVPS   m_cVPS;
+#endif
+
   Bool      m_recalculateQPAccordingToLambda;                 ///< recalculate QP value according to the lambda value
   Int       m_activeParameterSetsSEIEnabled;                  ///< enable active parameter set SEI message
   Bool      m_vuiParametersPresentFlag;                       ///< enable generation of VUI parameters
@@ -588,6 +631,13 @@ protected:
   std::string m_summaryPicFilenameBase;                       ///< Base filename to use for producing summary picture output files. The actual filenames used will have I.txt, P.txt and B.txt appended.
   UInt        m_summaryVerboseness;                           ///< Specifies the level of the verboseness of the text output.
 
+#if NH_MV
+  Int       m_layerId;
+  Int       m_layerIdInVps;
+  Int       m_viewId;
+  Int       m_viewIndex;
+#endif
+
 #if JCTVC_AD0021_SEI_MANIFEST
   Bool        m_SEIManifestSEIEnabled;
 #endif
@@ -600,6 +650,12 @@ public:
   TEncCfg()
   : m_tileColumnWidth()
   , m_tileRowHeight()
+#if NH_MV
+  , m_layerId(-1)
+  , m_layerIdInVps(-1)
+  , m_viewId(-1)
+  , m_viewIndex(-1)
+#endif
   {
     m_PCMBitDepth[CHANNEL_TYPE_LUMA]=8;
     m_PCMBitDepth[CHANNEL_TYPE_CHROMA]=8;
@@ -651,12 +707,33 @@ public:
   Void      setShutterFilterFlag(Bool value)    { m_ShutterFilterEnable = value; }
 #endif
 
+#if NH_MV
+  Void      setLayerId                       ( Int layerId )      { m_layerId = layerId; }
+  Int       getLayerId                       ()         const     { return m_layerId;    }
+  Int       getLayerIdInVps                  ()         const     { return m_layerIdInVps; }
+  Void      setLayerIdInVps                  ( Int layerIdInVps)  { m_layerIdInVps = layerIdInVps; }
+  Void      setViewId                        ( Int viewId  )      { m_viewId  = viewId;  }
+  Int       getViewId                        ()         const     { return m_viewId;    }
+  Void      setViewIndex                     ( Int viewIndex  )   { m_viewIndex  = viewIndex;  }
+  Int       getViewIndex                     ()         const     { return m_viewIndex;    }
+#if NH_MV
+  Void      setSendParameterSets            ( Bool value )       { m_sendParameterSets = value; };
+  Bool      getSendParameterSets            (  )                 { return m_sendParameterSets; };
+
+  Void      setParameterSetId               ( Int  value )       { m_parameterSetId = value; };
+  Int       getParameterSetId               (  )                 { return m_parameterSetId;  };
+#endif
+#endif
   //====== Coding Structure ========
   Void      setIntraPeriod                  ( Int   i )      { m_uiIntraPeriod = (UInt)i; }
   Void      setDecodingRefreshType          ( Int   i )      { m_uiDecodingRefreshType = (UInt)i; }
   Void      setReWriteParamSetsFlag         ( Bool  b )      { m_bReWriteParamSetsFlag = b; }
   Void      setGOPSize                      ( Int   i )      { m_iGOPSize = i; }
+#if NH_MV
+  Void      setGopList                      ( GOPEntry*  GOPList ) {  for ( Int i = 0; i < MAX_GOP+1; i++ ) m_GOPList[i] = GOPList[i]; }
+#else
   Void      setGopList                      ( const GOPEntry GOPList[MAX_GOP] ) {  for ( Int i = 0; i < MAX_GOP; i++ ) m_GOPList[i] = GOPList[i]; }
+#endif
   Void      setExtraRPSs                    ( Int   i )      { m_extraRPSs = i; }
   const GOPEntry &getGOPEntry               ( Int   i ) const { return m_GOPList[i]; }
   Void      setEncodedFlag                  ( Int  i, Bool value )  { m_GOPList[i].m_isEncoded = value; }
@@ -666,7 +743,12 @@ public:
   Void      setQP                           ( Int   i )      { m_iQP = i; }
   Void      setIntraQPOffset                ( Int   i )         { m_intraQPOffset = i; }
   Void      setLambdaFromQPEnable           ( Bool  b )         { m_lambdaFromQPEnable = b; }
+
+#if NH_MV
+  Void      setPad                          ( Int*  iPad                   )      { for ( Int i = 0; i < 2; i++ ) m_sourcePadding[i] = iPad[i]; }
+#else
   Void      setSourcePadding                ( Int*  padding )   { for ( Int i = 0; i < 2; i++ ) m_sourcePadding[i] = padding[i]; }
+#endif
 
   Int       getMaxRefPicNum                 ()                              { return m_iMaxRefPicNum;           }
   Void      setMaxRefPicNum                 ( Int iMaxRefPicNum )           { m_iMaxRefPicNum = iMaxRefPicNum;  }
@@ -702,6 +784,11 @@ public:
   Void      setFastMEAssumingSmootherMVEnabled ( Bool b )    { m_bFastMEAssumingSmootherMVEnabled = b; }
   Void      setMinSearchWindow              ( Int   i )      { m_minSearchWindow = i; }
   Void      setRestrictMESampling           ( Bool  b )      { m_bRestrictMESampling = b; }
+
+#if NH_MV
+  Void      setUseDisparitySearchRangeRestriction ( Bool   b )      { m_bUseDisparitySearchRangeRestriction = b; }
+  Void      setVerticalDisparitySearchRange ( Int   i )      { m_iVerticalDisparitySearchRange = i; }
+#endif
 
   //====== Quality control ========
   Void      setMaxDeltaQP                   ( Int   i )      { m_iMaxDeltaQP = i; }
@@ -773,7 +860,11 @@ public:
   UInt      getIntraPeriod                  ()      { return  m_uiIntraPeriod; }
   UInt      getDecodingRefreshType          ()      { return  m_uiDecodingRefreshType; }
   Bool      getReWriteParamSetsFlag         ()      { return m_bReWriteParamSetsFlag; }
+#if NH_MV
+  Int       getGOPSize                      ()    const  { return  m_iGOPSize; }
+#else
   Int       getGOPSize                      ()      { return  m_iGOPSize; }
+#endif
   Int       getMaxDecPicBuffering           (UInt tlayer) { return m_maxDecPicBuffering[tlayer]; }
   Int       getNumReorderPics               (UInt tlayer) { return m_numReorderPics[tlayer]; }
   Int       getIntraQPOffset                () const    { return  m_intraQPOffset; }
@@ -794,11 +885,19 @@ public:
   UInt      getQuadtreeTUMaxDepthIntra      ()      const { return m_uiQuadtreeTUMaxDepthIntra; }
 
   //==== Loop/Deblock Filter ========
+#if NH_MV
+  Bool      getLoopFilterDisable            ()      const { return  m_bLoopFilterDisable;       }
+  Bool      getLoopFilterOffsetInPPS        ()      const { return m_loopFilterOffsetInPPS; }
+  Int       getLoopFilterBetaOffset         ()      const { return m_loopFilterBetaOffsetDiv2; }
+  Int       getLoopFilterTcOffset           ()      const { return m_loopFilterTcOffsetDiv2; }
+  Int       getDeblockingFilterMetric       ()      const { return m_deblockingFilterMetric; }
+#else
   Bool      getLoopFilterDisable            ()      { return  m_bLoopFilterDisable;       }
   Bool      getLoopFilterOffsetInPPS        ()      { return m_loopFilterOffsetInPPS; }
   Int       getLoopFilterBetaOffset         ()      { return m_loopFilterBetaOffsetDiv2; }
   Int       getLoopFilterTcOffset           ()      { return m_loopFilterTcOffsetDiv2; }
   Int       getDeblockingFilterMetric       ()      { return m_deblockingFilterMetric; }
+#endif
 
   //==== Motion search ========
   Bool      getDisableIntraPUsInInterSlices    () const { return m_bDisableIntraPUsInInterSlices; }
@@ -808,6 +907,11 @@ public:
   Bool      getFastMEAssumingSmootherMVEnabled () const { return m_bFastMEAssumingSmootherMVEnabled; }
   Int       getMinSearchWindow                 () const { return m_minSearchWindow; }
   Bool      getRestrictMESampling              () const { return m_bRestrictMESampling; }
+
+#if NH_MV
+  Bool      getUseDisparitySearchRangeRestriction ()      { return  m_bUseDisparitySearchRangeRestriction; }
+  Int       getVerticalDisparitySearchRange ()            { return  m_iVerticalDisparitySearchRange; }
+#endif
 
   //==== Quality control ========
   Int       getMaxDeltaQP                   () const { return  m_iMaxDeltaQP; }
@@ -1334,6 +1438,10 @@ public:
   const std::string &getAnnotatedRegionSEIFileRoot() const           { return m_arSEIFileRoot; }
 
   const TComSEIMasteringDisplay &getMasteringDisplaySEI() const      { return m_masteringDisplay; }
+#if NH_MV
+  Void setSeiMessages(SEIMessages *p)                                { m_seiMessages = p;    }
+  const SEIMessages*  getSeiMessages()                               { return m_seiMessages; }
+#endif
   Void         setUseWP               ( Bool b )                     { m_useWeightedPred   = b;    }
   Void         setWPBiPred            ( Bool b )                     { m_useWeightedBiPred = b;    }
   Bool         getUseWP               ()                             { return m_useWeightedPred;   }
@@ -1351,7 +1459,11 @@ public:
   WeightedPredictionMethod getWeightedPredictionMethod() const       { return m_weightedPredictionMethod; }
   Void         setWeightedPredictionMethod( WeightedPredictionMethod m ) { m_weightedPredictionMethod = m; }
   Void         setSignDataHidingEnabledFlag( Bool b )                { m_SignDataHidingEnabledFlag = b;    }
+#if NH_MV
+  Bool         getSignDataHidingEnabledFlag()       const            { return m_SignDataHidingEnabledFlag; }
+#else
   Bool         getSignDataHidingEnabledFlag()                        { return m_SignDataHidingEnabledFlag; }
+#endif
   Bool         getUseRateCtrl         ()                             { return m_RCEnableRateControl;   }
   Void         setUseRateCtrl         ( Bool b )                     { m_RCEnableRateControl = b;      }
   Int          getTargetBitrate       ()                             { return m_RCTargetBitrate;       }
@@ -1372,15 +1484,34 @@ public:
   Void         setCpbSize             ( UInt ui )                    { m_RCCpbSize = ui;   }
   Double       getInitialCpbFullness  ()                             { return m_RCInitialCpbFullness;  }
   Void         setInitialCpbFullness  (Double f)                     { m_RCInitialCpbFullness = f;     }
+
+#if KWU_RC_MADPRED_E0227
+  UInt         getUseDepthMADPred     ()                             { return m_depthMADPred;        }
+  Void         setUseDepthMADPred     (UInt b)                       { m_depthMADPred    = b;        }
+#endif
+#if KWU_RC_VIEWRC_E0227
+  Bool         getUseViewWiseRateCtrl ()                             { return m_bViewWiseRateCtrl;        }
+  Void         setUseViewWiseRateCtrl (Bool b)                       { m_bViewWiseRateCtrl    = b;        }
+#endif
+#if NH_MV
+  Bool         getTransquantBypassEnabledFlag()               const   { return m_TransquantBypassEnabledFlag; }
+#else
   Bool         getTransquantBypassEnabledFlag()                      { return m_TransquantBypassEnabledFlag; }
+#endif
   Void         setTransquantBypassEnabledFlag(Bool flag)             { m_TransquantBypassEnabledFlag = flag; }
   Bool         getCUTransquantBypassFlagForceValue()                 { return m_CUTransquantBypassFlagForce; }
   Void         setCUTransquantBypassFlagForceValue(Bool flag)        { m_CUTransquantBypassFlagForce = flag; }
   CostMode     getCostMode( ) const                                  { return m_costMode; }
   Void         setCostMode(CostMode m )                              { m_costMode = m; }
 
+#if NH_MV
+  Void         setVPS( TComVPS *p )                                  { m_cVPS = p;    }
+  TComVPS*     getVPS()                                              { return m_cVPS; }
+  TComVPS*     getVPS() const                                        { return m_cVPS; }
+#else
   Void         setVPS(TComVPS *p)                                    { m_cVPS = *p; }
   TComVPS *    getVPS()                                              { return &m_cVPS; }
+#endif
   Void         setUseRecalculateQPAccordingToLambda (Bool b)         { m_recalculateQPAccordingToLambda = b;    }
   Bool         getUseRecalculateQPAccordingToLambda ()               { return m_recalculateQPAccordingToLambda; }
 

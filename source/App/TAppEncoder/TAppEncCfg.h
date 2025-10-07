@@ -57,6 +57,73 @@ namespace po = df::program_options_lite;
 // Class definition
 // ====================================================================================================================
 
+#if NH_MV
+enum UIProfileName // this is used for determining profile strings, where multiple profiles map to a single profile idc with various constraint flag combinations
+{
+  UI_NONE = 0,
+  UI_MAIN = 1,
+  UI_MAIN10 = 2,
+  UI_MAIN10_STILL_PICTURE=10002,
+  UI_MAINSTILLPICTURE = 3,
+  UI_MAINREXT = 4,
+  UI_HIGHTHROUGHPUTREXT = 5,
+  // The following are RExt profiles, which would map to the MAINREXT profile idc.
+  // The enumeration indicates the bit-depth constraint in the bottom 2 digits
+  //                           the chroma format in the next digit
+  //                           the intra constraint in the next digit (1 for no intra constraint, 2 for intra constraint)
+  //                           If it is a RExt still picture, there is a '1' for the top digit.
+#if NH_MV
+  UI_MULTIVIEWMAIN     = 6,
+#if JVET_AH0046
+  UI_MULTIVIEWEXTENDED    = 12,
+  UI_MULTIVIEWEXTENDED10  = 13,
+#else
+#if JVET_AE0295
+  UI_MULTIVIEWMAIN10     = 99,
+#endif//JVET_AE0295
+#endif  // JVET_AE0046
+#if JVET_AM1080
+  UI_MULTIVIEWREXT  = 14,
+#endif //  JVET_AM1080
+#endif
+  UI_MONOCHROME_8      = 1008,
+  UI_MONOCHROME_12     = 1012,
+  UI_MONOCHROME_16     = 1016,
+  UI_MAIN_12           = 1112,
+  UI_MAIN_422_10       = 1210,
+  UI_MAIN_422_12       = 1212,
+  UI_MAIN_444          = 1308,
+  UI_MAIN_444_10       = 1310,
+  UI_MAIN_444_12       = 1312,
+  UI_MAIN_444_16       = 1316, // non-standard profile definition, used for development purposes
+  UI_MAIN_INTRA        = 2108,
+  UI_MAIN_10_INTRA     = 2110,
+  UI_MAIN_12_INTRA     = 2112,
+  UI_MAIN_422_10_INTRA = 2210,
+  UI_MAIN_422_12_INTRA = 2212,
+  UI_MAIN_444_INTRA    = 2308,
+  UI_MAIN_444_10_INTRA = 2310,
+  UI_MAIN_444_12_INTRA = 2312,
+  UI_MAIN_444_16_INTRA = 2316,
+  UI_MAIN_444_STILL_PICTURE = 11308,
+  UI_MAIN_444_16_STILL_PICTURE = 12316,
+  // The following are high throughput profiles, which would map to the HIGHTHROUGHPUTREXT profile idc.
+  // The enumeration indicates the bit-depth constraint in the bottom 2 digits
+  //                           the chroma format in the next digit
+  //                           the intra constraint in the next digit
+  //                           There is a '2' for the top digit to indicate it is high throughput profile
+
+  UI_HIGHTHROUGHPUT_444     = 21308,
+  UI_HIGHTHROUGHPUT_444_10  = 21310,
+  UI_HIGHTHROUGHPUT_444_14  = 21314,
+  UI_HIGHTHROUGHPUT_444_16_INTRA  = 22316
+#if NH_MV_ALLOW_NON_CONFORMING
+  ,
+  UI_MULTIVIEWMAIN_NONCONF     = 10000006,
+#endif
+};
+#endif
+
 /// encoder configuration class
 class TAppEncCfg
 {
@@ -71,12 +138,86 @@ public:
 
 protected:
   // file I/O
+#if NH_MV
+  std::vector<TChar*>     m_pchInputFileList;                  ///< source file names
+#else
   std::string m_inputFileName;                                ///< source file name
+#endif
   std::string m_bitstreamFileName;                            ///< output bitstream file
+#if NH_MV
+  std::vector<char*>     m_pchReconFileList;                  ///< output reconstruction file names
+  Int                    m_numberOfLayers;                    ///< number of Layers to Encode
+  Int                    m_iNumberOfViews;                    ///< number of Layers that are views
+#if NH_MV
+  Bool                   m_shareParameterSets;
+  IntAry1d               m_layerIdxInVpsToGopDefIdx;
+  IntAry1d               m_layerIdxInVpsToRepFormatIdx;
+  Int                    m_numRepFormats;
+  Int                    m_numInputOutputRepFormats;
+#endif
+#else
   std::string m_reconFileName;                                ///< output reconstruction file
+#endif
 #if SHUTTER_INTERVAL_SEI_PROCESSING
   Bool        m_ShutterFilterEnable;                          ///< enable Pre-Filtering with Shutter Interval SEI
   std::string m_shutterIntervalPreFileName;                   ///< output Pre-Filtering video
+#endif
+
+#if NH_MV
+// VPS specification
+IntAry2d m_dimIds;                   ///< dimension ids ( pointers to m_viewId and m_depthFlag
+IntAry1d               m_viewId;                            ///< view id
+IntAry1d               m_viewOrderIndex;                    ///< view order index
+IntAry1d               m_auxId;                             ///< auxiliary id
+
+IntAry1d               m_targetEncLayerIdList;              ///< layer Ids in Nuh to be encoded
+IntAry1d               m_layerIdInNuh;                      ///< layer Id in Nuh for each layer
+Bool                   m_splittingFlag;                     ///< Splitting Flag
+Int                    m_scalabilityMask;                   ///< Mask indicating scalabilities, 1: texture; 3: texture + depth
+IntAry1d               m_dimensionIdLen;                    ///< Length of scalability dimension s
+
+// layer sets
+Int                    m_vpsNumLayerSets;                   ///< Number of layer sets
+IntAry2d               m_layerIdxInVpsInSets;               ///< LayerIds in vps of layer set
+Int                    m_numAddLayerSets;                   ///< Number of additional layer sets
+IntAry2d               m_highestLayerIdxPlus1;              ///< HighestLayerIdxPlus1 for each additional layer set and each independent layer (value with index 0 will be ignored)
+Int                    m_defaultOutputLayerIdc;             ///< Specifies output layers of layer sets, 0: output all layers, 1: output highest layers, 2: specified by LayerIdsInDefOuputLayerSet
+IntAry1d               m_outputLayerSetIdx;                 ///< Indices of layer sets used as additional output layer sets
+IntAry2d               m_layerIdsInAddOutputLayerSet;       ///< LayerIds in vps of additional output layers
+IntAry2d               m_layerIdsInDefOutputLayerSet;       ///< Indices in vps of output layers in layer sets
+IntAry2d               m_profileTierLevelIdx;               ///< Indices of of profile, per layer in layer set
+BoolAry1d              m_altOutputLayerFlag;                ///< Alt output layer flag
+
+// Dependencies
+IntAry2d m_directRefLayers;          ///< LayerIds of direct reference layers
+IntAry2d m_dependencyTypes;          ///< Dependency types of direct reference layers
+
+// VPS VUI
+Bool m_vpsVuiPresentFlag;
+Bool m_crossLayerPicTypeAlignedFlag;
+Bool m_crossLayerIrapAlignedFlag;
+Bool m_allLayersIdrAlignedFlag;
+Bool m_bitRatePresentVpsFlag;
+Bool m_picRatePresentVpsFlag;
+BoolAry2d m_bitRatePresentFlag;
+BoolAry2d m_picRatePresentFlag;
+IntAry2d  m_avgBitRate;
+IntAry2d  m_maxBitRate;
+IntAry2d  m_constantPicRateIdc;
+IntAry2d  m_avgPicRate;
+Bool      m_tilesNotInUseFlag;
+BoolAry1d m_tilesInUseFlag;
+BoolAry1d m_loopFilterNotAcrossTilesFlag;
+Bool      m_wppNotInUseFlag;
+BoolAry1d m_wppInUseFlag;
+
+BoolAry2d m_tileBoundariesAlignedFlag;
+Bool      m_ilpRestrictedRefLayersFlag;
+IntAry2d  m_minSpatialSegmentOffsetPlus1;
+BoolAry2d m_ctuBasedOffsetEnabledFlag;
+IntAry2d  m_minHorizontalCtuOffsetPlus1;
+Bool      m_singleLayerForNonIrapFlag;
+Bool      m_higherLayerIrapSkipFlag;
 #endif
 
   // Lambda modifiers
@@ -88,12 +229,21 @@ protected:
   Int       m_iFrameRate;                                     ///< source frame-rates (Hz)
   UInt      m_FrameSkip;                                      ///< number of skipped frames from the beginning
   UInt      m_temporalSubsampleRatio;                         ///< temporal subsample ratio, 2 means code every two frames
+#if NH_MV
+  IntAry1d       m_iSourceWidths   ;                                   ///< source width in pixel
+  IntAry1d       m_iSourceHeights  ;                                  ///< source height in pixel (when interlaced = field height)
+  IntAry1d       m_inputFileWidths ;                                 ///< width of image in input file  (this is equivalent to sourceWidth,  if sourceWidth  is not subsequently altered due to padding)
+  IntAry1d       m_inputFileHeights;                                ///< height of image in input file (this is equivalent to sourceHeight, if sourceHeight is not subsequently altered due to padding)
+
+  IntAry1d       m_iSourceHeightOrgs;                               ///< original source height in pixel (when interlaced = frame height)
+#else
   Int       m_sourceWidth;                                    ///< source width in pixel
   Int       m_sourceHeight;                                   ///< source height in pixel (when interlaced = field height)
   Int       m_inputFileWidth;                                 ///< width of image in input file  (this is equivalent to sourceWidth,  if sourceWidth  is not subsequently altered due to padding)
   Int       m_inputFileHeight;                                ///< height of image in input file (this is equivalent to sourceHeight, if sourceHeight is not subsequently altered due to padding)
 
   Int       m_sourceHeightOrg;                                ///< original source height in pixel (when interlaced = frame height)
+#endif
 
   Bool      m_isField;                                        ///< enable field coding
   Bool      m_isTopFieldFirst;
@@ -101,17 +251,33 @@ protected:
   Bool      m_bHarmonizeGopFirstFieldCoupleEnabled;
 
   Int       m_conformanceWindowMode;
+#if NH_MV
+  IntAry1d  m_confWinLefts  ;
+  IntAry1d  m_confWinRights ;
+  IntAry1d  m_confWinTops   ;
+  IntAry1d  m_confWinBottoms;
+#else
   Int       m_confWinLeft;
   Int       m_confWinRight;
   Int       m_confWinTop;
   Int       m_confWinBottom;
-  Int       m_sourcePadding[2];                               ///< number of padded pixels for width and height
+#endif
+
+#if NH_MV
+  IntAry2d  m_aiPads;                                         ///< number of padded pixels for
+#else
+  Int       m_sourcePadding[2];                                       ///< number of padded pixels for width and height
+#endif
   Int       m_framesToBeEncoded;                              ///< number of encoded frames
   Bool      m_AccessUnitDelimiter;                            ///< add Access Unit Delimiter NAL units
   InputColourSpaceConversion m_inputColourSpaceConvert;       ///< colour space conversion to apply to input video
   Bool      m_snrInternalColourSpace;                       ///< if true, then no colour space conversion is applied for snr calculation, otherwise inverse of input is applied.
   Bool      m_outputInternalColourSpace;                    ///< if true, then no colour space conversion is applied for reconstructed video, otherwise inverse of input is applied.
+#if NH_MV
+  std::vector<ChromaFormat> m_InputChromaFormatIDC;
+#else
   ChromaFormat m_InputChromaFormatIDC;
+#endif
 
   Bool      m_printMSEBasedSequencePSNR;
   Bool      m_printHexPsnr;
@@ -127,6 +293,27 @@ protected:
   Bool      m_bClipOutputVideoToRec709Range;
 
   // profile/level
+#if NH_MV
+  std::vector< Profile::Name > m_profiles;
+  
+  std::vector<UIProfileName>   m_uiProfiles;
+
+  std::vector< Level::Tier   > m_levelTier;
+  std::vector< Level::Name   > m_level;
+  std::vector< Bool          > m_inblFlag;
+
+  IntAry1d                    m_bitDepthConstraints          ;
+  IntAry1d                    m_tmpConstraintChromaFormats   ;
+  std::vector< ChromaFormat > m_chromaFormatConstraints      ;
+  BoolAry1d                   m_intraConstraintFlags         ;
+  BoolAry1d                   m_onePictureOnlyConstraintFlags;
+  BoolAry1d                   m_lowerBitRateConstraintFlags  ;
+  BoolAry1d                   m_progressiveSourceFlags       ;
+  BoolAry1d                   m_interlacedSourceFlags        ;
+  BoolAry1d                   m_nonPackedConstraintFlags     ;
+  BoolAry1d                   m_frameOnlyConstraintFlags     ;
+
+#else
   Profile::Name m_profile;
   Level::Tier   m_levelTier;
   Level::Name   m_level;
@@ -139,19 +326,35 @@ protected:
   Bool m_interlacedSourceFlag;
   Bool m_nonPackedConstraintFlag;
   Bool m_frameOnlyConstraintFlag;
+#endif
 
   // coding structure
+#if NH_MV
+  IntAry1d  m_iIntraPeriod;                            ///< period of I-slice (random access period)
+#else
   Int       m_iIntraPeriod;                                   ///< period of I-slice (random access period)
+#endif
   Int       m_iDecodingRefreshType;                           ///< random access type
   Int       m_iGOPSize;                                       ///< GOP size of hierarchical structure
   Bool      m_bReWriteParamSetsFlag;                          ///< Flag to enable rewriting of parameter sets at random access points
+#if NH_MV
+  Int       m_extraRPSsMvc[MAX_NUM_LAYERS];                       ///< extra RPSs added to handle CRA for each layer
+  std::vector< GOPEntry* >  m_GOPListMvc;                            ///< the coding structure entries from the config file for each layer
+  Int       m_numReorderPicsMvc[MAX_NUM_LAYERS][MAX_TLAYER];      ///< total number of reorder pictures for each layer
+  Int       m_maxDecPicBufferingMvc[MAX_NUM_LAYERS][MAX_TLAYER];  ///< total number of reference pictures needed for decoding for each layer
+#else
   Int       m_extraRPSs;                                      ///< extra RPSs added to handle CRA
   GOPEntry  m_GOPList[MAX_GOP];                               ///< the coding structure entries from the config file
   Int       m_numReorderPics[MAX_TLAYER];                     ///< total number of reorder pictures
   Int       m_maxDecPicBuffering[MAX_TLAYER];                 ///< total number of pictures in the decoded picture buffer
+#endif
   Bool      m_crossComponentPredictionEnabledFlag;            ///< flag enabling the use of cross-component prediction
   Bool      m_reconBasedCrossCPredictionEstimate;             ///< causes the alpha calculation in encoder search to be based on the decoded residual rather than the pre-transform encoder-side residual
+#if NH_MV
+  UInt      m_log2SaoOffsetScale[MAX_NUM_LAYERS][MAX_NUM_CHANNEL_TYPE];        ///< number of bits for the upward bit shift operation on the decoded SAO offsets
+#else
   UInt      m_log2SaoOffsetScale[MAX_NUM_CHANNEL_TYPE];       ///< number of bits for the upward bit shift operation on the decoded SAO offsets
+#endif
   Bool      m_useTransformSkip;                               ///< flag for enabling intra transform skipping
   Bool      m_useTransformSkipFast;                           ///< flag for enabling fast intra transform skipping
   UInt      m_log2MaxTransformSkipBlockSize;                  ///< transform-skip maximum size (minimum of 2)
@@ -163,12 +366,21 @@ protected:
   Bool      m_cabacBypassAlignmentEnabledFlag;
 
   // coding quality
+#if NH_MV
+  std::vector<Int>   m_qpIncrementAtSourceFrame;             ///< Optional source frame number at which all subsequent frames are to use an increased internal QP.
+  std::vector<Int>     m_iQP;                                 ///< QP value of key-picture (integer) for each layer
+#else
   OptionalValue<UInt> m_qpIncrementAtSourceFrame;             ///< Optional source frame number at which all subsequent frames are to use an increased internal QP.
   Int       m_iQP;                                            ///< QP value of key-picture (integer)
+#endif
   Int       m_intraQPOffset;                                  ///< QP offset for intra slice (integer)
   Bool      m_lambdaFromQPEnable;                             ///< enable flag for QP:lambda fix
   std::string m_dQPFileName;                                  ///< QP offset for each slice (initialized from external file)
+#if NH_MV
+  std::vector<Int*> m_aidQP;                                    ///< array of slice QP values for each layer
+#else
   Int*      m_aidQP;                                          ///< array of slice QP values
+#endif
   Int       m_iMaxDeltaQP;                                    ///< max. |delta QP|
   UInt      m_uiDeltaQpRD;                                    ///< dQP range for multi-pass slice QP optimization
   Int       m_iMaxCuDQPDepth;                                 ///< Max. depth for a minimum CuDQPSize (0:default)
@@ -193,18 +405,30 @@ protected:
   Int       m_iSmoothQPReductionLimit;
 #endif
   TComSEIMasteringDisplay m_masteringDisplay;
+#if NH_MV
+  std::vector<char*>     m_seiCfgFileNames;               ///< SEI message files.
+  SEIMessages            m_seiMessages;                       ///< Buffer for SEI messages. 
+#endif
 
   Bool      m_bUseAdaptiveQP;                                 ///< Flag for enabling QP adaptation based on a psycho-visual model
   Int       m_iQPAdaptationRange;                             ///< dQP range by QP adaptation
 
+#if NH_MV
+  Int       m_maxTempLayerMvc[MAX_NUM_LAYER_IDS];             ///< Max temporal layer for each layer
+#else
   Int       m_maxTempLayer;                                  ///< Max temporal layer
+#endif
 
   // coding unit (CU) definition
   // TODO: Remove MaxCUWidth/MaxCUHeight and replace with MaxCUSize.
   UInt      m_uiMaxCUWidth;                                   ///< max. CU width in pixel
   UInt      m_uiMaxCUHeight;                                  ///< max. CU height in pixel
   UInt      m_uiMaxCUDepth;                                   ///< max. CU depth (as specified by command line)
+#if NH_MV
+  IntAry1d  m_uiMaxTotalCUDepth;                              ///< max. total CU depth - includes depth of transform-block structure
+#else
   UInt      m_uiMaxTotalCUDepth;                              ///< max. total CU depth - includes depth of transform-block structure
+#endif
   UInt      m_uiLog2DiffMaxMinCodingBlockSize;                ///< difference between largest and smallest CU depth
 
   // transfom unit (TU) definition
@@ -215,21 +439,37 @@ protected:
   UInt      m_uiQuadtreeTUMaxDepthIntra;
 
   // coding tools (bit-depth)
+#if NH_MV
+  IntAry2d  m_inputBitDepths      ;         ///< bit-depth of input file
+  IntAry2d  m_outputBitDepths     ;         ///< bit-depth of output file
+  IntAry2d  m_MSBExtendedBitDepths;         ///< bit-depth of input samples after MSB extension
+  IntAry2d  m_internalBitDepths   ;         ///< bit-depth codec operates at (input/output files will be converted)
+#else
   Int       m_inputBitDepth   [MAX_NUM_CHANNEL_TYPE];         ///< bit-depth of input file
   Int       m_outputBitDepth  [MAX_NUM_CHANNEL_TYPE];         ///< bit-depth of output file
   Int       m_MSBExtendedBitDepth[MAX_NUM_CHANNEL_TYPE];      ///< bit-depth of input samples after MSB extension
   Int       m_internalBitDepth[MAX_NUM_CHANNEL_TYPE];         ///< bit-depth codec operates at (input/output files will be converted)
+#endif
+
   Bool      m_extendedPrecisionProcessingFlag;
   Bool      m_highPrecisionOffsetsEnabledFlag;
 
   //coding tools (chroma format)
+#if NH_MV
+  std::vector<ChromaFormat> m_chromaFormatIDCs;
+#else
   ChromaFormat m_chromaFormatIDC;
+#endif
 
   // coding tools (PCM bit-depth)
   Bool      m_bPCMInputBitDepthFlag;                          ///< 0: PCM bit-depth is internal bit-depth. 1: PCM bit-depth is input bit-depth.
 
   // coding tool (SAO)
+#if NH_MV
+  std::vector<Bool> m_bUseSAO; 
+#else
   Bool      m_bUseSAO;
+#endif
   Bool      m_bTestSAODisableAtPictureLevel;
   Double    m_saoEncodingRate;                                ///< When >0 SAO early picture termination is enabled for luma and chroma
   Double    m_saoEncodingRateChroma;                          ///< The SAO early picture termination rate to use for chroma (when m_SaoEncodingRate is >0). If <=0, use results for luma.
@@ -237,7 +477,11 @@ protected:
   Bool      m_saoCtuBoundary;                                 ///< SAO parameter estimation using non-deblocked pixels for CTU bottom and right boundary areas
   Bool      m_resetEncoderStateAfterIRAP;                     ///< When true, encoder state will be reset following an IRAP.
   // coding tools (loop filter)
+#if NH_MV
+  std::vector<Bool> m_bLoopFilterDisable;                     ///< flag for using deblocking filter for each layer
+#else
   Bool      m_bLoopFilterDisable;                             ///< flag for using deblocking filter
+#endif
   Bool      m_loopFilterOffsetInPPS;                          ///< offset for deblocking filter in 0 = slice header, 1 = PPS
   Int       m_loopFilterBetaOffsetDiv2;                       ///< beta offset for deblocking filter
   Int       m_loopFilterTcOffsetDiv2;                         ///< tc offset for deblocking filter
@@ -264,6 +508,10 @@ protected:
   Int       m_minSearchWindow;                                ///< ME minimum search window size for the Adaptive Window ME
   Bool      m_bClipForBiPredMeEnabled;                        ///< Enables clipping for Bi-Pred ME.
   Bool      m_bFastMEAssumingSmootherMVEnabled;               ///< Enables fast ME assuming a smoother MV.
+#if NH_MV
+  Bool      m_bUseDisparitySearchRangeRestriction;            ///< restrict vertical search range for inter-view prediction
+  Int       m_iVerticalDisparitySearchRange;                  ///< ME vertical search range for inter-view prediction
+#endif
   FastInterSearchMode m_fastInterSearchMode;                  ///< Parameter that controls fast encoder settings
   Bool      m_bUseEarlyCU;                                    ///< flag for using Early CU setting
   Bool      m_useFastDecisionForMerge;                        ///< flag for using Fast Decision Merge RD-Cost
@@ -450,7 +698,16 @@ protected:
   Bool      m_RCForceIntraQP;                     ///< force all intra picture to use initial QP or not
   Bool      m_RCCpbSaturationEnabled;             ///< enable target bits saturation to avoid CPB overflow and underflow
   UInt      m_RCCpbSize;                          ///< CPB size
-  Double    m_RCInitialCpbFullness;               ///< initial CPB fullness 
+  Double    m_RCInitialCpbFullness;               ///< initial CPB fullness
+
+#if KWU_RC_VIEWRC_E0227
+  vector<Int>     m_viewTargetBits;
+  Bool      m_viewWiseRateCtrl;                              ///< Flag for using view-wise rate control
+#endif
+#if KWU_RC_MADPRED_E0227
+  UInt       m_depthMADPred;
+#endif
+
   ScalingListMode m_useScalingListId;                         ///< using quantization matrix
   std::string m_scalingListFileName;                          ///< quantization matrix file name
 
@@ -555,6 +812,11 @@ protected:
   friend class TExt360AppEncTop;
 #endif
 
+#if NH_MV
+  Bool              m_outputVpsInfo;
+  TChar*            m_pchBaseViewCameraNumbers;
+#endif
+
 #if JCTVC_AD0021_SEI_MANIFEST
   Bool       m_SEIManifestSEIEnabled;
 #endif
@@ -581,6 +843,109 @@ protected:
 #if DPB_ENCODER_USAGE_CHECK
   Int   xDPBUsage(std::ostream *pOs);                         ///> Calculates maximum number of frames stored in DPB. Can optionally output usage to a stream
 #endif
+#if NH_MV
+  Void xConfirmRepFormat( const TComVPS& vps);
+  Void xDeriveProfAndConstrFlags( const TComVPS& vps );
+  Void xCheckProfiles           ( const TComVPS& vps );
+
+  Void xPrintProfiles();
+
+  template< typename T >
+  Void xConfirmSingleRepFormat(Bool& checkFailed, std::string name, Int curLayer, Int refLayer, T valCur, T valRef )
+  {
+    if ( valCur != valRef )
+    {
+      printf("Error: %s of layer %d and its reference layer %d must be equal. \n", name.c_str(), curLayer, refLayer );
+      checkFailed = true;
+    }
+  }
+
+  GOPEntry*  xGetGopEntries( Int layerIdInVps );
+  GOPEntry*  xGetGopEntry( Int layerIdInVps, Int poc );
+
+  template<typename T>
+  Void xReadStrToEnum(string in, std::vector<T> &val)
+  {
+    val.clear();
+
+    char* cElement = NULL;
+    char* cString = new char[in.size()+1];
+    strcpy(cString, in.c_str());
+
+    cElement = strtok( cString, " " );
+    while ( cElement != NULL )
+    {
+      T profile;
+      std::istringstream ss( cElement );
+      ss >> profile;
+      val.push_back( profile );
+      cElement = strtok( NULL, " " );
+    }
+    delete[] cString;
+  }
+
+
+  template <typename T>
+  Void xResizeVector(  std::vector<T> & rpcVector )
+  {
+    for( Int layer = 0; rpcVector.size() < m_numberOfLayers; layer++ )
+    {
+      assert( rpcVector.size() > 0 );
+      rpcVector.push_back( rpcVector[layer] );
+    }
+
+    for( ; rpcVector.size() > m_numberOfLayers; )
+    {
+      rpcVector.pop_back( );
+    }
+  }
+
+  template <typename T>
+  Void xResizeVector(  std::vector<T> & rpcVector, UInt n )
+  {
+    for( Int layer = 0; rpcVector.size() < n; layer++ )
+    {
+      assert( rpcVector.size() > 0 );
+      rpcVector.push_back( rpcVector[layer] );
+    }
+
+    for( ; rpcVector.size() > n; )
+    {
+      rpcVector.pop_back( );
+    }
+  }
+
+
+  template <typename T>
+  Void xPrintParaVector( std::string description, std::vector<T> & rpcVector )
+  {
+    Int iSpace = max(1, ENC_CFG_CONSOUT_SPACE - (Int) description.length() );
+    
+    for ( Int i = 0; i < iSpace; i++ )
+    {
+      description.append( " " );
+    }
+      
+    description.append( ":" );
+    printf( "%s", description.c_str() );
+
+    for(Int i=0;i<rpcVector.size();i++)
+    {
+      xPrintVectorElem( rpcVector[i] );
+    }
+
+    printf("\n");
+  }
+  
+  Void xPrintVectorElem( UInt   elem ) { printf(" %d"   , elem            );};
+  Void xPrintVectorElem( Int    elem ) { printf(" %d"   , elem            );};
+  
+  Void xPrintVectorElem( Double elem ) { printf(" %5.2f", elem            );};
+  Void xPrintVectorElem( Bool   elem ) { printf(" %d"   , ( elem ? 1 : 0 ));};
+  Void xParseSeiCfg();
+
+  Int   getGOPSize() { return m_iGOPSize; }
+#endif
 public:
   TAppEncCfg();
   virtual ~TAppEncCfg();
@@ -589,6 +954,21 @@ public:
   Void  create    ();                                         ///< create option handling class
   Void  destroy   ();                                         ///< destroy option handling class
   Bool  parseCfg  ( Int argc, TChar* argv[] );                ///< parse configuration file to fill member variables
+
+#if NH_MV
+private:
+  Void   xConvertRepFormatParameters(
+    IntAry2d& tmpPad                       ,
+    IntAry2d& tmpInputBitDepth             ,
+    IntAry2d& tmpOutputBitDepth            ,
+    IntAry2d& tmpMSBExtendedBitDepth       ,
+    IntAry2d& tmpInternalBitDepth          ,
+    IntAry1d& tmpInputChromaFormat         ,
+    IntAry1d& tmpChromaFormat
+    );
+
+  Void xGetMaxValuesOfApplicableLayers(const TComVPS& vps, Int vpsPtlIdx, Int& maxBitDepthLuma, Int& maxBitDepthChroma, ChromaFormat& maxChromaFormatIdc, Int& maxNumRefLayers);
+#endif
 
 };// END CLASS DEFINITION TAppEncCfg
 

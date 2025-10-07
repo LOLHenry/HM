@@ -1653,4 +1653,36 @@ void SEIEncoder::initSEIDigitallySignedContentVerification(SEIDigitallySignedCon
 }
 #endif
 
+#if NH_MV
+Void SEIEncoder::createAnnexFGISeiMessages( SEIMessages& seiMessage, const TComSlice* slice )
+{
+  const SEIMessages* seiMessageCfg = m_pcCfg->getSeiMessages();
+
+  for( SEIMessages::const_iterator itS = seiMessageCfg->begin(); itS != seiMessageCfg->end(); itS++ )
+  {
+    const SEI* curSei = (*itS);
+    SEI* newSei;
+    if ( curSei->insertSei( slice->getLayerId(), slice->getPOC(), slice->getTemporalId(), slice->getNalUnitType() ) )
+    {
+      newSei = curSei->getCopy( ) ;
+
+      if ( curSei->m_modifyByEncoder )
+      {
+        newSei->setupFromSlice  ( slice );
+      }
+
+      if ( newSei   ->checkCfg( slice ) )
+      {
+        std::cout << "--> Omit sending SEI."  <<  std::endl;
+        delete newSei;
+      }
+      else
+      {
+        seiMessage.push_back(newSei);
+      }
+
+    }
+  }
+}
+#endif
 //! \}

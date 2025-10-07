@@ -91,9 +91,21 @@ Void TDecSlice::decompressSlice(TComInputBitstream** ppcSubstreams, TComPic* pcP
 #if ENC_DEC_TRACE
   g_bJustDoIt = g_bEncDecTraceEnable;
 #endif
+#if NH_MV_ENC_DEC_TRAC
+#if ENC_DEC_TRACE
+  incSymbolCounter();
+#endif
+  DTRACE_CABAC_VL( g_nSymbolCounter );
+#else
   DTRACE_CABAC_VL( g_nSymbolCounter++ );
+#endif
+    
   DTRACE_CABAC_T( "\tPOC: " );
   DTRACE_CABAC_V( pcPic->getPOC() );
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_CABAC_T( " Layer: " );
+  DTRACE_CABAC_V( pcPic->getLayerId() );
+#endif
   DTRACE_CABAC_T( "\n" );
 
 #if ENC_DEC_TRACE

@@ -82,6 +82,11 @@ Double TComRdCost::calcRdCost( Double numBits, Distortion distortion, DFunc eDFu
       break;
   }
 
+#if NH_MV
+  // D_PRINT_INDENT( g_traceRDCost,  "Dist: " + n2s(distortion) + " Bits: " + n2s(numBits) + " RD Cost: " + n2s(dRdCost));
+   D_PRINT_INDENT( g_traceRDCost,  "Dist: " + n2s(distortion) + " Bits: " + n2s(numBits) );
+#endif
+
   if (eDFunc == DF_SAD)
   {
     if (m_costMode != COST_STANDARD_LOSSY)

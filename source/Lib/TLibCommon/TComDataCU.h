@@ -390,6 +390,10 @@ public:
   Void          getMvPredAbove                ( TComMv&     rcMvPred ) const                               { rcMvPred = m_cMvFieldB.getMv();            }
   Void          getMvPredAboveRight           ( TComMv&     rcMvPred ) const                               { rcMvPred = m_cMvFieldC.getMv();            }
 
+#if NH_MV
+  Void          checkMvVertRest (TComMv&  rcMv,  RefPicList eRefPicList, int iRefIdx );
+#endif
+
   Void          compressMV                    ();
 
   // -------------------------------------------------------------------------------------------------------------------
@@ -519,7 +523,7 @@ namespace RasterAddress
    */
   static inline Bool isEqualRowOrCol( Int addrA, Int addrB, Int numUnitsPerRow )
   {
-    return isEqualCol( addrA, addrB, numUnitsPerRow ) | isEqualRow( addrA, addrB, numUnitsPerRow );
+    return isEqualCol( addrA, addrB, numUnitsPerRow ) || isEqualRow( addrA, addrB, numUnitsPerRow );
   }
 
   /** Check whether one address points to the first column
