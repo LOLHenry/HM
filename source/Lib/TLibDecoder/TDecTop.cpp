@@ -1748,7 +1748,7 @@ Void TDecTop::initFromActiveVps( const TComVPS* vps )
 #if JVET_AH0046
              || profileIdc == Profile::MULTIVIEWEXTENDED || profileIdc == Profile::MULTIVIEWEXTENDED10
 #endif
-#if JVET_AM1080
+#if JVET_AM1018
              || profileIdc == Profile::MAINREXT || profileIdc == Profile::MULTIVIEWREXT
 #endif
              );
@@ -1759,7 +1759,7 @@ Void TDecTop::initFromActiveVps( const TComVPS* vps )
 #if JVET_AH0046
           || profileIdc == Profile::MULTIVIEWEXTENDED || profileIdc == Profile::MULTIVIEWEXTENDED10
 #endif  // JVET_AH0046
-#if JVET_AM1080
+#if JVET_AM1018
       || profileIdc == Profile::MULTIVIEWREXT
 #endif
 #if NH_MV_ALLOW_NON_CONFORMING

@@ -4053,7 +4053,7 @@ Bool ProfileTierLevel::getV2ConstraintsPresentFlag() const
 #if JVET_AH0046
     || getProfileIdc( ) == 12 || getProfileCompatibilityFlag( 12 ) || getProfileIdc( ) == 13 || getProfileCompatibilityFlag( 13 )
 #endif // JVET_AH0046
-#if JVET_AM1080
+#if JVET_AM1018
     || getProfileCompatibilityFlag( 14 )
 #endif
     );

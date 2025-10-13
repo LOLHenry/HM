@@ -73,11 +73,11 @@
 /*
  NOTE: MV MAIN/MAIN10:          HEVC_EXT = 1, JVET_AE0295 = 1 and JVET_AH0046 = 0
        MV EXTENDED/EXTENDED10:  HEVC_EXT = 1, JVET_AE0295 = 1,    JVET_AH0046 = 1
-       MV REXT:                 HEVC_EXT = 1, JVET_AE0295 = 0,    JVET_AH0046 = 0 and JVET_AM1080 = 1
+       MV REXT:                 HEVC_EXT = 1, JVET_AE0295 = 0,    JVET_AH0046 = 0 and JVET_AM1018 = 1
  */
 #define JVET_AE0295                               1  // MV-MAIN 10 implementation
 #define JVET_AH0046                               0  // Changes to the existing MV Main 10 to accommodate the Multiview Extended 10
-#define JVET_AM1080                               0  // Multiview Range Extended profiles support
+#define JVET_AM1018                               0  // Multiview Range Extended profiles support
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////   FIXES AND INTEGRATIONS     ////////////////////////
@@ -708,9 +708,9 @@ namespace Profile
     MULTIVIEWEXTENDED = 12,
     MULTIVIEWEXTENDED10 = 13,
 #endif  // JVET_AH0046
-#if JVET_AM1080
+#if JVET_AM1018
     MULTIVIEWREXT = 14,
-#endif  // JVET_AM1080
+#endif  // JVET_AM1018
 #if NH_MV_ALLOW_NON_CONFORMING
     MULTIVIEWMAIN_NONCONFORMING = 29,
 #endif

@@ -397,13 +397,13 @@ strToUIProfileName[] =
     {"multiview-main10"     , UI_MULTIVIEWMAIN10   },
 #endif //JVET_AE0295
 #endif  // JVET_AH0046
-#if JVET_AM1080
+#if JVET_AM1018
     {"multiview_RExt"       , UI_MULTIVIEWREXT   },
     {"multiview-RExt"       , UI_MULTIVIEWREXT   },
     {"multiview_rext"       , UI_MULTIVIEWREXT   },
     {"multiview-rext"       , UI_MULTIVIEWREXT   },
     {"multiview-rext"       , UI_MULTIVIEWREXT   },
-#endif  // JVET_AM1080
+#endif  // JVET_AM1018
 #if NH_MV_ALLOW_NON_CONFORMING
     {"multiview-main_NONCONFORMING"     , UI_MULTIVIEWMAIN_NONCONF   },
 #endif
@@ -3050,12 +3050,12 @@ Void TAppEncCfg::xDeriveProfAndConstrFlags( const TComVPS& vps )
       break;
 #endif //JVET_AE0295
 #endif  // JVET_AH0046
-#if JVET_AM1080
+#if JVET_AM1018
     case UI_MULTIVIEWREXT:
       m_profiles[i] = Profile::MULTIVIEWREXT;
       m_onePictureOnlyConstraintFlags[i] = false;
       break;
-#endif //  JVET_AM1080
+#endif //  JVET_AM1018
     case UI_NONE:
       m_profiles[i] = Profile::NONE;
       m_onePictureOnlyConstraintFlags[i] = false;
@@ -3240,7 +3240,7 @@ Void TAppEncCfg::xDeriveProfAndConstrFlags( const TComVPS& vps )
       break;
 #endif  // JVET_AH046
       break;
-#if JVET_AM1080
+#if JVET_AM1018
     case Profile::MULTIVIEWREXT:
       // Assume that the profile for each layer is identical during MV-HEVC encoding.
       switch ((m_uiProfiles[0]/100)%10)
@@ -3251,7 +3251,7 @@ Void TAppEncCfg::xDeriveProfAndConstrFlags( const TComVPS& vps )
         default: m_chromaFormatConstraints[i]=CHROMA_444; break;
       }
       break;
-#endif //  JVET_AM1080
+#endif //  JVET_AM1018
 
     default:
       fprintf(stderr, "Unknown profile selected\n");
@@ -3367,7 +3367,7 @@ Void TAppEncCfg::xCheckProfiles( const TComVPS& vps )
        break;
 #endif  // JVET_AH0046
 
-#if JVET_AM1080
+#if JVET_AM1018
     case Profile::MULTIVIEWREXT:
     // Assume that the profile for each layer is identical during MV-HEVC encoding.
     {
@@ -3383,7 +3383,7 @@ Void TAppEncCfg::xCheckProfiles( const TComVPS& vps )
        xConfirmPara(m_chromaFormatConstraints    [i] != chromaFormat   , "ChromaFormatConstraint must be a right format for multi-RExt profiles.");
      }
       break;
-#endif  // JVET_AM1080
+#endif  // JVET_AM1018
 
     case Profile::MAIN:
     case Profile::MAIN10:
@@ -5113,7 +5113,7 @@ Void TAppEncCfg::xPrintProfiles()
     }
     else
     {
-#if JVET_AM1080
+#if JVET_AM1018
       if (m_profiles[i] == Profile::MULTIVIEWREXT)
       {
         printf(" multiview-rext");
@@ -5146,7 +5146,7 @@ Void TAppEncCfg::xPrintProfiles()
 #else
       printf(" %s ", profileToString(m_profiles[i]) );
 #endif // JVET_AE0295
-#endif // JVET_AM1080
+#endif // JVET_AM1018
     }
   }
   printf("\n\n");
