@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -129,6 +129,12 @@ public:
   void initSEIDigitallySignedContentSelection(SEIDigitallySignedContentSelection *sei, int substream);
   void initSEIDigitallySignedContentVerification(SEIDigitallySignedContentVerification *sei, int32_t substream, const std::vector<uint8_t> &signature);
 #endif
+#if JVET_AJ0207_GFV
+  Void initSEIGenerativeFaceVideo(SEIGenerativeFaceVideo* sei, int currframeindex);
+#endif
+#if JVET_AK0239_GEFV
+  Void initSEIGenerativeFaceVideoEnhancement(SEIGenerativeFaceVideoEnhancement* sei, int currframeindex);
+#endif
 #if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
   void initSEIPackedRegionsInfo(SEIPackedRegionsInfo *sei);
 #endif
@@ -143,6 +149,7 @@ public:
 #if JVET_AK2006_SPTI_SEI_MESSAGE
   void initSEISourcePictureTimingInfo(SEISourcePictureTimingInfo *SEISourcePictureTimingInfo);
 #endif
+
 private:
   TEncCfg* m_pcCfg;
   TEncTop* m_pcEncTop;

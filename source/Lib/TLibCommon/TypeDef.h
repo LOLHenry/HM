@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -108,6 +108,8 @@
 #define NH_MV_HLS_PTL_LIMITS               0
 #endif
 
+#define JVET_AN0237_FILM_GRAIN_ANALYSIS                   1 // film grain analysis improvements
+
 #define JCTVC_AD0021_SEI_MANIFEST                         1  // JCTVC_AD0021(JVET-T0056): SEI manifest SEI message
 #define JCTVC_AD0021_SEI_PREFIX_INDICATION                1  // JCTVC_AD0021(JVET-T0056): SEI prefix indication SEI message
 #define JVET_X0079_MODIFIED_BITRATES                      1 // JVET-X0079: Addition of level 6.3
@@ -192,8 +194,10 @@
 #define SHUTTER_INTERVAL_SEI_PROCESSING                   1 ///< JCTVC-AM0024: pre-/post-processing to use shutter interval SEI
 #endif
 #define JVET_AK0107_MODALITY_INFORMATION                  1 // Implementation of Modality Information SEI message
-
+#define JVET_AJ0207_GFV                                   1 //generative face video (GFV) SEI
+#define JVET_AK0239_GEFV                                  1 //generative enhancement face video (GEFV) SEI
 #define JVET_AK2006_SPTI_SEI_MESSAGE                      1 // Implementation of Source Picture Timing Information SEI message
+
 // ====================================================================================================================
 // Tool Switches
 // ====================================================================================================================

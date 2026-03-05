@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -840,6 +840,73 @@ Bool      m_higherLayerIrapSkipFlag;
   uint32_t m_sptiNumUnitsInElementalInterval;
   bool m_sptiDirectionFlag;
 #endif
+#if JVET_AJ0207_GFV
+  bool                                 m_generativeFaceVideoEnabled;
+  uint32_t                             m_generativeFaceVideoSEINumber;
+  bool                                 m_generativeFaceVideoSEIBasePicFlag;
+  bool                                 m_generativeFaceVideoSEINNPresentFlag;
+  uint32_t                             m_generativeFaceVideoSEINNModeIdc;
+  std::string                          m_generativeFaceVideoSEINNTagURI;
+  std::string                          m_generativeFaceVideoSEINNURI;
+  bool                                 m_generativeFaceVideoSEIChromaKeyInfoPresentFlag;
+  std::vector<bool>                    m_generativeFaceVideoSEIChromaKeyValuePresentFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEIChromaKeyValue;
+  std::vector<bool>                    m_generativeFaceVideoSEIChromaKeyThrPresentFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEIChromaKeyThrValue;
+  std::vector<bool>                    m_generativeFaceVideoSEIDrivePicFusionFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEIId;
+  std::vector<uint32_t>                m_generativeFaceVideoSEICnt;
+  std::vector<bool>                    m_generativeFaceVideoSEILowConfidenceFaceParameterFlag;
+  std::vector<bool>                    m_generativeFaceVideoSEICoordinatePresentFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEICoordinateQuantizationFactor;
+  std::vector<bool>                    m_generativeFaceVideoSEICoordinatePredFlag;
+  std::vector<bool>                    m_generativeFaceVideoSEI3DCoordinateFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEICoordinatePointNum;
+  std::vector<std::vector<double>>     m_generativeFaceVideoSEICoordinateXTesonr;
+  std::vector<std::vector<double>>     m_generativeFaceVideoSEICoordinateYTesonr;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEIZCoordinateMaxValue;
+  std::vector<std::vector<double>>     m_generativeFaceVideoSEICoordinateZTesonr;
+  std::vector<bool>                    m_generativeFaceVideoSEIMatrixPresentFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEIMatrixElementPrecisionFactor;
+  std::vector<bool>                    m_generativeFaceVideoSEIMatrixPredFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEINumMatrixType;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEIMatrixTypeIdx;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEINumMatricestoNumKpsFlag;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEINumMatricesInfo;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEIMatrix3DSpaceFlag;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEINumMatrices;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEIMatrixWidth;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEIMatrixHeight;
+  std::vector < std::vector<std::vector<std::vector<std::vector<double>>>>>   m_generativeFaceVideoSEIMatrixElement;
+  std::string                          m_generativeFaceVideoSEIPayloadFilename;
+#endif
+#if JVET_AK0239_GEFV
+  bool                                 m_generativeFaceVideoEnhancementEnabled;
+  uint32_t                             m_generativeFaceVideoEnhancementSEINumber;
+  bool                                 m_generativeFaceVideoEnhancementSEIBasePicFlag;
+  bool                                 m_generativeFaceVideoEnhancementSEINNPresentFlag;
+  uint32_t                             m_generativeFaceVideoEnhancementSEINNModeIdc;
+  std::string                          m_generativeFaceVideoEnhancementSEINNTagURI;
+  std::string                          m_generativeFaceVideoEnhancementSEINNURI;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIId;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIGFVId;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIGFVCnt;
+  std::vector<bool>                    m_generativeFaceVideoEnhancementSEIMatrixPresentFlag;
+  std::vector<bool>                    m_generativeFaceVideoEnhancementSEIMatrixPredFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIMatrixElementPrecisionFactor;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEINumMatrices;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoEnhancementSEIMatrixWidth;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoEnhancementSEIMatrixHeight;
+  std::vector<std::vector<std::vector<std::vector<double>>>>   m_generativeFaceVideoEnhancementSEIMatrixElement;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIPupilPresentIdx;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIPupilCoordinatePrecisionFactor;
+  std::vector<double>                  m_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateX;
+  std::vector<double>                  m_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateY;
+  std::vector<double>                  m_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateX;
+  std::vector<double>                  m_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateY;
+  std::string                          m_generativeFaceVideoEnhancementSEIPayloadFilename;
+#endif
+
 #if EXTENSION_360_VIDEO
   TExt360AppEncCfg m_ext360;
   friend class TExt360AppEncCfg;

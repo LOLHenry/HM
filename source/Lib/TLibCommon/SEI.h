@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -158,6 +158,12 @@ public:
     DIGITALLY_SIGNED_CONTENT_INITIALIZATION = 220,
     DIGITALLY_SIGNED_CONTENT_SELECTION      = 221,
     DIGITALLY_SIGNED_CONTENT_VERIFICATION   = 222,
+#endif
+#if JVET_AJ0207_GFV
+    GENERATIVE_FACE_VIDEO                = 223,
+#endif
+#if JVET_AK0239_GEFV
+    GENERATIVE_ENHANCEMENT_FACE_VIDEO    = 224,
 #endif
 #if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
     PACKED_REGIONS_INFO                     = 226,
@@ -1947,7 +1953,95 @@ public:
   uint8_t getNumsOfSeiPrefixIndications(const SEI* sei);
 };
 #endif 
-
+#if JVET_AJ0207_GFV
+class SEIGenerativeFaceVideo : public SEI
+{
+public:
+  PayloadType payloadType() const { return PayloadType::GENERATIVE_FACE_VIDEO; }
+  SEIGenerativeFaceVideo() {}
+  SEIGenerativeFaceVideo(const SEIGenerativeFaceVideo & sei);
+  virtual ~SEIGenerativeFaceVideo() {}
+  uint32_t       m_number;
+  uint32_t       m_currentid;
+  bool           m_basePicFlag;
+  bool           m_nnPresentFlag;
+  uint32_t       m_nnModeIdc;
+  std::string    m_nnTagURI;
+  std::string    m_nnURI;
+  bool                    m_chromaKeyInfoPresentFlag;
+  std::vector<bool>       m_chromaKeyValuePresentFlag;
+  std::vector<uint32_t>   m_chromaKeyValue;
+  std::vector<bool>       m_chromaKeyThrPresentFlag;
+  std::vector<uint32_t>   m_chromaKeyThrValue;
+  bool       m_drivePicFusionFlag;
+  uint32_t   m_id;
+  uint32_t   m_cnt;
+  bool   m_lowConfidenceFaceParameterFlag;
+  bool   m_coordinatePresentFlag;
+  uint32_t   m_coordinateQuantizationFactor;
+  bool   m_coordinatePredFlag;
+  bool   m_3DCoordinateFlag;
+  uint32_t   m_coordinatePointNum;
+  std::vector<double>   m_coordinateX;
+  std::vector<double>   m_coordinateY;
+  uint32_t       m_coordinateZMaxValue;
+  std::vector<double>   m_coordinateZ;
+  bool           m_matrixPresentFlag;
+  uint32_t       m_matrixElementPrecisionFactor;
+  bool           m_matrixPredFlag;
+  uint32_t       m_numMatrixType;
+  std::vector<uint32_t>   m_matrixTypeIdx;
+  std::vector<uint32_t>   m_numMatricestonumKpsFlag;
+  std::vector<uint32_t>    m_numMatricesInfo;
+  std::vector<uint32_t>    m_matrix3DSpaceFlag;
+  std::vector<uint32_t>    m_numMatrices;
+  std::vector<uint32_t>    m_matrixWidth;
+  std::vector<uint32_t>    m_matrixHeight;
+  std::vector<std::vector<std::vector<std::vector<double>>>>   m_matrixElement;
+  std::string             m_payloadFilename;
+  uint64_t                m_payloadLength;
+  char*                   m_payloadByte;
+  std::vector<uint32_t>    m_numMatricesstore;
+  std::vector<uint32_t>    m_matrixWidthstore;
+  std::vector<uint32_t>    m_matrixHeightstore;
+};
+#endif
+#if JVET_AK0239_GEFV
+class SEIGenerativeFaceVideoEnhancement : public SEI
+{
+public:
+  PayloadType payloadType() const { return PayloadType::GENERATIVE_ENHANCEMENT_FACE_VIDEO; }
+  SEIGenerativeFaceVideoEnhancement() {}
+  SEIGenerativeFaceVideoEnhancement(const SEIGenerativeFaceVideoEnhancement & sei);
+  virtual ~SEIGenerativeFaceVideoEnhancement() {}
+  uint32_t                 m_number;
+  uint32_t                 m_currentid;
+  bool                     m_basePicFlag;
+  bool                     m_nnPresentFlag;
+  uint32_t                 m_nnModeIdc;
+  std::string              m_nnTagURI;
+  std::string              m_nnURI;
+  uint32_t                 m_id;
+  uint32_t                 m_gfvcnt;
+  uint32_t                 m_gfvid;
+  uint32_t                 m_matrixElementPrecisionFactor;
+  bool                     m_matrixPresentFlag;
+  bool                     m_matrixPredFlag;
+  uint32_t                 m_numMatrices;
+  std::vector<uint32_t>    m_matrixWidth;
+  std::vector<uint32_t>    m_matrixHeight;
+  std::vector<std::vector<std::vector<double>>>   m_matrixElement;
+  std::string              m_payloadFilename;
+  uint64_t                 m_payloadLength;
+  char*                    m_payloadByte;
+  uint32_t                 m_pupilPresentIdx;
+  uint32_t                 m_pupilCoordinatePrecisionFactor;
+  double                   m_pupilLeftEyeCoordinateX;
+  double                   m_pupilLeftEyeCoordinateY;
+  double                   m_pupilRightEyeCoordinateX;
+  double                   m_pupilRightEyeCoordinateY;
+};
+#endif
 #if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
 class SEIPackedRegionsInfo : public SEI
 {

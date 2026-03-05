@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1243,6 +1243,28 @@ Void TEncGOP::xUpdateDuInfoSEI(SEIMessages &duInfoSeiMessages, SEIPictureTiming 
   }
 }
 
+#if JVET_AJ0207_GFV
+Void TEncGOP::xCreateGenerativeFaceVideoSEIMessages(SEIMessages& seiMessages)
+{
+  for (int frameIndex = 0; frameIndex < m_pcCfg->getGenerativeFaceVideoSEINumber(); frameIndex++)
+  {
+    SEIGenerativeFaceVideo *seiGenerativeFaceVideo = new SEIGenerativeFaceVideo;
+    m_seiEncoder.initSEIGenerativeFaceVideo(seiGenerativeFaceVideo, frameIndex);
+    seiMessages.push_back(seiGenerativeFaceVideo);
+  }
+}
+#endif
+#if JVET_AK0239_GEFV
+Void TEncGOP::xCreateGenerativeFaceVideoEnhancementSEIMessages(SEIMessages& seiMessages)
+{
+  for (int frameIndex = 0; frameIndex < m_pcCfg->getGenerativeFaceVideoEnhancementSEINumber(); frameIndex++)
+  {
+    SEIGenerativeFaceVideoEnhancement *seiGenerativeFaceVideoEnhancement = new SEIGenerativeFaceVideoEnhancement;
+    m_seiEncoder.initSEIGenerativeFaceVideoEnhancement(seiGenerativeFaceVideoEnhancement, frameIndex);
+    seiMessages.push_back(seiGenerativeFaceVideoEnhancement);
+  }
+}
+#endif
 static Void
 cabac_zero_word_padding(TComSlice *const pcSlice, TComPic *const pcPic, const std::size_t binCountsInNalUnits, const std::size_t numBytesInVclNalUnits, std::ostringstream &nalUnitData, const Bool cabacZeroWordPaddingEnabled)
 {
@@ -2237,6 +2259,18 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
 
       m_bSeqFirst = false;
     }
+#if JVET_AJ0207_GFV
+    if (writePS && m_pcCfg->getGenerativeFaceVideoSEIEnabled())
+    {
+      xCreateGenerativeFaceVideoSEIMessages(trailingSeiMessages);
+    }
+#endif
+#if JVET_AK0239_GEFV
+    if (writePS && m_pcCfg->getGenerativeFaceVideoEnhancementSEIEnabled())
+    {
+      xCreateGenerativeFaceVideoEnhancementSEIMessages(trailingSeiMessages);
+    }
+#endif
     if (m_pcCfg->getAccessUnitDelimiter())
     {
       xWriteAccessUnitDelimiter(accessUnit, pcSlice);
