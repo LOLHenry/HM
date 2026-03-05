@@ -44,6 +44,9 @@
 
 #include "TLibCommon/CommonDef.h"
 #include <vector>
+#if NH_MV
+#include <fstream>
+#endif
 
 //! \ingroup TAppDecoder
 //! \{
@@ -88,6 +91,28 @@ protected:
   std::string   m_trustStoreDir;
 #endif
 
+#if NH_MV
+  std::vector<TChar*> m_pchReconFiles;                ///< array of output reconstruction file name create from output reconstruction file name
+
+  std::vector<Int> m_targetOptLayerSetInd;            ///< target output layer set indices (multiple decoding when more than one element, e.g. for additional layer sets)
+  Int           m_targetOptLayerSetIdx;               ///< current target output layer set index
+
+  Int           m_targetDecLayerSetIdx;
+  Int           m_baseLayerOutputFlag;
+  Int           m_baseLayerPicOutputFlag;
+  Int           m_auOutputFlag;
+  Int           m_maxLayerId;                         ///< maximum nuh_layer_id decoded
+  std::ifstream m_bitstreamFile;
+  Int           m_highestTid;
+  Bool          m_targetDecLayerIdSetFileEmpty;       ///< indication if target layers are given by file
+
+  Bool          m_printVpsInfo;                       ///< Output VPS information
+  Bool          m_printPicOutput;                     ///< Print information on picture output
+  Bool          m_printReceivedNalus;                 ///< Print information on received NAL units
+
+  Void xAppendToFileNameEnd( const TChar* pchInputFileName, const TChar* pchStringToAppend, TChar*& rpchOutputFileName); ///< create filenames
+#endif
+
 public:
   TAppDecCfg()
   : m_bitstreamFileName()
@@ -116,6 +141,10 @@ public:
 #if MCTS_ENC_CHECK
   , m_tmctsCheck(false)
 #endif
+#if NH_MV
+  , m_highestTid(-1)
+  , m_targetDecLayerIdSetFileEmpty(true)
+#endif
   {
     for (UInt channelTypeIndex = 0; channelTypeIndex < MAX_NUM_CHANNEL_TYPE; channelTypeIndex++)
     {
@@ -126,6 +155,9 @@ public:
   virtual ~TAppDecCfg() {}
 
   Bool  parseCfg        ( Int argc, TChar* argv[] );   ///< initialize option class from configuration
+#if NH_MV
+  Int   getNumDecodings ( ) { return (Int) m_targetOptLayerSetInd.size();  };
+#endif
 };
 
 //! \}

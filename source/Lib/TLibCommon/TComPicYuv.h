@@ -203,6 +203,10 @@ public:
   
   // Set border extension flag
   Void          setBorderExtension(Bool b) { m_bIsBorderExtended = b; }
+    
+#if NH_MV
+  Bool          getBorderExtension( )     { return m_bIsBorderExtended; }
+#endif
 };// END CLASS DEFINITION TComPicYuv
 
 

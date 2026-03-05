@@ -59,8 +59,16 @@ struct OutputNALUnit : public NALUnit
   OutputNALUnit(
     NalUnitType nalUnitType,
     UInt temporalID = 0,
+#if NH_MV
+    Int layerId = 0)
+#else
     UInt reserved_zero_6bits = 0)
+#endif
+#if NH_MV
+  : NALUnit(nalUnitType, temporalID, layerId)
+#else
   : NALUnit(nalUnitType, temporalID, reserved_zero_6bits)
+#endif
   , m_Bitstream()
   {}
 

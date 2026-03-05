@@ -160,6 +160,10 @@ public:
 #else
   Void compress(SChar* pePredMode, Int scale);
 #endif
+
+#if NH_MV
+  Void print   (SChar* pePredMode);
+#endif
 };
 
 //! \}

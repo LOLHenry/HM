@@ -65,7 +65,16 @@ Void  SyntaxElementWriter::xWriteCodeTr (UInt value, UInt  length, const TChar *
   xWriteCode (value,length);
   if( g_HLSTraceEnable )
   {
+#if NH_MV_ENC_DEC_TRAC
+    if ( !g_disableNumbering )
+    {
+      incSymbolCounter();
+      fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter );
+    }
+#else
     fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter++ );
+#endif
+
     if( length<10 )
     {
       fprintf( g_hTrace, "%-50s u(%d)  : %d\n", pSymbolName, length, value );
@@ -82,7 +91,16 @@ Void  SyntaxElementWriter::xWriteUvlcTr (UInt value, const TChar *pSymbolName)
   xWriteUvlc (value);
   if( g_HLSTraceEnable )
   {
+#if NH_MV_ENC_DEC_TRAC
+    if ( !g_disableNumbering )
+    {
+      incSymbolCounter();
+      fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter );
+    }
+#else
     fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter++ );
+#endif
+
     fprintf( g_hTrace, "%-50s ue(v) : %d\n", pSymbolName, value );
   }
 }
@@ -92,7 +110,16 @@ Void  SyntaxElementWriter::xWriteSvlcTr (Int value, const TChar *pSymbolName)
   xWriteSvlc(value);
   if( g_HLSTraceEnable )
   {
+#if NH_MV_ENC_DEC_TRAC
+    if ( !g_disableNumbering )
+    {
+      incSymbolCounter();
+      fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter );
+    }
+#else
     fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter++ );
+#endif
+
     fprintf( g_hTrace, "%-50s se(v) : %d\n", pSymbolName, value );
   }
 }
@@ -102,7 +129,16 @@ Void  SyntaxElementWriter::xWriteFlagTr(UInt value, const TChar *pSymbolName)
   xWriteFlag(value);
   if( g_HLSTraceEnable )
   {
+#if NH_MV_ENC_DEC_TRAC
+    if ( !g_disableNumbering )
+    {
+      incSymbolCounter();
+      fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter );
+    }
+#else
     fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter++ );
+#endif
+
     fprintf( g_hTrace, "%-50s u(1)  : %d\n", pSymbolName, value );
   }
 }
@@ -116,6 +152,18 @@ void  SyntaxElementWriter::xWriteStringTr( const std::string &value, const char 
     fprintf( g_hTrace, "%-50s st(v)  : %s\n", symbolName, value.c_str() );
   }
 }
+
+#if NH_MV_ENC_DEC_TRAC
+Void  SyntaxElementWriter::xWriteStringTr( UChar* value, UInt length, const TChar *pSymbolName)
+{
+  xWriteString(value, length);
+  if( g_HLSTraceEnable )
+  {
+    fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter++ );
+    fprintf( g_hTrace, "%-50s st(v=%d)  : %s\n", pSymbolName, length, value );
+  }
+}
+#endif
 #endif
 
 Void SyntaxElementWriter::xWriteSCode    ( Int iCode, UInt uiLength )
@@ -161,6 +209,17 @@ Void SyntaxElementWriter::xWriteFlag( UInt uiCode )
   m_pcBitIf->write( uiCode, 1 );
 }
 
+#if NH_MV_ENC_DEC_TRAC
+Void  SyntaxElementWriter::xWriteString( UChar* sCode, UInt uiLength)
+{
+  assert(m_pcBitIf->getNumberOfWrittenBits() % 8 == 0 );
+  for (Int i=0 ; i<uiLength; i++)
+  {
+    m_pcBitIf->write( sCode[i], 8 );
+  }
+  m_pcBitIf->write( 0, 8 ); //zero-termination byte
+}
+#else
 void  SyntaxElementWriter::xWriteString( const std::string &value )
 {
   for (int i = 0; i < value.length(); ++i)
@@ -169,6 +228,7 @@ void  SyntaxElementWriter::xWriteString( const std::string &value )
   }
   m_pcBitIf->write('\0', 8);
 }
+#endif
 
 Void SyntaxElementWriter::xWriteRbspTrailingBits()
 {

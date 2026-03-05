@@ -50,6 +50,63 @@
 
 //! \ingroup TLibCommon
 //! \{
+/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////// EXTENSION SELECTION ///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
+/* HEVC_EXT might be defined by compiler/makefile options.
+   Linux makefiles support the following settings:
+   make             -> HEVC_EXT not defined
+   make HEVC_EXT=0  -> NH_MV=0   --> plain HM
+   make HEVC_EXT=1  -> NH_MV=1   --> MV only
+
+*/
+#ifndef HEVC_EXT
+#define HEVC_EXT                    0
+#endif
+#if ( HEVC_EXT < 0 )||( HEVC_EXT > 1 )
+#error HEVC_EXT must be in the range of 0 to 1, inclusive.
+#endif
+#define NH_MV          ( HEVC_EXT != 0)
+
+#define NH_MV_ALLOW_NON_CONFORMING                0   // Allow non-conforming representations formats
+
+/*
+ NOTE: MV MAIN/MAIN10:          HEVC_EXT = 1, JVET_AE0295 = 1 and JVET_AH0046 = 0
+       MV EXTENDED/EXTENDED10:  HEVC_EXT = 1, JVET_AE0295 = 1,    JVET_AH0046 = 1
+       MV REXT:                 HEVC_EXT = 1, JVET_AE0295 = 0,    JVET_AH0046 = 0 and JVET_AM1018 = 1
+ */
+#define JVET_AE0295                               1  // MV-MAIN 10 implementation
+#define JVET_AH0046                               0  // Changes to the existing MV Main 10 to accommodate the Multiview Extended 10
+#define JVET_AM1018                               0  // Multiview Range Extended profiles support
+
+/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////   FIXES AND INTEGRATIONS     ////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
+#if NH_MV
+// Things that needs to be fixed also in the Specification ... CHECK if this has been done
+#define NH_MV_FIX_NO_REF_PICS_CHECK               1 // !!SPEC!!
+#define NH_MV_FIX_INIT_NUM_ACTIVE_REF_LAYER_PICS  1 // Derivation of NumActiveRefLayerPIcs. !!SPEC!!
+#define NH_MV_FIX_NUM_POC_TOTAL_CUR               1 // Derivation of NumPocTotalCur for IDR pictures. !!SPEC!!
+// To be done
+#define NH_MV_HLS_PTL_LIMITS                      0
+#define NH_MV_SEI_TBD                             0
+#endif
+/////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////   MAJOR DEFINES   ///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
+
+
+#if NH_MV
+#define NH_MV_ENC_DEC_TRAC                 1  //< CU/PU level tracking
+////////////////////////
+/// Consider Removal
+////////////////////////
+// Rate Control
+#define KWU_FIX_URQ                       0
+#define KWU_RC_VIEWRC_E0227               0  ///< JCT3V-E0227, view-wise target bitrate allocation
+#define KWU_RC_MADPRED_E0227              0  ///< JCT3V-E0227, inter-view MAD prediction
+#define NH_MV_HLS_PTL_LIMITS               0
+#endif
 
 #define JCTVC_AD0021_SEI_MANIFEST                         1  // JCTVC_AD0021(JVET-T0056): SEI manifest SEI message
 #define JCTVC_AD0021_SEI_PREFIX_INDICATION                1  // JCTVC_AD0021(JVET-T0056): SEI prefix indication SEI message
@@ -65,7 +122,7 @@
 
 // Keep the following define. Can be switched off by CMake, when OpenSSL is not found
 #ifndef JVET_AK0194_DSC_SEI
-#define JVET_AK0194_DSC_SEI   1                      // Digitally signed content signing and verification (requires OpenSSL v3)
+#define JVET_AK0194_DSC_SEI   0                      // Digitally signed content signing and verification (requires OpenSSL v3)
 #endif
 
 // ====================================================================================================================
@@ -95,8 +152,11 @@
 
 #define PRINT_RPS_INFO                                    0 ///< Enable/disable the printing of bits used to send the RPS.
 
+#if NH_MV
+#define MCTS_EXTRACTION                                   0 ///< Additional project for MCTS Extraction as in JCTVC-AC1005
+#else
 #define MCTS_EXTRACTION                                   1 ///< Additional project for MCTS Extraction as in JCTVC-AC1005
-
+#endif
 // ====================================================================================================================
 // Tool Switches - transitory (these macros are likely to be removed in future revisions)
 // ====================================================================================================================
@@ -109,12 +169,17 @@
 #endif
 #define DECODER_CHECK_SUBSTREAM_AND_SLICE_TRAILING_BYTES  1 ///< TODO: integrate this macro into a broader conformance checking system.
 #define MCTS_ENC_CHECK                                    1  ///< Temporal MCTS encoder constraint and decoder checks. Also requires SEITMCTSTileConstraint to be enabled to enforce constraint
-#define SHUTTER_INTERVAL_SEI_MESSAGE                      1  ///< support for shutter interval SEI message 
 #define JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE          1  ///< support for phase indication SEI message
 #define SEI_ENCODER_CONTROL                               1  ///< add encoder control for the following SEI: film grain characteristics, content light level, ambient viewing environment
+#if NH_MV
+#define SHUTTER_INTERVAL_SEI_MESSAGE                      0  ///< support for shutter interval SEI message
+#define DPB_ENCODER_USAGE_CHECK                           0 ///< Adds DPB encoder usage check.
+#define JVET_X0048_X0103_FILM_GRAIN                       0 ///< JVET-X0048-X0103: SMPTE RDD-5 based film grain analysis and synthesis model for film grain characterstics (FGC) SEI
+#else
+#define SHUTTER_INTERVAL_SEI_MESSAGE                      1  ///< support for shutter interval SEI message
 #define DPB_ENCODER_USAGE_CHECK                           1 ///< Adds DPB encoder usage check.
 #define JVET_X0048_X0103_FILM_GRAIN                       1 ///< JVET-X0048-X0103: SMPTE RDD-5 based film grain analysis and synthesis model for film grain characterstics (FGC) SEI
-
+#endif
 #define JVET_T0050_ANNOTATED_REGIONS_SEI                  1 ///< Detect static objects and use it in Annotated Regions SEI message
 
 #if SHUTTER_INTERVAL_SEI_MESSAGE
@@ -131,7 +196,11 @@
 #define EXTENSION_360_VIDEO                               0   ///< extension for 360/spherical video coding support; this macro should be controlled by makefile, as it would be used to control whether the library is built and linked
 #endif
 
+#if NH_MV
+#define REDUCED_ENCODER_MEMORY                            0 ///< When 1, the encoder will allocate TComPic memory when required and release it when no longer required.
+#else
 #define REDUCED_ENCODER_MEMORY                            1 ///< When 1, the encoder will allocate TComPic memory when required and release it when no longer required.
+#endif
 
 #define ADAPTIVE_QP_SELECTION                             1 ///< G382: Adaptive reconstruction levels, non-normative part for adaptive QP selection
 
@@ -282,6 +351,20 @@ typedef       UInt            Intermediate_UInt; ///< used as intermediate value
 typedef       UInt64          Distortion;        ///< distortion measurement
 #else
 typedef       UInt            Distortion;        ///< distortion measurement
+#endif
+#if NH_MV
+typedef std::vector< std::string > StringAry1d;
+typedef std::vector< StringAry1d > StringAry2d;
+typedef std::vector< Int >        IntAry1d;
+typedef std::vector< IntAry1d >   IntAry2d;
+typedef std::vector< IntAry2d >   IntAry3d;
+typedef std::vector< IntAry3d >   IntAry4d;
+typedef std::vector< IntAry4d >   IntAry5d;
+typedef std::vector< Bool >        BoolAry1d;
+typedef std::vector< BoolAry1d >   BoolAry2d;
+typedef std::vector< BoolAry2d >   BoolAry3d;
+typedef std::vector< BoolAry3d >   BoolAry4d;
+typedef std::vector< BoolAry4d >   BoolAry5d;
 #endif
 
 // ====================================================================================================================
@@ -597,7 +680,18 @@ enum SAOEOClasses
 
 #define NUM_SAO_BO_CLASSES_LOG2  5
 #define NUM_SAO_BO_CLASSES       (1<<NUM_SAO_BO_CLASSES_LOG2)
-
+#if NH_MV
+enum DecodingProcess
+{
+  INVALID,
+  CLAUSE_8,
+  ANNEX_C,
+  ANNEX_F,
+  ANNEX_G,
+  ANNEX_H,
+  ANNEX_I
+};
+#endif
 namespace Profile
 {
   enum Name
@@ -608,6 +702,19 @@ namespace Profile
     MAINSTILLPICTURE = 3,
     MAINREXT = 4,
     HIGHTHROUGHPUTREXT = 5
+#if NH_MV
+    ,MULTIVIEWMAIN = 6,
+#if JVET_AH0046
+    MULTIVIEWEXTENDED = 12,
+    MULTIVIEWEXTENDED10 = 13,
+#endif  // JVET_AH0046
+#if JVET_AM1018
+    MULTIVIEWREXT = 14,
+#endif  // JVET_AM1018
+#if NH_MV_ALLOW_NON_CONFORMING
+    MULTIVIEWMAIN_NONCONFORMING = 29,
+#endif
+#endif
   };
 }
 
@@ -774,6 +881,21 @@ enum LumaLevelToDQPMode
   LUMALVL_TO_DQP_NUM_MODES  = 3
 };
 
+#if NH_MV
+/// scalability types
+enum ScalabilityType
+{
+  DEPTH_ID = 0,
+  VIEW_ORDER_INDEX  = 1,
+  DEPENDENCY_ID = 2,
+  AUX_ID = 3,
+};
+enum DecProcPart
+{
+  START_PIC,
+  FINALIZE_PIC
+};
+#endif
 // ---------------------------------------------------------------------------
 // exception class
 // ---------------------------------------------------------------------------
@@ -994,6 +1116,9 @@ private:
   Int  m_winRightOffset;
   Int  m_winTopOffset;
   Int  m_winBottomOffset;
+#if NH_MV
+  Bool          m_scaledFlag;
+#endif
 public:
   Window()
   : m_enabledFlag    (false)
@@ -1001,6 +1126,9 @@ public:
   , m_winRightOffset (0)
   , m_winTopOffset   (0)
   , m_winBottomOffset(0)
+#if NH_MV
+  , m_scaledFlag(true)
+#endif
   { }
 
   Bool getWindowEnabledFlag() const   { return m_enabledFlag;                          }
@@ -1013,6 +1141,11 @@ public:
   Int  getWindowBottomOffset() const  { return m_enabledFlag ? m_winBottomOffset: 0;   }
   Void setWindowBottomOffset(Int val) { m_winBottomOffset = val; m_enabledFlag = true; }
 
+#if NH_MV
+  Void          setScaledFlag(Bool flag)          { m_scaledFlag = flag;  }
+  Bool          getScaledFlag() const             { return m_scaledFlag;  }
+  Void          scaleOffsets( Int scal );
+#endif
   Void setWindow(Int offsetLeft, Int offsetRight, Int offsetTop, Int offsetBottom)
   {
     m_enabledFlag     = (offsetLeft || offsetRight || offsetTop || offsetBottom);

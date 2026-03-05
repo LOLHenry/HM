@@ -131,6 +131,9 @@ public:
   Void initTemporalLevel0IndexSEI(SEITemporalLevel0Index *sei, TComSlice *slice);
   Void initSEIGreenMetadataInfo(SEIGreenMetadataInfo *sei, UInt u);
 
+#if NH_MV
+  Void createAnnexFGISeiMessages( SEIMessages& seiMessage, const TComSlice* slice );;
+#endif
 private:
   TEncCfg* m_pcCfg;
   TEncTop* m_pcEncTop;

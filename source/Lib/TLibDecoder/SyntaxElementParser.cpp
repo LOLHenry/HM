@@ -76,6 +76,152 @@ Void SyntaxElementParser::xReadCodeChk ( UInt   length, UInt& val, const TChar *
   TDecConformanceCheck::checkRange(val, pSymbolName, minValIncl, maxValIncl);
 }
 
+#if NH_MV
+
+Void  SyntaxElementParser::xReadCodeTr           (UInt length, UInt& rValue, const TChar *pSymbolName)
+{
+#if RExt__DECODER_DEBUG_BIT_STATISTICS
+  xReadCode (length, rValue, pSymbolName);
+#else
+  xReadCode (length, rValue);
+#endif
+#if NH_MV_ENC_DEC_TRAC
+  if ( g_disableHLSTrace || !g_HLSTraceEnable )
+  {
+    return;
+  }
+  if ( !g_disableNumbering )
+  {
+    incSymbolCounter();
+    fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter );
+  }
+#else
+    fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter++ );
+#endif
+  if (length < 10)
+  {
+    fprintf( g_hTrace, "%-50s u(%d)  : %u\n", pSymbolName, length, rValue );
+  }
+  else
+  {
+    fprintf( g_hTrace, "%-50s u(%d) : %u\n", pSymbolName, length, rValue );
+  }
+  fflush ( g_hTrace );
+}
+
+Void  SyntaxElementParser::xReadUvlcTr           (UInt& rValue, const TChar *pSymbolName)
+{
+#if RExt__DECODER_DEBUG_BIT_STATISTICS
+  xReadUvlc (rValue, pSymbolName);
+#else
+  xReadUvlc (rValue);
+#endif
+#if NH_MV_ENC_DEC_TRAC
+  if ( g_disableHLSTrace || !g_HLSTraceEnable )
+  {
+    return;
+  }
+  if ( !g_disableNumbering )
+  {
+  incSymbolCounter();
+  fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter );
+  }
+#else
+  fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter++ );
+#endif
+  fprintf( g_hTrace, "%-50s ue(v) : %u\n", pSymbolName, rValue );
+  fflush ( g_hTrace );
+}
+
+Void  SyntaxElementParser::xReadSvlcTr           (Int& rValue, const TChar *pSymbolName)
+{
+#if RExt__DECODER_DEBUG_BIT_STATISTICS
+  xReadSvlc (rValue, pSymbolName);
+#else
+  xReadSvlc (rValue);
+#endif
+#if NH_MV_ENC_DEC_TRAC
+  if ( g_disableHLSTrace || !g_HLSTraceEnable )
+  {
+    return;
+  }
+  if ( !g_disableNumbering )
+  {
+    incSymbolCounter();
+    fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter );
+  }
+#else
+    fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter++ );
+#endif
+  fprintf( g_hTrace, "%-50s se(v) : %d\n", pSymbolName, rValue );
+  fflush ( g_hTrace );
+}
+
+Void  SyntaxElementParser::xReadFlagTr           (UInt& rValue, const TChar *pSymbolName)
+{
+#if RExt__DECODER_DEBUG_BIT_STATISTICS
+  xReadFlag (rValue, pSymbolName);
+#else
+  xReadFlag (rValue);
+#endif
+#if NH_MV_ENC_DEC_TRAC
+  if ( g_disableHLSTrace || !g_HLSTraceEnable )
+  {
+    return;
+  }
+  if ( !g_disableNumbering )
+  {
+    incSymbolCounter();
+    fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter );
+  }
+#else
+  fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter++ );
+#endif
+  fprintf( g_hTrace, "%-50s u(1)  : %d\n", pSymbolName, rValue );
+  fflush ( g_hTrace );
+}
+
+#if NH_MV
+Void  SyntaxElementParser::xReadStringTr        (UInt buSize, UChar *pValue, UInt& rLength, const TChar *pSymbolName)
+{
+#if RExt__DECODER_DEBUG_BIT_STATISTICS
+  xReadString (buSize, pValue, rLength, pSymbolName);
+#else
+  xReadString(buSize, pValue, rLength);
+#endif
+  fprintf( g_hTrace, "%8lld  ", g_nSymbolCounter++ );
+  fprintf( g_hTrace, "%-50s st(v=%d)  : %s\n", pSymbolName, rLength, pValue );
+  fflush ( g_hTrace );
+}
+#endif
+Void  xTraceAccessUnitDelimiter ()
+{
+  fprintf( g_hTrace, "=========== Access Unit Delimiter ===========\n");
+}
+
+Void xTraceFillerData ()
+{
+  fprintf( g_hTrace, "=========== Filler Data ===========\n");
+}
+
+
+// ====================================================================================================================
+// Protected member functions
+// ====================================================================================================================
+#if RExt__DECODER_DEBUG_BIT_STATISTICS
+Void SyntaxElementParser::xReadCode (UInt uiLength, UInt& ruiCode, const TChar *pSymbolName)
+#else
+Void SyntaxElementParser::xReadCode (UInt uiLength, UInt& ruiCode)
+#endif
+{
+  assert ( uiLength > 0 );
+  m_pcBitstream->read (uiLength, ruiCode);
+#if RExt__DECODER_DEBUG_BIT_STATISTICS
+  TComCodingStatistics::IncrementStatisticEP(pSymbolName, uiLength, ruiCode);
+#endif
+}
+
+#else
 Void SyntaxElementParser::xReadUvlcChk ( UInt&  val, const TChar *pSymbolName, const UInt minValIncl, const UInt maxValIncl )
 {
   READ_UVLC(val, pSymbolName);
@@ -93,6 +239,7 @@ Void SyntaxElementParser::xReadFlagChk ( UInt&  val, const TChar *pSymbolName, c
   READ_FLAG(val, pSymbolName);
   TDecConformanceCheck::checkRange(val, pSymbolName, minValIncl, maxValIncl);
 }
+#endif
 #endif
 
 // ====================================================================================================================
@@ -196,6 +343,29 @@ Void SyntaxElementParser::xReadUvlc( UInt& rValue)
 #endif
 }
 
+#if NH_MV
+#if RExt__DECODER_DEBUG_BIT_STATISTICS || ENC_DEC_TRACE
+Void  SyntaxElementParser::xReadString  (UInt bufSize, UChar *pVal, UInt& rLength, const TChar *pSymbolName)
+#else
+Void  SyntaxElementParser::xReadString  (UInt bufSize, UChar *pVal, UInt& rLength )
+#endif
+{
+  assert( m_pcBitstream->getNumBitsRead() % 8 == 0 ); //always start reading at a byte-aligned position
+  UInt val;
+  UInt i;
+  for (i=0 ; i<bufSize ; ++i )
+  {
+    m_pcBitstream->readByte( val );
+    pVal[i] = val;
+    if ( val == 0)
+    {
+      break;
+    }
+  }
+  rLength = i;
+  assert( pVal[rLength] == 0 );
+}
+#else
 #if RExt__DECODER_DEBUG_BIT_STATISTICS || ENC_DEC_TRACE
 Void SyntaxElementParser::xReadString( std::string& valueOut, const TChar *symbolName )
 #else
@@ -220,6 +390,7 @@ Void SyntaxElementParser::xReadString( std::string& valueOut )
 #endif
   valueOut = value;
 }
+#endif
 
 #if RExt__DECODER_DEBUG_BIT_STATISTICS || ENC_DEC_TRACE
 Void SyntaxElementParser::xReadSvlc( Int& rValue, const TChar *pSymbolName)

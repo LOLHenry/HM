@@ -50,7 +50,9 @@
 int main(int argc, char* argv[])
 {
   Int returnCode = EXIT_SUCCESS;
+#if !NH_MV
   TAppDecTop  cTAppDecTop;
+#endif
 
   // print information
   fprintf( stdout, "\n" );
@@ -60,23 +62,40 @@ int main(int argc, char* argv[])
   fprintf( stdout, NVM_BITS );
   fprintf( stdout, "\n" );
 
-  // create application decoder class
-  cTAppDecTop.create();
-
-  // parse configuration
-  if(!cTAppDecTop.parseCfg( argc, argv ))
+#if NH_MV
+  Int numDecodings = 1;
+  Int curDecoding  = 0;
+  Double dResult = 0;
+  do
   {
-    cTAppDecTop.destroy();
-    returnCode = EXIT_FAILURE;
-    return returnCode;
-  }
+    TAppDecTop  cTAppDecTop;
+#endif
+    // create application decoder class
+    cTAppDecTop.create();
+
+    // parse configuration
+    if(!cTAppDecTop.parseCfg( argc, argv ))
+    {
+      cTAppDecTop.destroy();
+      returnCode = EXIT_FAILURE;
+      return returnCode;
+    }
+#if NH_MV
+    numDecodings = cTAppDecTop.getNumDecodings();
+#endif
 
   // starting time
+#if !NH_MV
   Double dResult;
-  clock_t lBefore = clock();
+#endif
+    clock_t lBefore = clock();
 
   // call decoding function
-  cTAppDecTop.decode();
+#if NH_MV
+    cTAppDecTop.decode( curDecoding );
+#else
+    cTAppDecTop.decode();
+#endif
 
   if (cTAppDecTop.getNumberOfChecksumErrorsDetected() != 0)
   {
@@ -85,11 +104,22 @@ int main(int argc, char* argv[])
   }
 
   // ending time
+#if NH_MV
+    dResult += (double)(clock()-lBefore) / CLOCKS_PER_SEC;
+#else
   dResult = (Double)(clock()-lBefore) / CLOCKS_PER_SEC;
   printf("\n Total Time: %12.3f sec.\n", dResult);
+#endif
 
   // destroy application decoder class
   cTAppDecTop.destroy();
+#if NH_MV
+    curDecoding++;
+  }
+  while ( curDecoding < numDecodings );
+
+  printf("\n Total Time: %12.3f sec.\n", dResult);
+#endif
 
   return returnCode;
 }

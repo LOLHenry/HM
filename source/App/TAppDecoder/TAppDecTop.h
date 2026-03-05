@@ -60,8 +60,67 @@ class TAppDecTop : public TAppDecCfg
 {
 private:
   // class interface
+#if NH_MV
+  TDecTop*                        m_tDecTop             [ MAX_NUM_LAYERS ];    ///< decoder classes
+  TVideoIOYuv*                    m_tVideoIOYuvReconFile[ MAX_NUM_LAYERS ];    ///< reconstruction YUV class
+  Int                             m_layerIdToDecIdx     [ MAX_NUM_LAYER_IDS ]; ///< mapping from layer id to decoder index
+  Int                             m_numDecoders;                               ///< number of decoder instances
+  TComPicLists                    m_dpb;                                       ///< picture buffers of decoder instances
+
+  TComPic*                        m_curPic;                                    ///< currently decoded picture
+  TComAu                          m_curAu;                                     ///< currently decoded Au
+ 
+  // Random access related
+  Bool                            m_handleCraAsBlaFlag;
+  Bool                            m_handleCraAsBlaFlagSetByExtMeans;
+  Bool                            m_noClrasOutputFlag;
+  Bool                            m_noClrasOutputFlagSetByExtMeans;
+  Bool                            m_noRaslOutputFlagAssocIrap           [ MAX_NUM_LAYER_IDS ];
+
+  // Layer wise startup
+  Bool                            m_firstPicInLayerDecodedFlag          [ MAX_NUM_LAYER_IDS ];
+  Bool                            m_layerInitilizedFlag                 [ MAX_NUM_LAYER_IDS ];
+  Bool                            m_layerResetFlag;
+
+  // DPB related variables
+  Int                             m_maxNumReorderPics;
+  Int                             m_maxLatencyIncreasePlus1;
+  Int                             m_maxLatencyValue;
+  Int                             m_maxDecPicBufferingMinus1            [ MAX_NUM_LAYER_IDS ];
+
+  // Poc resetting
+  Int                             m_lastPresentPocResetIdc              [ MAX_NUM_LAYER_IDS ];
+  Bool                            m_firstPicInPocResettingPeriodReceived[ MAX_NUM_LAYER_IDS ];
+  Bool                            m_pocDecrementedInDpbFlag             [ MAX_NUM_LAYER_IDS ];
+  Bool                            m_newPicIsFstPicOfAllLayOfPocResetPer;
+  Bool                            m_newPicIsPocResettingPic;
+
+  // General decoding state
+  Bool                            m_newVpsActivatedbyCurAu;
+  Bool                            m_newVpsActivatedbyCurPic;
+  Bool                            m_eosInLayer                          [ MAX_NUM_LAYER_IDS ];
+  Bool                            m_initilizedFromVPS;
+  Bool                            m_firstSliceInBitstream;
+  UInt64                          m_decodingOrder                       [ MAX_NUM_LAYER_IDS ];
+  UInt64                          m_totalNumofPicsReceived;
+  Bool                            m_cvsStartFound;
+  Int                             m_smallestLayerId;
+
+  // Decoding processes for current  picture
+  DecodingProcess                 m_decProcPocAndRps;
+  DecodingProcess                 m_decProcCvsg;
+  
+  // Active parameter sets
+  const TComPPS*                  m_pps;                                ///< active PPS
+  const TComSPS*                  m_sps;                                ///< active SPS
+  const TComVPS*                  m_vps;                                ///< active VPS
+
+  Bool                            m_reconOpen           [ MAX_NUM_LAYERS ]; ///< reconstruction file opened
+#else
   TDecTop                         m_cTDecTop;                     ///< decoder class
   TVideoIOYuv                     m_cTVideoIOYuvReconFile;        ///< reconstruction YUV class
+#endif
+
 #if JVET_X0048_X0103_FILM_GRAIN
   TVideoIOYuv                     m_cTVideoIOYuvSEIFGSFile;       ///< reconstruction YUV class
 #endif
@@ -71,7 +130,9 @@ private:
 #endif
 
   // for output control
+#if !NH_MV
   Int                             m_iPOCLastDisplay;              ///< last POC in display order
+#endif
   std::ofstream                   m_seiMessageFileStream;         ///< Used for outputing SEI messages.
 
   SEIColourRemappingInfo*         m_pcSeiColourRemappingInfoPrevious;
@@ -86,8 +147,15 @@ public:
 
   Void  create            (); ///< create internal members
   Void  destroy           (); ///< destroy internal members
+
+#if NH_MV
+  Void  decode            ( Int i ); ///< main decoding function
+  UInt  getNumberOfChecksumErrorsDetected( ) const;
+  UInt  getNumberOfChecksumErrorsDetected( Int decIdx ) const { return m_tDecTop[decIdx]->getNumberOfChecksumErrorsDetected(); }
+#else
   Void  decode            (); ///< main decoding function
   UInt  getNumberOfChecksumErrorsDetected() const { return m_cTDecTop.getNumberOfChecksumErrorsDetected(); }
+#endif
 
 #if SHUTTER_INTERVAL_SEI_PROCESSING
   Bool  getShutterFilterFlag()        const { return m_ShutterFilterEnable; }
@@ -99,9 +167,63 @@ protected:
   Void  xDestroyDecLib    (); ///< destroy internal classes
   Void  xInitDecLib       (); ///< initialize decoder class
 
+#if !NH_MV
   Void  xWriteOutput      ( TComList<TComPic*>* pcListPic , UInt tId); ///< write YUV to file
   Void  xFlushOutput      ( TComList<TComPic*>* pcListPic ); ///< flush all remaining decoded pictures to file
   Bool  isNaluWithinTargetDecLayerIdSet ( InputNALUnit* nalu ); ///< check whether given Nalu is within targetDecLayerIdSet
+#else
+  // Process NAL units
+  Bool xExtractAndRewrite                  ( InputNALUnit* nalu );
+  Void xProcessVclNalu                     ( InputNALUnit nalu );
+  Bool xIsSkipVclNalu                      ( InputNALUnit& nalu, Bool isFirstSliceOfPic );
+  Void xProcessNonVclNalu                  ( InputNALUnit nalu );
+  Void xTerminateDecoding                  ( );
+
+  // Process slice
+  Void xDecodeFirstSliceOfPicture          ( InputNALUnit nalu, Bool sliceIsFirstOfNewAu );
+  Void xDecodeFollowSliceOfPicture         ( InputNALUnit nalu );
+
+  // Process picture
+  Void xFinalizePreviousPictures           ( Bool sliceIsFirstOfNewAU );
+  Void xFinalizePic                        ( Bool curPicIsLastInAu );
+  Void xFinalizeAU                         ( );
+  Void xPicDecoding                        ( DecProcPart curPart, Bool picPosInAuIndication );
+
+  // Clause 8
+  Void x812CvsgDecodingProcess             ( Int decIdx );
+  Void x813decProcForCodPicWithLIdZero     ( DecProcPart curPart );
+
+  // Annex C (DPB)
+  Void xC522OutputAndRemOfPicsFromDpb      ( );
+  Void xC523PicDecMarkAddBumpAndStor       ( );
+  Void xC524Bumping                        ( );
+
+  // Annex F.8
+  Void xF811GeneralDecProc                 ( InputNALUnit nalu );
+  Void xF812CvsgDecodingProcess            ( Int decIdx );
+  Void xF813ComDecProcForACodedPic         ( DecProcPart curPart, Bool picPosInAuIndication );
+  Void xF814decProcForCodPicWithLIdZero    ( DecProcPart curPart );
+  Void xF816decProcEndDecOfCodPicLIdGrtZero( );
+
+  // Annex F.13 (DPB)
+  Void xF13521InitDpb                      ( );
+  Void xF13522OutputAndRemOfPicsFromDpb    ( Bool beforePocDerivation );
+  Void xF13523PicDecMarkAddBumpAndStor     ( Bool curPicIsLastInAu   );
+  Void xF13524Bumping                      ( TComList<TComAu*> aus );
+
+  // Helpers
+  TDecTop* xGetDecoder                     ( InputNALUnit& nalu );
+  Int   xGetDecoderIdx                     ( Int layerId, Bool createFlag = false );
+  Int   xPreDecodePoc                      ( InputNALUnit& nalu );
+  Bool  xDetectNewAu                       ( InputNALUnit& nalu );
+  Void  xDetectNewPocResettingPeriod       ( InputNALUnit& nalu );
+  Bool  xIsNaluInTargetDecLayerIdSet       ( InputNALUnit* nalu ); ///< check whether given Nalu is within targetDecLayerIdSet
+  Bool  xAllRefLayersInitilized            ( Int curLayerId );
+  Void  xInitFileIO                        ( );
+  Void  xOpenReconFile                     ( TComPic* curPic );
+  Void  xFlushOutput                       ( );
+  Void  xCropAndOutput                     ( TComPic* curPic );
+#endif
 
 private:
   Void applyColourRemapping(const TComPicYuv& pic, SEIColourRemappingInfo& pCriSEI, const TComSPS &activeSPS);

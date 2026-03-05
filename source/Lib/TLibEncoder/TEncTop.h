@@ -64,6 +64,9 @@
 // Class definition
 // ====================================================================================================================
 
+#if KWU_RC_MADPRED_E0227
+class TAppEncTop;
+#endif
 /// encoder class
 class TEncTop : public TEncCfg
 {
@@ -72,8 +75,13 @@ private:
   Int                     m_iPOCLast;                     ///< time index (POC)
   Int                     m_iNumPicRcvd;                  ///< number of received pictures
   UInt                    m_uiNumAllPicCoded;             ///< number of coded pictures
+#if !NH_MV
   TComList<TComPic*>      m_cListPic;                     ///< dynamic list of pictures
+#endif
 
+#if NH_MV
+  TComPicLists*           m_ivPicLists;                   ///< access to picture lists of other layers
+#endif
   // encoder search
   TEncSearch              m_cSearch;                      ///< encoder search class
   //TEncEntropy*            m_pcEntropyCoder;                     ///< entropy encoder
@@ -92,8 +100,13 @@ private:
   TEncSlice               m_cSliceEncoder;                ///< slice encoder
   TEncCu                  m_cCuEncoder;                   ///< CU encoder
   // SPS
+#if NH_MV
+  ParameterSetMap<TComSPS>& m_spsMap;                      ///< SPS. This is the base value. This is copied to TComPicSym
+  ParameterSetMap<TComPPS>& m_ppsMap;                      ///< PPS. This is the base value. This is copied to TComPicSym
+#else
   ParameterSetMap<TComSPS> m_spsMap;                      ///< SPS. This is the base value. This is copied to TComPicSym
   ParameterSetMap<TComPPS> m_ppsMap;                      ///< PPS. This is the base value. This is copied to TComPicSym
+#endif
   // RD cost computation
   TComRdCost              m_cRdCost;                      ///< RD cost computation class
   TEncSbac***             m_pppcRDSbacCoder;              ///< temporal storage for RD computation
@@ -111,6 +124,18 @@ private:
 
   TEncRateCtrl            m_cRateCtrl;                    ///< Rate control class
 
+#if KWU_RC_MADPRED_E0227
+  TAppEncTop*             m_pcTAppEncTop;
+  TAppComCamPara*         m_cCamParam;
+#endif
+#if NH_MV
+  TEncAnalyze             m_cAnalyzeAll;
+  TEncAnalyze             m_cAnalyzeI;
+  TEncAnalyze             m_cAnalyzeP;
+  TEncAnalyze             m_cAnalyzeB;
+  TEncAnalyze             m_cAnalyzeAll_in;
+#endif
+
 protected:
   Void  xGetNewPicBuffer  ( TComPic*& rpcPic, Int ppsId ); ///< get picture buffer which will be processed. If ppsId<0, then the ppsMap will be queried for the first match.
   Void  xInitVPS          (TComVPS &vps, const TComSPS &sps); ///< initialize VPS from encoder options
@@ -119,23 +144,46 @@ protected:
   Void  xInitScalingLists (TComSPS &sps, TComPPS &pps);   ///< initialize scaling lists
   Void  xInitHrdParameters(TComSPS &sps);                 ///< initialize HRD parameters
 
+#if NH_MV
+  Int   xGetPsIdAndPsLayerId      ( );
+
+  Void  xInitPPSforTiles  (TComPPS &pps) const ;
+#else
   Void  xInitPPSforTiles  (TComPPS &pps);
+#endif
   Void  xInitRPS          (TComSPS &sps, Bool isFieldCoding);           ///< initialize PPS from encoder options
 
 public:
+#if NH_MV
+  TEncTop( ParameterSetMap<TComSPS>& spsMap, ParameterSetMap<TComPPS>& ppsMap );
+#else
   TEncTop();
+#endif
   virtual ~TEncTop();
 
   Void      create          ();
   Void      destroy         ();
+#if KWU_RC_MADPRED_E0227
+  Void      init            ( TAppEncTop* pcTAppEncTop, Bool isFieldCoding );
+#else
   Void      init            (Bool isFieldCoding);
+#endif
+#if NH_MV
+  TComPicLists* getIvPicLists() { return m_ivPicLists; }
+#endif
   Void      deletePicBuffer ();
-
+#if NH_MV
+  Void      initNewPic(TComPicYuv* pcPicYuvOrg);
+#endif
   // -------------------------------------------------------------------------------------------------------------------
   // member access functions
   // -------------------------------------------------------------------------------------------------------------------
 
+#if NH_MV
+  TComList<TComPic*>*     getListPic            () { return  m_ivPicLists->getSubDpb( getLayerId(), false);             }
+#else
   TComList<TComPic*>*     getListPic            () { return  &m_cListPic;             }
+#endif
   TEncSearch*             getPredSearch         () { return  &m_cSearch;              }
 
   TComTrQuant*            getTrQuant            () { return  &m_cTrQuant;             }
@@ -153,10 +201,29 @@ public:
   TEncSbac***             getRDSbacCoder        () { return  m_pppcRDSbacCoder;       }
   TEncSbac*               getRDGoOnSbacCoder    () { return  &m_cRDGoOnSbacCoder;     }
   TEncRateCtrl*           getRateCtrl           () { return &m_cRateCtrl;             }
+#if KWU_RC_MADPRED_E0227
+  TAppEncTop*             getEncTop             () { return m_pcTAppEncTop; }
+  TAppComCamPara*         getCamParam()                 { return m_cCamParam;}
+  Void                    setCamParam(TAppComCamPara * pCamparam)                 { m_cCamParam = pCamparam;}
+#endif
   Void selectReferencePictureSet(TComSlice* slice, Int POCCurr, Int GOPid );
   Int getReferencePictureSetIdxForSOP(Int POCCurr, Int GOPid );
+#if NH_MV
+  TEncAnalyze*            getAnalyzeAll         () { return &m_cAnalyzeAll; }
+  TEncAnalyze*            getAnalyzeI           () { return &m_cAnalyzeI;   }
+  TEncAnalyze*            getAnalyzeP           () { return &m_cAnalyzeP;   }
+  TEncAnalyze*            getAnalyzeB           () { return &m_cAnalyzeB;   }
+  Int                     getNumAllPicCoded     () { return m_uiNumAllPicCoded; }
+  Int                     getFrameId            (Int iGOPid);
+  TComPic*                getPic                ( Int poc );
+  Void                    setIvPicLists         ( TComPicLists* picLists) { m_ivPicLists = picLists; }
+#endif
 
+#if NH_MV
+  Void                   setParamSetChanged(Int iD, Bool isPps );
+#else
   Void                   setParamSetChanged(Int spsId, Int ppsId);
+#endif
   Bool                   PPSNeedsWriting(Int ppsId);
   Bool                   SPSNeedsWriting(Int spsId);
 
@@ -165,6 +232,21 @@ public:
   // -------------------------------------------------------------------------------------------------------------------
 
   /// encode several number of pictures until end-of-sequence
+#if NH_MV
+  Void encode( Bool bEos,
+    TComPicYuv* pcPicYuvOrg,
+    TComPicYuv* pcPicYuvTrueOrg,
+    const InputColourSpaceConversion ipCSC, const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
+    TComList<TComPicYuv*>& rcListPicYuvRecOut,
+    std::list<AccessUnit>& accessUnitsOut, Int& iNumEncoded, Int gopId );
+
+  /// encode several number of pictures until end-of-sequence
+  Void encode( Bool bEos, TComPicYuv* pcPicYuvOrg,
+    TComPicYuv* pcPicYuvTrueOrg,
+    const InputColourSpaceConversion ipCSC, const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
+    TComList<TComPicYuv*>& rcListPicYuvRecOut,
+    std::list<AccessUnit>& accessUnitsOut, Int& iNumEncoded, Bool isTff, Int gopId);
+#else
 #if JVET_X0048_X0103_FILM_GRAIN
   Void encode(Bool bEos,
     TComPicYuv* pcPicYuvOrg,
@@ -188,6 +270,7 @@ public:
                const InputColourSpaceConversion ipCSC, const InputColourSpaceConversion snrCSC, // used for SNR calculations. Picture in original colour space.
                TComList<TComPicYuv*>& rcListPicYuvRecOut,
                std::list<AccessUnit>& accessUnitsOut, Int& iNumEncoded, Bool isTff);
+#endif
 
   TEncAnalyze::OutputLogControl getOutputLogControl() const
   {

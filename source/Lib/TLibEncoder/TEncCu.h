@@ -107,6 +107,12 @@ private:
   TEncSbac*               m_pcRDGoOnSbacCoder;
   TEncRateCtrl*           m_pcRateCtrl;
 
+#if KWU_RC_MADPRED_E0227
+  UInt                    m_LCUPredictionSAD;
+  Int                     m_addSADDepth;
+  Int                     m_temporalSAD;
+  Int                     m_spatialSAD;
+#endif
 public:
   /// copy parameters from encoder class
   Void  init                ( TEncTop* pcEncTop );
@@ -132,6 +138,9 @@ public:
   Void  encodeCtu           ( TComDataCU*  pCtu );
 
   Int   updateCtuDataISlice ( TComDataCU* pCtu, Int width, Int height );
+#if KWU_RC_MADPRED_E0227
+  UInt getLCUPredictionSAD() { return m_LCUPredictionSAD; }
+#endif
 
   Void setFastDeltaQp       ( Bool b)                 { m_bFastDeltaQP = b;         }
 

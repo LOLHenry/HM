@@ -119,13 +119,25 @@ namespace df
       return OptionSpecific(*this);
     }
 
+#if NH_MV
+    static void setOptions(Options::NamesPtrList& opt_list, const std::vector<int> idcs, const string& value, ErrorReporter& error_reporter)
+#else
     static void setOptions(Options::NamesPtrList& opt_list, const string& value, ErrorReporter& error_reporter)
+#endif
     {
       /* multiple options may be registered for the same name:
        *   allow each to parse value */
       for (Options::NamesPtrList::iterator it = opt_list.begin(); it != opt_list.end(); ++it)
       {
+#if NH_MV
+          Bool doParsing = (*it)->opt->checkDim( idcs, error_reporter );
+          if ( doParsing )
+          {
+            (*it)->opt->parse(value, idcs, error_reporter);
+          }
+#else
         (*it)->opt->parse(value, error_reporter);
+#endif
       }
     }
 
@@ -173,6 +185,9 @@ namespace df
       unsigned max_width = 0;
       for(Options::NamesPtrList::iterator it = opts.opt_list.begin(); it != opts.opt_list.end(); it++)
       {
+#if NH_MV
+        if  ( (*it)->opt->opt_duplicate ) continue;
+#endif
         ostringstream line(ios_base::out);
         doHelpOpt(line, **it, pad_short);
         max_width = max(max_width, (unsigned) line.tellp());
@@ -188,6 +203,9 @@ namespace df
        */
       for(Options::NamesPtrList::iterator it = opts.opt_list.begin(); it != opts.opt_list.end(); it++)
       {
+#if NH_MV
+        if  ( (*it)->opt->opt_duplicate ) continue;
+#endif
         ostringstream line(ios_base::out);
         line << "  ";
         doHelpOpt(line, **it, pad_short);
@@ -283,6 +301,31 @@ namespace df
 
     bool OptionWriter::storePair(bool allow_long, bool allow_short, const string& name, const string& value)
     {
+#if NH_MV
+      std::vector<int> idcs;
+      
+      std::size_t pos_underscore            = name.find("_" );
+      std::size_t pos_last_underscore_plus1 = pos_underscore+1;
+      std::size_t pos_first_underscore      = pos_underscore;
+
+      while ( pos_underscore != string::npos )
+      {
+        pos_underscore   = name.find("_", pos_last_underscore_plus1  );
+        size_t subStrlen = ( pos_underscore == string::npos ) ? string::npos : ( pos_underscore - pos_last_underscore_plus1 );
+        string idx_str   = name.substr( pos_last_underscore_plus1, subStrlen );
+        idcs.push_back( atoi( idx_str.c_str()));
+        pos_last_underscore_plus1 = pos_underscore + 1;
+      }
+
+      string name_idcs = name.substr(0, pos_first_underscore  );
+      for (size_t i = 0; i < idcs.size(); i++ )
+      {
+        name_idcs += "_%d";
+      }
+
+      bool found_idcs = false;
+      Options::NamesMap::iterator opt_it_idcs;
+#endif
       bool found = false;
       std::string val = value;
       Options::NamesMap::iterator opt_it;
@@ -293,6 +336,19 @@ namespace df
         {
           found = true;
         }
+#if NH_MV
+        if ( idcs.size() > 0 )
+        {
+          opt_it_idcs = opts.opt_long_map.find(name_idcs);
+          if (opt_it_idcs != opts.opt_long_map.end() )
+          {
+            assert( !found );
+            found = true;
+            found_idcs = true;
+            opt_it = opt_it_idcs;
+          }
+        }
+#endif
       }
 
       /* check for the short list */
@@ -303,6 +359,19 @@ namespace df
         {
           found = true;
         }
+#if NH_MV
+        if ( idcs.size() > 0 )
+        {
+          opt_it = opts.opt_short_map.find(name);
+          if (opt_it != opts.opt_short_map.end())
+          {
+            assert( !found );
+            found = true;
+            found_idcs = true;
+            opt_it = opt_it_idcs;
+          }
+        }
+#endif
       }
 
       bool allow_prefix = allow_long;
@@ -321,14 +390,32 @@ namespace df
         }
       }
 
+#if NH_MV
+    if ( !found_idcs )
+    {
+      idcs.clear();
+    }
+#endif
       if (!found)
       {
+#if NH_MV
+        if (error_reporter.output_on_unknow_parameter )
+        {
+#endif
+
         error_reporter.error(where())
           << "Unknown option `" << name << "' (value:`" << value << "')\n";
+#if NH_MV
+        }
+#endif
         return false;
       }
 
+#if NH_MV
+      setOptions((*opt_it).second, idcs, value, error_reporter);
+#else
       setOptions((*opt_it).second, val, error_reporter);
+#endif
       return true;
     }
 
@@ -518,7 +605,11 @@ namespace df
       if (start == string::npos)
       {
         /* error: badly formatted line */
+#if !NH_MV
         error_reporter.warn(where()) << "line formatting error\n";
+#else
+        // MV encoding also allows empty parameters.
+#endif
         return;
       }
 
@@ -549,7 +640,11 @@ namespace df
       else
       {
         /* error: no value */
+#if !NH_MV
         error_reporter.warn(where()) << "no value found\n";
+#else
+        // This is ok for MV encoding.
+#endif
         return;
       }
 

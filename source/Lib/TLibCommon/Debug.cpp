@@ -179,6 +179,9 @@ Void printMacroSettings()
   PRINT_CONSTANT(O0043_BEST_EFFORT_DECODING,                                        settingNameWidth, settingValueWidth);
 
   PRINT_CONSTANT(ME_ENABLE_ROUNDING_OF_MVS,                                         settingNameWidth, settingValueWidth);
+#if NH_MV
+  PRINT_CONSTANT(NH_MV_ALLOW_NON_CONFORMING,                                        settingNameWidth, settingValueWidth);
+#endif
 
   //------------------------------------------------
 

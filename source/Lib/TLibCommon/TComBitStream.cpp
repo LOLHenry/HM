@@ -257,6 +257,16 @@ Void TComInputBitstream::read (UInt uiNumberOfBits, UInt& ruiBits)
 
   m_numBitsRead += uiNumberOfBits;
 
+#if ENC_DEC_TRACE && NH_MV_ENC_DEC_TRAC
+  if ( g_traceBitsRead )
+  {
+      Bool oldJustDoIt = g_bJustDoIt;
+      g_bJustDoIt = true;
+      writeToTraceFile( "Bits: ", m_numBitsRead, true );
+      g_bJustDoIt = oldJustDoIt;
+  }
+#endif
+
   /* NB, bits are extracted from the MSB of each byte. */
   UInt retval = 0;
   if (uiNumberOfBits <= m_num_held_bits)

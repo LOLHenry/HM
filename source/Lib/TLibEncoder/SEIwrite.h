@@ -121,6 +121,27 @@ protected:
   Void xWriteSEICodedRegionCompletion             (const SEICodedRegionCompletion& sei);
   Void xWriteSEIAlternativeTransferCharacteristics(const SEIAlternativeTransferCharacteristics& sei);
   Void xWriteSEIAmbientViewingEnvironment         (const SEIAmbientViewingEnvironment& sei);
+#if NH_MV
+  Void xWriteSEILayersNotPresent              ( const SEILayersNotPresent& sei);
+  Void xWriteSEIInterLayerConstrainedTileSets ( const SEIInterLayerConstrainedTileSets& sei);
+#if NH_MV_SEI_TBD
+  Void xWriteSEIBspNesting                    ( const SEIBspNesting& sei);
+  Void xWriteSEIBspInitialArrivalTime         ( const SEIBspInitialArrivalTime& sei);
+#endif
+  Void xWriteSEISubBitstreamProperty          ( const SEISubBitstreamProperty& sei);
+  Void xWriteSEIAlphaChannelInfo              ( const SEIAlphaChannelInfo& sei);
+  Void xWriteSEIOverlayInfo                   ( const SEIOverlayInfo& sei);
+  Void xWriteSEITemporalMvPredictionConstraints ( const SEITemporalMvPredictionConstraints& sei);
+#if NH_MV_SEI_TBD
+  Void xWriteSEIFrameFieldInfo                ( const SEIFrameFieldInfo& sei);
+#endif
+  Void xWriteSEIThreeDimensionalReferenceDisplaysInfo ( const SEIThreeDimensionalReferenceDisplaysInfo& sei);
+  Void xWriteSEIDepthRepInfoElement           ( double f);
+  Void xWriteSEIDepthRepresentationInfo       ( const SEIDepthRepresentationInfo& sei);
+  Void xWriteSEIMultiviewSceneInfo            ( const SEIMultiviewSceneInfo& sei);
+  Void xWriteSEIMultiviewAcquisitionInfo      ( const SEIMultiviewAcquisitionInfo& sei);
+  Void xWriteSEIMultiviewViewPosition         ( const SEIMultiviewViewPosition& sei);
+#endif
   Void xWriteSEIRegionalNesting                   (TComBitIf& bs, const SEIRegionalNesting& sei, const TComSPS *sps);
 
   Void xWriteSEIAnnotatedRegions                  (const SEIAnnotatedRegions& sei, const TComSPS *sps);

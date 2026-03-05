@@ -37,6 +37,15 @@
 #include <map>
 
 #include "TLibCommon/CommonDef.h"
+#if NH_MV
+#include <vector>
+#include <errno.h>
+#include <cstring>
+
+#ifdef WIN32
+#define strdup _strdup
+#endif
+#endif
 
 #ifndef __PROGRAM_OPTIONS_LITE__
 #define __PROGRAM_OPTIONS_LITE__
@@ -90,11 +99,18 @@ namespace df
 
     struct ErrorReporter
     {
+#if NH_MV
+      ErrorReporter() : is_errored(0), output_on_unknow_parameter(true)  {}
+#else
       ErrorReporter() : is_errored(0) {}
+#endif
       virtual ~ErrorReporter() {}
       virtual std::ostream& error(const std::string& where);
       virtual std::ostream& warn(const std::string& where);
       bool is_errored;
+#if NH_MV
+      bool output_on_unknow_parameter;
+#endif
     };
 
     extern ErrorReporter default_error_reporter;
@@ -109,30 +125,140 @@ namespace df
      * information should be stored in a derived class. */
     struct OptionBase
     {
+#if NH_MV
+      OptionBase(const std::string& name, const std::string& desc, bool duplicate = false, std::vector< int > maxdim = std::vector< int >(0) )
+        : opt_string(name), opt_desc(desc), opt_duplicate(duplicate), max_dim( maxdim )
+#else
       OptionBase(const std::string& name, const std::string& desc)
       : opt_string(name), opt_desc(desc)
+#endif
       {};
 
       virtual ~OptionBase() {}
 
       /* parse argument arg, to obtain a value for the option */
+#if NH_MV
+      virtual void parse(const std::string& arg, const std::vector<int>& idcs,  ErrorReporter&) = 0;
+      
+      bool   checkDim( std::vector< int > dims, ErrorReporter& err )
+      {
+        bool doParsing = true;
+        if ( dims.size() != max_dim.size() )
+        {
+            err.error(" ") << "Number of indices of `" <<  opt_string << "' not matching. Should be " << max_dim.size() << std::endl;
+            doParsing = false;
+        }
+
+        for (size_t i = 0 ; i < dims.size(); i++ )
+        {
+          if ( dims[i] >= max_dim[i] )
+          {
+            if (err.output_on_unknow_parameter )
+            {
+              err.warn(" ") << "Index " << i  << " of  " <<  opt_string << " should be less than " << max_dim[i] << std::endl;
+              doParsing = false;
+            }
+          }
+        }
+        return doParsing;
+      }
+
+      void   xParseVec( const std::string& arg, BoolAry1d& storage )
+      {
+        char* pcNextStart = (char*) arg.data();
+        char* pcEnd = pcNextStart + arg.length();
+
+        char* pcOldStart = 0;
+
+        size_t iIdx = 0;
+
+        while (pcNextStart < pcEnd)
+        {
+          if ( iIdx < storage.size() )
+          {
+            storage[iIdx] = (strtol(pcNextStart, &pcNextStart,10) != 0);
+          }
+          else
+          {
+            storage.push_back(strtol(pcNextStart, &pcNextStart,10) != 0) ;
+          }
+          iIdx++;
+
+          if ( errno == ERANGE || (pcNextStart == pcOldStart) )
+          {
+            std::cerr << "Error Parsing Bools: `" << arg << "'" << std::endl;
+            exit(EXIT_FAILURE);
+          };
+          while( (pcNextStart < pcEnd) && ( *pcNextStart == ' ' || *pcNextStart == '\t' || *pcNextStart == '\r' ) ) pcNextStart++;
+          pcOldStart = pcNextStart;
+        }
+      }
+
+      void   xParseVec( const std::string& arg, IntAry1d& storage )
+      {
+        storage.clear();
+
+        char* pcNextStart = (char*) arg.data();
+        char* pcEnd = pcNextStart + arg.length();
+
+        char* pcOldStart = 0;
+
+        size_t iIdx = 0;
+
+
+        while (pcNextStart < pcEnd)
+        {
+
+          if ( iIdx < storage.size() )
+          {
+            storage[iIdx] = (int) strtol(pcNextStart, &pcNextStart,10);
+          }
+          else
+          {
+            storage.push_back( (int) strtol(pcNextStart, &pcNextStart,10)) ;
+          }
+          iIdx++;
+          if ( errno == ERANGE || (pcNextStart == pcOldStart) )
+          {
+            std::cerr << "Error Parsing Integers: `" << arg << "'" << std::endl;
+            exit(EXIT_FAILURE);
+          };
+          while( (pcNextStart < pcEnd) && ( *pcNextStart == ' ' || *pcNextStart == '\t' || *pcNextStart == '\r' ) ) pcNextStart++;
+          pcOldStart = pcNextStart;
+        }
+      }
+#else
       virtual void parse(const std::string& arg, ErrorReporter&) = 0;
+#endif
       /* set the argument to the default value */
       virtual void setDefault() = 0;
 
       std::string opt_string;
       std::string opt_desc;
+#if NH_MV
+      bool        opt_duplicate;
+      std::vector<int> max_dim;
+#endif
     };
 
     /** Type specific option storage */
     template<typename T>
     struct Option : public OptionBase
     {
+#if NH_MV
+      Option(const std::string& name, T& storage, T default_val, const std::string& desc, bool duplicate = false, std::vector< int > maxdim = std::vector< int >(0) )
+        : OptionBase(name, desc, duplicate, maxdim), opt_storage(storage), opt_default_val(default_val)
+#else
       Option(const std::string& name, T& storage, T default_val, const std::string& desc)
       : OptionBase(name, desc), opt_storage(storage), opt_default_val(default_val)
+#endif
       {}
 
+#if NH_MV
+      void parse(const std::string& arg, const std::vector<int>& idcs, ErrorReporter&);
+#else
       void parse(const std::string& arg, ErrorReporter&);
+#endif
 
       void setDefault()
       {
@@ -146,8 +272,16 @@ namespace df
     /* Generic parsing */
     template<typename T>
     inline void
+#if NH_MV
+    Option<T>::parse(const std::string& arg, const std::vector<int>& idcs, ErrorReporter&)
+#else
     Option<T>::parse(const std::string& arg, ErrorReporter&)
+#endif
     {
+#if NH_MV
+      assert( idcs.size() == 0 );
+#endif
+
       std::istringstream arg_ss (arg,std::istringstream::in);
       arg_ss.exceptions(std::ios::failbit);
       try
@@ -164,11 +298,170 @@ namespace df
      * first word */
     template<>
     inline void
+#if NH_MV
+    Option<std::string>::parse(const std::string& arg, const std::vector<int>& idcs, ErrorReporter&)
+    {
+      assert( idcs.size() == 0 );
+      opt_storage = arg;
+    }
+#else
     Option<std::string>::parse(const std::string& arg, ErrorReporter&)
     {
       opt_storage = arg;
     }
+#endif
 
+#if NH_MV
+    template<>
+    inline void
+      Option<char*>::parse(const std::string& arg, const std::vector<int>& idcs, ErrorReporter&)
+    {
+      assert( idcs.size() == 0 );
+      opt_storage = arg.empty() ? NULL : strdup(arg.c_str()) ;
+    }
+
+    template<>
+    inline void
+      Option< std::vector<double> >::parse(const std::string& arg, const std::vector< int > & idcs, ErrorReporter&)
+    {
+      assert( idcs.size() == 0 );
+      char* pcNextStart = (char*) arg.data();
+      char* pcEnd = pcNextStart + arg.length();
+
+      char* pcOldStart = 0;
+
+      size_t iIdx = 0;
+
+      while (pcNextStart < pcEnd)
+      {
+        errno = 0;
+
+        if ( iIdx < opt_storage.size() )
+        {
+          opt_storage[iIdx] = strtod(pcNextStart, &pcNextStart);
+        }
+        else
+        {
+          opt_storage.push_back( strtod(pcNextStart, &pcNextStart)) ;
+        }
+        iIdx++;
+
+        if ( errno == ERANGE || (pcNextStart == pcOldStart) )
+        {
+          std::cerr << "Error Parsing Doubles: `" << arg << "'" << std::endl;
+          exit(EXIT_FAILURE);
+        };
+        while( (pcNextStart < pcEnd) && ( *pcNextStart == ' ' || *pcNextStart == '\t' || *pcNextStart == '\r' ) ) pcNextStart++;
+        pcOldStart = pcNextStart;
+
+      }
+    }
+
+
+    template<>
+    inline void
+      Option< IntAry1d >::parse(const std::string& arg, const IntAry1d& idcs, ErrorReporter& err)
+    {
+      xParseVec( arg, opt_storage );
+    };
+
+    template<>
+    inline void
+      Option< IntAry2d >::parse(const std::string& arg, const IntAry1d& idcs, ErrorReporter&)
+    {
+      xParseVec( arg, opt_storage[ idcs[0] ] );
+    };
+
+    template<>
+    inline void
+      Option< IntAry3d >::parse(const std::string& arg, const IntAry1d& idcs, ErrorReporter&)
+    {
+      xParseVec ( arg, opt_storage[ idcs[0] ][ idcs[1] ] );
+    };
+
+    template<>
+    inline void
+    Option< std::vector< std::vector<double> > >::parse(const std::string& arg, const IntAry1d& idcs, ErrorReporter&)
+    {
+        // xParseVec ( arg, opt_storage[ idcs[0] ] );
+        char* pcNextStart = (char*) arg.data();
+        char* pcEnd = pcNextStart + arg.length();
+
+        char* pcOldStart = 0;
+
+        size_t iIdx = 0;
+
+        while (pcNextStart < pcEnd)
+        {
+            errno = 0;
+
+            if ( iIdx < opt_storage[idcs[0]].size() )
+            {
+                opt_storage[idcs[0]][iIdx] = strtod(pcNextStart, &pcNextStart);
+            }
+            else
+            {
+                opt_storage[idcs[0]].push_back( strtod(pcNextStart, &pcNextStart)) ;
+            }
+            iIdx++;
+
+            if ( errno == ERANGE || (pcNextStart == pcOldStart) )
+            {
+                std::cerr << "Error Parsing Doubles: `" << arg << "'" << std::endl;
+                exit(EXIT_FAILURE);
+            };
+            while( (pcNextStart < pcEnd) && ( *pcNextStart == ' ' || *pcNextStart == '\t' || *pcNextStart == '\r' ) ) pcNextStart++;
+            pcOldStart = pcNextStart;
+        }
+    }
+
+
+    template<>
+    inline void
+      Option< StringAry1d  >::parse(const std::string& arg, const std::vector<int>& idcs, ErrorReporter& err )
+    {
+
+      opt_storage[ idcs[ 0 ] ] = arg;
+    };
+
+    template<>
+    inline void
+      Option< StringAry2d  >::parse(const std::string& arg, const std::vector<int>& idcs, ErrorReporter& err )
+    {
+
+      opt_storage[idcs[0]][idcs[1]] = arg;
+    };
+
+
+    template<>
+    inline void
+      Option< std::vector< char*>  >::parse(const std::string& arg, const std::vector<int>& idcs, ErrorReporter& err )
+    {
+      
+      opt_storage[ idcs[ 0 ] ] = arg.empty() ? NULL : strdup(arg.c_str()) ;
+    };
+
+    template<>
+    inline void
+      Option< BoolAry1d >::parse(const std::string& arg, const std::vector<int>& idcs, ErrorReporter& err)
+    {
+      xParseVec( arg, opt_storage );
+    };
+
+    template<>
+    inline void
+      Option< BoolAry2d >::parse(const std::string& arg, const IntAry1d& idcs, ErrorReporter& err)
+    {
+      xParseVec( arg, opt_storage[ idcs[0] ] );
+    };
+
+    template<>
+    inline void
+      Option< BoolAry3d >::parse(const std::string& arg, const IntAry1d& idcs, ErrorReporter& err )
+    {
+      xParseVec( arg, opt_storage[idcs[0]][idcs[1]] );
+    };
+#endif
     /** Option class for argument handling using a user provided function */
     struct OptionFunc : public OptionBase
     {
@@ -178,7 +471,11 @@ namespace df
       : OptionBase(name, desc), parent(parent_), func(func_)
       {}
 
+#if NH_MV
+      void parse(const std::string& arg, const std::vector<int>& idcs, ErrorReporter& error_reporter)
+#else
       void parse(const std::string& arg, ErrorReporter& error_reporter)
+#endif
       {
         func(parent, arg, error_reporter);
       }
@@ -247,6 +544,39 @@ namespace df
         return *this;
       }
 
+#if NH_MV
+      template<typename T>
+      OptionSpecific&
+        operator()(const std::string& name, std::vector<T>& storage, T default_val, unsigned uiMaxNum, const std::string& desc = "" )
+      {
+        std::vector<T> defVal;
+        defVal.resize( uiMaxNum, default_val );
+        std::vector< int > maxSize;
+        maxSize.push_back( uiMaxNum );
+        parent.addOption(new Option< std::vector<T> >( name, storage, defVal, desc, false, maxSize ));
+
+        return *this;
+      }
+
+      template<typename T>
+      OptionSpecific&
+        operator()(const std::string& name, std::vector< std::vector<T> >& storage, T default_val, unsigned uiMaxNumDim1, unsigned uiMaxNumDim2, const std::string& desc = "" )
+      {
+        std::vector< std::vector<T> > defVal;
+        defVal.resize(uiMaxNumDim1);
+        for ( unsigned int idxDim1 = 0; idxDim1 < uiMaxNumDim1; idxDim1++ )
+        {
+          defVal[ idxDim1 ].resize(uiMaxNumDim2, default_val );
+        }
+
+        std::vector< int > maxSize;
+        maxSize.push_back( uiMaxNumDim1 );
+        maxSize.push_back( uiMaxNumDim2 );
+
+        parent.addOption(new Option< std::vector< std::vector<T> > >( name, storage, defVal, desc, false, maxSize ));
+        return *this;
+      }
+#endif
       /**
        * Add option described by name to the parent Options list,
        *   with desc as an optional help description

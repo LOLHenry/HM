@@ -123,6 +123,40 @@ extern const UChar  g_chroma422IntraAngleMappingTable[NUM_INTRA_MODE];
 // ====================================================================================================================
 
 extern const TMatrixCoeff g_as_DST_MAT_4 [TRANSFORM_NUMBER_OF_DIRECTIONS][4][4];
+#if NH_MV_HLS_PTL_LIMITS
+class TComGeneralTierAndLevelLimits
+{
+public:
+  TComGeneralTierAndLevelLimits::TComGeneralTierAndLevelLimits
+  ( Int maxLumaPs,
+    Int maxCPBMainTier,
+    Int maxCPBHighTier,
+    Int maxSliceSegmentsPerPicture,
+    Int maxTileRows,
+    Int maxTileCols )
+  : m_maxLumaPs                 ( maxLumaPs                     ),
+    m_maxCPBMainTier            ( maxCPBMainTier                ),
+    m_maxCPBHighTier            ( maxCPBHighTier                ),
+    m_maxSliceSegmentsPerPicture( maxSliceSegmentsPerPicture    ),
+    m_maxTileRows               ( maxTileRows                   ),
+    m_maxTileCols               ( maxTileCols                   );
+  {};
+  Int getMaxLumaPs                 ( ) { return m_maxLumaPs                 ; };
+  Int getMaxCPBMainTier            ( ) { return m_maxCPBMainTier            ; };
+  Int getMaxCPBHighTier            ( ) { return m_maxCPBHighTier            ; };
+  Int getMaxSliceSegmentsPerPicture( ) { return m_maxSliceSegmentsPerPicture; };
+  Int getMaxTileRows               ( ) { return m_maxTileRows               ; };
+  Int getMaxTileCols               ( ) { return m_maxTileCols               ; };
+private:
+  const Int m_maxLumaPs;
+  const Int m_maxCPBMainTier;
+  const Int m_maxCPBHighTier;
+  const Int m_maxSliceSegmentsPerPicture;
+  const Int m_maxTileRows;
+  const Int m_maxTileCols;
+};
+extern std::map< Level::Name, TComGeneralTierAndLevelLimits > g_generalTierAndLevelLimits;
+#endif
 
 // ====================================================================================================================
 // Misc.
@@ -149,7 +183,57 @@ extern UInt64 g_nSymbolCounter;
 #define DTRACE_CABAC_X(x)     if ( ( g_nSymbolCounter >= COUNTER_START && g_nSymbolCounter <= COUNTER_END )|| g_bJustDoIt ) fprintf( g_hTrace, "%x", x );
 #define DTRACE_CABAC_R( x,y ) if ( ( g_nSymbolCounter >= COUNTER_START && g_nSymbolCounter <= COUNTER_END )|| g_bJustDoIt ) fprintf( g_hTrace, x,    y );
 #define DTRACE_CABAC_N        if ( ( g_nSymbolCounter >= COUNTER_START && g_nSymbolCounter <= COUNTER_END )|| g_bJustDoIt ) fprintf( g_hTrace, "\n"    );
-
+#if NH_MV_ENC_DEC_TRAC
+ extern Bool   g_traceCU;
+ extern Bool   g_tracePU ;
+ extern Bool   g_traceTU;
+ extern Bool   g_disableHLSTrace;       // USE g_HLSTraceEnable to toggle HLS trace. Not this one!
+ extern Bool   g_disableNumbering;      // Don't print numbers to trace file
+ extern UInt64 g_stopAtCounter;         // Counter to set breakpoint.
+ extern Bool   g_traceCopyBack;         // Output samples on copy back
+ extern Bool   g_decTraceDispDer;       // Trace derived disparity vectors (decoder only)
+ extern Bool   g_decTraceMvFromMerge;   // Trace motion vectors obtained from merge (decoder only)
+ extern Bool   g_decTracePicOutput;     // Trace output of pictures
+ extern Bool   g_startStopTrace;             // Stop at position
+ extern Bool   g_outputPos;             // Output position
+ extern Bool   g_traceCameraParameters; // Trace camera parameters
+ extern Bool   g_encNumberOfWrittenBits;// Trace number of written bits
+ extern Bool   g_traceEncFracBits;      // Trace fractional bits
+ extern Bool   g_traceIntraSearchCost;  // Trace intra mode cost
+ extern Bool   g_traceRDCost;
+ extern Bool   g_traceModeCheck;
+ extern Bool   g_traceSAOCost;
+ extern UInt   g_indent;
+extern Bool   g_traceMotionInfoBeforUniPred;
+ extern Bool   g_traceMergeCandListConst;
+ extern Bool   g_traceSubPBMotion;
+ extern Bool   g_traceBitsRead;
+#define DTRACE_CU(x,y)             writeToTraceFile( x,y, g_traceCU );
+#define DTRACE_PU(x,y)             writeToTraceFile( x,y, g_tracePU );
+#define DTRACE_TU(x,y)             writeToTraceFile( x,y, g_traceTU );
+#define DTRACE_CU_S(x)             writeToTraceFile( x,   g_traceCU );
+#define DTRACE_PU_S(x)             writeToTraceFile( x,   g_tracePU );
+#define DTRACE_TU_S(x)             writeToTraceFile( x,   g_traceTU );
+#define D_DEC_INDENT( b )            decIndent        ( b );
+#define D_PRINT_INC_INDENT( b, str ) prinStrIncIndent( b, str );
+#define D_PRINT_INDENT( b, str )     printStrIndent   ( b, str);
+ Void           tracePSHeader   ( const TChar* psName, Int layerId );
+ Void           writeToTraceFile( const TChar* symbolName, Int val, Bool doIt );
+ Void           writeToTraceFile( const TChar* symbolName, Bool doIt );
+ UInt64         incSymbolCounter();
+ Void           stopAtPos       ( Int poc, Int layerId, Int cuPelX, Int cuPelY, Int cuWidth, Int cuHeight );
+ Void           printStr         ( std::string str );
+ Void           printStrIndent   ( Bool b, std::string str );
+ Void           prinStrIncIndent ( Bool b, std::string str );
+ Void           decIndent        ( Bool b );
+ template <typename T>
+ std::string n2s ( T Number )
+ {
+   std::ostringstream ss;
+   ss << Number;
+   return ss.str();
+ };
+#endif
 #else
 
 #define DTRACE_CABAC_F(x)
@@ -159,7 +243,17 @@ extern UInt64 g_nSymbolCounter;
 #define DTRACE_CABAC_X(x)
 #define DTRACE_CABAC_R( x,y )
 #define DTRACE_CABAC_N
-
+#if NH_MV
+#define DTRACE_CU(x,y) ;
+#define DTRACE_PU(x,y) ;
+#define DTRACE_TU(x,y) ;
+#define DTRACE_CU_S(x) ;
+#define DTRACE_PU_S(x) ;
+#define DTRACE_TU_S(x) ;
+#define D_DEC_INDENT( b ) ;
+#define D_PRINT_INC_INDENT( b, str );
+#define D_PRINT_INDENT( b, str );
+#endif
 #endif
 
 const TChar* nalUnitTypeToString(NalUnitType type);

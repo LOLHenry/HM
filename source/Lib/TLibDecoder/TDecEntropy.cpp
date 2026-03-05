@@ -202,6 +202,12 @@ Void TDecEntropy::decodePUWise( TComDataCU* pcCU, UInt uiAbsPartIdx, UInt uiDept
   pcSubCU->copyInterPredInfoFrom( pcCU, uiAbsPartIdx, REF_PIC_LIST_1 );
   for ( UInt uiPartIdx = 0, uiSubPartIdx = uiAbsPartIdx; uiPartIdx < uiNumPU; uiPartIdx++, uiSubPartIdx += uiPUOffset )
   {
+#if NH_MV_ENC_DEC_TRAC
+    DTRACE_PU_S("=========== prediction_unit ===========\n")
+    // ToDo:
+    //DTRACE_PU("x0", uiLPelX)
+    //DTRACE_PU("x1", uiTPelY)
+#endif
     decodeMergeFlag( pcCU, uiSubPartIdx, uiDepth, uiPartIdx );
     if ( pcCU->getMergeFlag( uiSubPartIdx ) )
     {
@@ -374,6 +380,18 @@ Void TDecEntropy::decodeMVPIdxPU( TComDataCU* pcSubCU, UInt uiPartAddr, UInt uiD
   if ( (pcSubCU->getInterDir(uiPartAddr) & ( 1 << eRefList )) )
   {
     m_pcEntropyDecoderIf->parseMVPIdx( iMVPIdx );
+#if NH_MV_ENC_DEC_TRAC
+#if ENC_DEC_TRACE
+    if ( eRefList == REF_PIC_LIST_0 )
+    {
+      DTRACE_PU("mvp_l0_flag", iMVPIdx)
+    }
+    else
+    {
+      DTRACE_PU("mvp_l1_flag", iMVPIdx)
+    }
+#endif
+#endif
   }
   pcSubCU->fillMvpCand(uiPartIdx, uiPartAddr, eRefList, iRefIdx, pAMVPInfo);
 #if MCTS_ENC_CHECK
@@ -400,6 +418,20 @@ Void TDecEntropy::xDecodeTransform        ( Bool& bCodeDQP, Bool& isChromaQpAdjC
   const UInt uiAbsPartIdx=rTu.GetAbsPartIdxTU();
   const UInt uiDepth=rTu.GetTransformDepthTotal();
   const UInt uiTrDepth = rTu.GetTransformDepthRel();
+
+#if NH_MV_ENC_DEC_TRAC
+#if ENC_DEC_TRACE
+  UInt uiLPelX   = pcCU->getCUPelX() + g_auiRasterToPelX[ g_auiZscanToRaster[uiAbsPartIdx] ];
+  UInt uiTPelY   = pcCU->getCUPelY() + g_auiRasterToPelY[ g_auiZscanToRaster[uiAbsPartIdx] ];
+
+  DTRACE_TU_S("=========== transform_tree ===========\n")
+  DTRACE_TU("x0", uiLPelX)
+  DTRACE_TU("x1", uiTPelY)
+  
+  DTRACE_TU("log2TrafoSize", pcCU->getSlice()->getSPS()->getMaxCUWidth()  >> uiDepth )
+  DTRACE_TU("trafoDepth"  , uiDepth)
+#endif
+#endif
 
   UInt uiSubdiv;
   const UInt numValidComponent = pcCU->getPic()->getNumberValidComponents();
@@ -494,6 +526,7 @@ Void TDecEntropy::xDecodeTransform        ( Bool& bCodeDQP, Bool& isChromaQpAdjC
     assert( uiDepth >= pcCU->getDepth( uiAbsPartIdx ) );
     pcCU->setTrIdxSubParts( uiTrDepth, uiAbsPartIdx, uiDepth );
 
+#if !NH_MV_ENC_DEC_TRAC
     {
       DTRACE_CABAC_VL( g_nSymbolCounter++ );
       DTRACE_CABAC_T( "\tTrIdx: abspart=" );
@@ -504,6 +537,7 @@ Void TDecEntropy::xDecodeTransform        ( Bool& bCodeDQP, Bool& isChromaQpAdjC
       DTRACE_CABAC_V( uiTrDepth );
       DTRACE_CABAC_T( "\n" );
     }
+#endif
 
     pcCU->setCbfSubParts ( 0, COMPONENT_Y, uiAbsPartIdx, uiDepth );
 

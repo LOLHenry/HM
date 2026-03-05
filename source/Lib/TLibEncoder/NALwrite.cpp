@@ -52,7 +52,11 @@ Void writeNalUnitHeader(ostream& out, OutputNALUnit& nalu)       // nal_unit_hea
 
   bsNALUHeader.write(0,1);                    // forbidden_zero_bit
   bsNALUHeader.write(nalu.m_nalUnitType, 6);  // nal_unit_type
+#if NH_MV
+  bsNALUHeader.write(nalu.m_nuhLayerId, 6);      // layerId
+#else
   bsNALUHeader.write(nalu.m_nuhLayerId, 6);   // nuh_layer_id
+#endif
   bsNALUHeader.write(nalu.m_temporalId+1, 3); // nuh_temporal_id_plus1
 
   out.write(reinterpret_cast<const TChar*>(bsNALUHeader.getByteStream()), bsNALUHeader.getByteStreamLength());

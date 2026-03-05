@@ -99,6 +99,9 @@ private:
   TEncSbac                m_entropyCodingSyncContextState;      ///< context storate for state of contexts at the wavefront/WPP/entropy-coding-sync second CTU of tile-row
   SliceType               m_encCABACTableIdx;
   Int                     m_gopID;
+#if NH_MV
+  SliceType               m_eSliceTypeBaseView;
+#endif
 
   Double   calculateLambda( const TComSlice* pSlice, const Int GOPid, const Int depth, const Double refQP, const Double dQP, Int &iQP );
   Void     setUpLambda(TComSlice* slice, const Double dLambda, Int iQP);
@@ -114,8 +117,13 @@ public:
   Void    resetEncoderDecisions() { m_encCABACTableIdx = I_SLICE; }
 
   /// preparation of slice encoding (reference marking, QP and lambda)
+#if NH_MV
+  Void    initEncSlice        ( TComPic* pcPic, Int pocLast, Int pocCurr,
+                                Int iGOPid, TComSlice*& rpcSlice, TComVPS* pVPS, Int layerId, bool isField  );
+#else
   Void    initEncSlice        ( TComPic*  pcPic, const Int pocLast, const Int pocCurr,
                                 const Int iGOPid,   TComSlice*& rpcSlice, const Bool isField );
+#endif
   Void    resetQP             ( TComPic* pic, Int sliceQP, Double lambda );
   Void    setGopID( Int iGopID )      { m_gopID = iGopID; }
   Int     getGopID() const            { return m_gopID;   }

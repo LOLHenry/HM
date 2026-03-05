@@ -202,6 +202,13 @@ Void TDecCu::xDecodeCU( TComDataCU*const pcCU, const UInt uiAbsPartIdx, const UI
   UInt uiRPelX   = uiLPelX + (maxCuWidth>>uiDepth)  - 1;
   UInt uiTPelY   = pcCU->getCUPelY() + g_auiRasterToPelY[ g_auiZscanToRaster[uiAbsPartIdx] ];
   UInt uiBPelY   = uiTPelY + (maxCuHeight>>uiDepth) - 1;
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_CU_S("=========== coding_quadtree ===========\n")
+  DTRACE_CU("x0", uiLPelX)
+  DTRACE_CU("x1", uiTPelY)
+  DTRACE_CU("log2CbSize", maxCuWidth>>uiDepth)
+  DTRACE_CU("cqtDepth"  , uiDepth)
+#endif
 
   if( ( uiRPelX < sps.getPicWidthInLumaSamples() ) && ( uiBPelY < sps.getPicHeightInLumaSamples() ) )
   {
@@ -252,6 +259,21 @@ Void TDecCu::xDecodeCU( TComDataCU*const pcCU, const UInt uiAbsPartIdx, const UI
     return;
   }
 
+#if NH_MV_ENC_DEC_TRAC
+  DTRACE_CU_S("=========== coding_unit ===========\n")
+#if NH_MV_ENC_DEC_TRAC
+#if ENC_DEC_TRACE
+    stopAtPos  ( pcCU->getSlice()->getPOC(),
+    pcCU->getSlice()->getLayerId(),
+    uiLPelX,
+    uiTPelY,
+    uiRPelX-uiLPelX+1,
+    uiBPelY-uiTPelY+1);
+#endif
+#endif
+
+#endif
+
   if( uiDepth <= pps.getMaxCuDQPDepth() && pps.getUseDQP())
   {
     setdQPFlag(true);
@@ -277,6 +299,11 @@ Void TDecCu::xDecodeCU( TComDataCU*const pcCU, const UInt uiAbsPartIdx, const UI
 
   if( pcCU->isSkipped(uiAbsPartIdx) )
   {
+#if NH_MV_ENC_DEC_TRAC
+    DTRACE_PU_S("=========== prediction_unit ===========\n")
+    DTRACE_PU("x0", uiLPelX)
+    DTRACE_PU("x1", uiTPelY)
+#endif
     m_ppcCU[uiDepth]->copyInterPredInfoFrom( pcCU, uiAbsPartIdx, REF_PIC_LIST_0 );
     m_ppcCU[uiDepth]->copyInterPredInfoFrom( pcCU, uiAbsPartIdx, REF_PIC_LIST_1 );
     TComMvField cMvFieldNeighbours[MRG_MAX_NUM_CANDS << 1]; // double length for mv of both lists
@@ -309,6 +336,24 @@ Void TDecCu::xDecodeCU( TComDataCU*const pcCU, const UInt uiAbsPartIdx, const UI
         pcCU->setMVPNumSubParts( 0, RefPicList( uiRefListIdx ), uiAbsPartIdx, 0, uiDepth);
         pcCU->getCUMvField( RefPicList( uiRefListIdx ) )->setAllMvd( cTmpMv, SIZE_2Nx2N, uiAbsPartIdx, uiDepth );
         pcCU->getCUMvField( RefPicList( uiRefListIdx ) )->setAllMvField( cMvFieldNeighbours[ 2*uiMergeIndex + uiRefListIdx ], SIZE_2Nx2N, uiAbsPartIdx, uiDepth );
+
+#if ENC_DEC_TRACE && NH_MV_ENC_DEC_TRAC
+        if ( g_decTraceMvFromMerge )
+        {
+          if ( uiRefListIdx == 0 )
+          {
+            DTRACE_PU( "mvL0[0]", cMvFieldNeighbours[ 2*uiMergeIndex + uiRefListIdx ].getHor());
+            DTRACE_PU( "mvL0[1]", cMvFieldNeighbours[ 2*uiMergeIndex + uiRefListIdx ].getVer());
+            DTRACE_PU( "refIdxL0   ", cMvFieldNeighbours[ 2*uiMergeIndex + uiRefListIdx ].getRefIdx());
+          }
+          else
+          {
+            DTRACE_PU( "mvL1[0]", cMvFieldNeighbours[ 2*uiMergeIndex + uiRefListIdx ].getHor());
+            DTRACE_PU( "mvL1[1]", cMvFieldNeighbours[ 2*uiMergeIndex + uiRefListIdx ].getVer());
+            DTRACE_PU( "refIdxL1", cMvFieldNeighbours[ 2*uiMergeIndex + uiRefListIdx ].getRefIdx());
+          }
+        }
+#endif
       }
     }
     xFinishDecodeCU( pcCU, uiAbsPartIdx, uiDepth, isLastCtuOfSliceSegment );

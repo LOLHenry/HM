@@ -159,10 +159,18 @@ Void TDecGop::filterPicture(TComPic* pcPic)
   }
 
   //-- For time output for each slice
+#if NH_MV
+  printf("Layer %2d   POC %4d TId: %1d ( %c-SLICE, QP%3d ) ", pcSlice->getLayerId(),
+                                                              pcSlice->getPOC(),
+                                                              pcSlice->getTLayer(),
+                                                              c,
+                                                              pcSlice->getSliceQp() );
+#else
   printf("POC %4d TId: %1d ( %c-SLICE, QP%3d ) ", pcSlice->getPOC(),
                                                   pcSlice->getTLayer(),
                                                   c,
                                                   pcSlice->getSliceQp() );
+#endif
 
   m_dDecTime += (Double)(clock()-iBeforeTime) / CLOCKS_PER_SEC;
   printf ("[DT %6.3f] ", m_dDecTime );
@@ -173,7 +181,18 @@ Void TDecGop::filterPicture(TComPic* pcPic)
     printf ("[L%d ", iRefList);
     for (Int iRefIndex = 0; iRefIndex < pcSlice->getNumRefIdx(RefPicList(iRefList)); iRefIndex++)
     {
+#if NH_MV
+      if( pcSlice->getLayerId() != pcSlice->getRefLayerId( RefPicList(iRefList), iRefIndex ) )
+      {
+        printf( "V%d ", pcSlice->getRefLayerId( RefPicList(iRefList), iRefIndex ) );
+      }
+      else
+      {
+#endif
       printf ("%d ", pcSlice->getRefPOC(RefPicList(iRefList), iRefIndex));
+#if NH_MV
+      }
+#endif
     }
     printf ("] ");
   }
@@ -189,9 +208,10 @@ Void TDecGop::filterPicture(TComPic* pcPic)
   }
 
   printf("\n");
-
+#if !NH_MV
   pcPic->setOutputMark(pcPic->getSlice(0)->getPicOutputFlag() ? true : false);
   pcPic->setReconMark(true);
+#endif
 }
 
 /**

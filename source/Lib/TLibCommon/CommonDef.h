@@ -49,6 +49,10 @@
 #pragma warning( disable : 4018 )
 // disable Bool coercion "performance warning"
 #pragma warning( disable : 4800 )
+// NH_MV
+// disabled decorated name length warning issued for IntAry5d
+#pragma warning(disable : 4503)
+//
 #endif // _MSC_VER > 1000
 #include "TypeDef.h"
 
@@ -57,6 +61,9 @@
 inline Int64 abs (Int64 x) { return _abs64(x); };
 #endif
 #endif
+#if NH_MV
+#include <assert.h>
+#endif
 
 //! \ingroup TLibCommon
 //! \{
@@ -64,7 +71,6 @@ inline Int64 abs (Int64 x) { return _abs64(x); };
 // ====================================================================================================================
 // Version information
 // ====================================================================================================================
-
 #define NV_VERSION        "18.0"                 ///< Current software version
 
 // ====================================================================================================================
@@ -114,6 +120,9 @@ inline Int64 abs (Int64 x) { return _abs64(x); };
 
 static const UInt   MAX_UINT =                            0xFFFFFFFFU; ///< max. value of unsigned 32-bit integer
 static const Int    MAX_INT =                              2147483647; ///< max. value of signed 32-bit integer
+#if NH_MV
+static const Int    MIN_INT =                         (- MAX_INT - 1); ///< max. value of signed 32-bit integer
+#endif
 static const Double MAX_DOUBLE =                             1.7e+308; ///< max. value of Double-type value
 
 // ====================================================================================================================
@@ -141,15 +150,28 @@ static const Int MAX_NUM_PICS_IN_SOP =                           1024;
 static const Int MAX_NESTING_NUM_OPS =                           1024;
 static const Int MAX_NESTING_NUM_LAYER =                           64;
 
+#if NH_MV
+static const Int MAX_VPS_NUM_HRD_PARAMETERS =                    1024;
+#else
 static const Int MAX_VPS_NUM_HRD_PARAMETERS =                       1;
+#endif
 static const Int MAX_VPS_OP_SETS_PLUS1 =                         1024;
+#if NH_MV
+static const Int MAX_VPS_NUH_LAYER_ID_PLUS1 =                      63;
+#else
 static const Int MAX_VPS_NUH_RESERVED_ZERO_LAYER_ID_PLUS1 =         1;
+#endif
 
 static const Int MAXIMUM_INTRA_FILTERED_WIDTH =                    16;
 static const Int MAXIMUM_INTRA_FILTERED_HEIGHT =                   16;
 
 static const Int MAX_CPB_CNT =                                     32; ///< Upper bound of (cpb_cnt_minus1 + 1)
+#if NH_MV
+static const Int MAX_NUM_LAYER_IDS =                               63;
+static const Int MAX_NUM_SEIS      =                               1000;
+#else
 static const Int MAX_NUM_LAYER_IDS =                               64;
+#endif
 
 static const Int COEF_REMAIN_BIN_REDUCTION =                        3; ///< indicates the level at which the VLC transitions from Golomb-Rice to TU+EG(k)
 
@@ -244,6 +266,24 @@ static const Int LAST_SIGNIFICANT_GROUPS =                        10 ;
 
 static const Int MAX_ENCODER_DEBLOCKING_QUALITY_LAYERS =           8 ;
 
+#if NH_MV
+static const Int  MAX_VPS_NUM_ADD_LAYER_SETS =                  1024 ;
+static const Int  MAX_NUM_SCALABILITY_TYPES =                     16 ;
+static const Int  ENC_CFG_CONSOUT_SPACE =                         34 ;
+static const Int  MAX_NUM_LAYERS =                                63 ;
+static const Int  MAX_VPS_PROFILE_TIER_LEVEL =                    64 ;
+static const Int  MAX_VPS_ADD_OUTPUT_LAYER_SETS =               1024 ;
+static const Int  MAX_VPS_OUTPUTLAYER_SETS =  MAX_VPS_ADD_OUTPUT_LAYER_SETS + MAX_VPS_OP_SETS_PLUS1 + MAX_VPS_OP_SETS_PLUS1 ;
+static const Int  MAX_NUM_VIDEO_SIGNAL_INFO =                     16 ;
+static const Int  MAX_NUM_SCALED_REF_LAYERS =     MAX_NUM_LAYERS - 1 ;
+static const Int  MAX_NUM_PICS_RPS          =                     16 ;
+static const Int  MAX_NUM_REF_LAYERS        =                     63 ;
+
+static IntAry1d getRangeVec( Int rngStart, Int rngEnd ) { IntAry1d rng; for (Int i = rngStart; i<=rngEnd; i++) rng.push_back(i);  return rng; };
+static const IntAry1d IDR_NAL_UNIT_TYPES   = getRangeVec( NAL_UNIT_CODED_SLICE_IDR_W_RADL, NAL_UNIT_CODED_SLICE_IDR_N_LP );
+static const IntAry1d IRAP_NAL_UNIT_TYPES  = getRangeVec( NAL_UNIT_CODED_SLICE_BLA_W_LP  , NAL_UNIT_CODED_SLICE_CRA      );
+#endif
+
 static const UInt LUMA_LEVEL_TO_DQP_LUT_MAXSIZE =                1024; ///< max LUT size for QP offset based on luma
 
 #if JVET_X0048_X0103_FILM_GRAIN
@@ -300,6 +340,115 @@ template <typename ValueType> inline ValueType rightShift_round(const ValueType 
 // when shift = 2, (value + 1 + value[2]) >> 2
 // when shift = 3, (value + 3 + value[3]) >> 3
 template <typename ValueType> inline ValueType rightShiftEvenRounding(const ValueType value, const UInt shift) { return (shift == 0) ? value : ((value + (1<<(shift-1))-1 + ((value>>shift)&1)) >> shift) ; }
+#endif
+#if NH_MV
+
+#define AOF( exp )                  \
+{                                   \
+  if( !( exp ) )                    \
+{                                 \
+  assert( 0 );                    \
+}                                 \
+}
+
+#define AOT( exp )            \
+{                             \
+  if( ( exp ) )               \
+{                           \
+  assert( 0 );              \
+}                           \
+}
+
+template <typename T>
+__inline T gSign(const T& t)
+{
+  if( t == 0 )
+    return T(0);
+  else
+    return (t < 0) ? T(-1) : T(1);
+}
+
+template <typename T>
+__inline T gCeilLog2( T val )
+{
+  assert( val > 0 );
+  Int ceilLog2 = 0;
+  while( val > ( 1 << ceilLog2 ) ) ceilLog2++;
+  return ceilLog2;
+}
+
+#define RemoveBitIncrement( exp ) ( exp >> ( REN_BIT_DEPTH - 8 ) )
+
+#endif
+
+#if NH_MV
+static const std::string NALU_TYPE_STR[] = {
+    "CODED_SLICE_TRAIL_N   ",  // 0
+    "CODED_SLICE_TRAIL_R   ",  // 1
+    "CODED_SLICE_TSA_N     ",  // 2
+    "CODED_SLICE_TSA_R     ",  // 3
+    "CODED_SLICE_STSA_N    ",  // 4
+    "CODED_SLICE_STSA_R    ",  // 5
+    "CODED_SLICE_RADL_N    ",  // 6
+    "CODED_SLICE_RADL_R    ",  // 7
+    "CODED_SLICE_RASL_N    ",  // 8
+    "CODED_SLICE_RASL_R    ",  // 9
+    "RESERVED_VCL_N10      ",
+    "RESERVED_VCL_R11      ",
+    "RESERVED_VCL_N12      ",
+    "RESERVED_VCL_R13      ",
+    "RESERVED_VCL_N14      ",
+    "RESERVED_VCL_R15      ",
+    "CODED_SLICE_BLA_W_LP  ",  // 16
+    "CODED_SLICE_BLA_W_RADL",  // 17
+    "CODED_SLICE_BLA_N_LP  ",  // 18
+    "CODED_SLICE_IDR_W_RADL",  // 19
+    "CODED_SLICE_IDR_N_LP  ",  // 20
+    "CODED_SLICE_CRA       ",  // 21
+    "RESERVED_IRAP_VCL22   ",
+    "RESERVED_IRAP_VCL23   ",
+    "RESERVED_VCL24        ",
+    "RESERVED_VCL25        ",
+    "RESERVED_VCL26        ",
+    "RESERVED_VCL27        ",
+    "RESERVED_VCL28        ",
+    "RESERVED_VCL29        ",
+    "RESERVED_VCL30        ",
+    "RESERVED_VCL31        ",
+    "VPS                   ",   // 32
+    "SPS                   ",   // 33
+    "PPS                   ",   // 34
+    "ACCESS_UNIT_DELIMITER ",   // 35
+    "EOS                   ",   // 36
+    "EOB                   ",   // 37
+    "FILLER_DATA           ",   // 38
+    "PREFIX_SEI            ",   // 39
+    "SUFFIX_SEI            ",   // 40
+    "RESERVED_NVCL41       ",
+    "RESERVED_NVCL42       ",
+    "RESERVED_NVCL43       ",
+    "RESERVED_NVCL44       ",
+    "RESERVED_NVCL45       ",
+    "RESERVED_NVCL46       ",
+    "RESERVED_NVCL47       ",
+    "UNSPECIFIED_48        ",
+    "UNSPECIFIED_49        ",
+    "UNSPECIFIED_50        ",
+    "UNSPECIFIED_51        ",
+    "UNSPECIFIED_52        ",
+    "UNSPECIFIED_53        ",
+    "UNSPECIFIED_54        ",
+    "UNSPECIFIED_55        ",
+    "UNSPECIFIED_56        ",
+    "UNSPECIFIED_57        ",
+    "UNSPECIFIED_58        ",
+    "UNSPECIFIED_59        ",
+    "UNSPECIFIED_60        ",
+    "UNSPECIFIED_61        ",
+    "UNSPECIFIED_62        ",
+    "UNSPECIFIED_63        ",
+    "INVALID               "
+  };
 #endif
 
 //! \}
