@@ -590,7 +590,58 @@ Void SEIEncoder::initSEIContentColourVolume(SEIContentColourVolume *seiContentCo
     seiContentColourVolume->m_ccvAvgLuminanceValue = (Int) (10000000 * m_pcCfg->getCcvSEIAvgLuminanceValue());
   }
 }
-
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+void SEIEncoder::initSEIEncoderOptimizationInfo(SEIEncoderOptimizationInfo *sei)
+{
+  sei->m_cancelFlag = m_pcCfg->getEOISEICancelFlag();
+  if (!sei->m_cancelFlag)
+  {
+    sei->m_persistenceFlag = m_pcCfg->getEOISEIPersistenceFlag();
+    sei->m_forHumanViewingIdc = m_pcCfg->getEOISEIForHumanViewingIdc();
+    sei->m_forMachineAnalysisIdc = m_pcCfg->getEOISEIForMachineAnalysisIdc();
+    sei->m_type = m_pcCfg->getEOISEIType();
+    if ((sei->m_type & EOI_OptimizationType::OBJECT_BASED_OPTIMIZATION) != 0)
+    {
+      sei->m_objectBasedIdc = m_pcCfg->getEOISEIObjectBasedIdc();
+      if (sei->m_objectBasedIdc & EOI_OBJECT_BASED::COARSER_QUANTIZATION)
+      {
+        sei->m_quantThresholdDelta = m_pcCfg->getEOISEIQuantThresholdDelta();
+        if (sei->m_quantThresholdDelta > 0)
+        {
+          sei->m_picQuantObjectFlag = m_pcCfg->getEOISEIPicQuantObjectFlag();
+        }
+      }
+    }
+    if ((sei->m_type & EOI_OptimizationType::TEMPORAL_RESAMPLING) != 0)
+    {
+      sei->m_temporalResamplingTypeFlag = m_pcCfg->getEOISEITemporalResamplingTypeFlag();
+      sei->m_numIntPics = m_pcCfg->getEOISEINumIntPics();
+      if (sei->m_temporalResamplingTypeFlag && sei->m_numIntPics > 0)
+      {
+        sei->m_srcPicFlag = m_pcCfg->getEOISEISrcPicFlag();
+      }
+    }
+    if ((sei->m_type & EOI_OptimizationType::SPATIAL_RESAMPLING) != 0)
+    {
+      sei->m_origPicDimensionsFlag = m_pcCfg->getEOISEIOrigPicDimensionsFlag();
+      if (sei->m_origPicDimensionsFlag)
+      {
+        sei->m_origPicWidth = m_pcCfg->getEOISEIOrigPicWidth();
+        sei->m_origPicHeight = m_pcCfg->getEOISEIOrigPicHeight();
+      }
+      else
+      {
+        sei->m_spatialResamplingTypeFlag = m_pcCfg->getEOISEISpatialResamplingTypeFlag();
+      }
+    }
+    if ((sei->m_type & EOI_OptimizationType::PRIVACY_PROTECTION_OPTIMIZATION) != 0)
+    {
+      sei->m_privacyProtectionTypeIdc = m_pcCfg->getEOISEIPrivacyProtectionTypeIdc();
+      sei->m_privacyProtectedInfoType = m_pcCfg->getEOISEIPrivacyProtectedInfoType();
+    }
+  }
+}
+#endif
 #if SHUTTER_INTERVAL_SEI_MESSAGE
 Void SEIEncoder::initSEIShutterIntervalInfo(SEIShutterIntervalInfo *seiShutterIntervalInfo)
 {
@@ -626,6 +677,14 @@ Void SEIEncoder::initSEIFilmGrainCharacteristics(SEIFilmGrainCharacteristics *se
   seiFilmGrain->m_separateColourDescriptionPresentFlag    = m_pcCfg->getFilmGrainCharactersticsSEISepColourDescPresent();
   seiFilmGrain->m_blendingModeId                          = m_pcCfg->getFilmGrainCharactersticsSEIBlendingModeID();
   seiFilmGrain->m_log2ScaleFactor                         = m_pcCfg->getFilmGrainCharactersticsSEILog2ScaleFactor();
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  seiFilmGrain->m_fgPicWidthInLumaSamples                 = m_pcCfg->getFilmGrainCharactersticsSEIPicWidthInLumaSamples();
+  seiFilmGrain->m_fgPicHeightInLumaSamples                = m_pcCfg->getFilmGrainCharactersticsSEIPicHeightInLumaSamples();
+  if (seiFilmGrain->m_fgPicWidthInLumaSamples > 0 || seiFilmGrain->m_fgPicHeightInLumaSamples > 0)
+  {
+    seiFilmGrain->m_fgSpatialResolutionPresentFlag = 1;
+  }
+#endif
   for (int i = 0; i < MAX_NUM_COMPONENT; i++)
   {
     seiFilmGrain->m_compModel[i].bPresentFlag = m_pcCfg->getFGCSEICompModelPresent(i);
@@ -1685,4 +1744,107 @@ Void SEIEncoder::createAnnexFGISeiMessages( SEIMessages& seiMessage, const TComS
   }
 }
 #endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+void SEIEncoder::initSEIPackedRegionsInfo(SEIPackedRegionsInfo* sei)
+{
+  sei->m_cancelFlag = m_pcCfg->getPriSEICancelFlag();
+  sei->m_persistenceFlag = m_pcCfg->getPriSEIPersistenceFlag();
+  sei->m_numRegionsMinus1 = m_pcCfg->getPriSEINumRegionsMinus1();
+  sei->m_layerId = 0;  // Always 0 in HM encoder
+  sei->m_multilayerFlag = m_pcCfg->getPriSEIMultilayerFlag();
+  sei->m_useMaxDimensionsFlag = m_pcCfg->getPriSEIUseMaxDimensionsFlag();
+  sei->m_log2UnitSize = m_pcCfg->getPriSEILog2UnitSize();
+  sei->m_regionSizeLenMinus1 = m_pcCfg->getPriSEIRegionSizeLenMinus1();
+  sei->m_regionIdPresentFlag = m_pcCfg->getPriSEIRegionIdPresentFlag();
+  sei->m_targetPicParamsPresentFlag = m_pcCfg->getPriSEITargetPicParamsPresentFlag();
+  sei->m_targetPicWidthMinus1 = m_pcCfg->getPriSEITargetPicWidthMinus1();
+  sei->m_targetPicHeightMinus1 = m_pcCfg->getPriSEITargetPicHeightMinus1();
+  sei->m_numResamplingRatiosMinus1 = m_pcCfg->getPriSEINumResamplingRatiosMinus1();
+
+  sei->m_resamplingWidthNumMinus1.resize(sei->m_numResamplingRatiosMinus1 + 1);
+  sei->m_resamplingWidthDenomMinus1.resize(sei->m_numResamplingRatiosMinus1 + 1);
+  sei->m_fixedAspectRatioFlag.resize(sei->m_numResamplingRatiosMinus1 + 1);
+  sei->m_resamplingHeightNumMinus1.resize(sei->m_numResamplingRatiosMinus1 + 1);
+  sei->m_resamplingHeightDenomMinus1.resize(sei->m_numResamplingRatiosMinus1 + 1);
+  for (uint32_t i = 0; i <= sei->m_numResamplingRatiosMinus1; i++)
+  {
+    sei->m_resamplingWidthNumMinus1[i] = m_pcCfg->getPriSEIResamplingWidthNumMinus1(i);
+    sei->m_resamplingWidthDenomMinus1[i] = m_pcCfg->getPriSEIResamplingWidthDenomMinus1(i);
+    sei->m_fixedAspectRatioFlag[i] = m_pcCfg->getPriSEIFixedAspectRatioFlag(i);
+    sei->m_resamplingHeightNumMinus1[i] = m_pcCfg->getPriSEIResamplingHeightNumMinus1(i);
+    sei->m_resamplingHeightDenomMinus1[i] = m_pcCfg->getPriSEIResamplingHeightDenomMinus1(i);
+  }
+
+  sei->m_regionId.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionLayerId.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionIsALayerFlag.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionTopLeftInUnitsX.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionTopLeftInUnitsY.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionWidthInUnitsMinus1.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionHeightInUnitsMinus1.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_resamplingRatioIdx.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_targetRegionTopLeftInUnitsX.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_targetRegionTopLeftInUnitsY.resize(sei->m_numRegionsMinus1 + 1);
+  for (uint32_t i = 0; i <= sei->m_numRegionsMinus1; i++)
+  {
+    sei->m_regionId[i] = m_pcCfg->getPriSEIRegionId(i);
+    if (sei->m_multilayerFlag)
+    {
+      sei->m_regionLayerId[i] = m_pcCfg->getPriSEIRegionLayerId(i);
+      sei->m_regionIsALayerFlag[i] = m_pcCfg->getPriSEIRegionIsALayerFlag(i);
+    }
+    else
+    {
+      sei->m_regionLayerId[i] = 0;
+      sei->m_regionIsALayerFlag[i] = 0;
+    }
+    if (!sei->m_regionIsALayerFlag[i])
+    {
+      sei->m_regionTopLeftInUnitsX[i] = m_pcCfg->getPriSEIRegionTopLeftInUnitsX(i);
+      sei->m_regionTopLeftInUnitsY[i] = m_pcCfg->getPriSEIRegionTopLeftInUnitsY(i);
+      sei->m_regionWidthInUnitsMinus1[i] = m_pcCfg->getPriSEIRegionWidthInUnitsMinus1(i);
+      sei->m_regionHeightInUnitsMinus1[i] = m_pcCfg->getPriSEIRegionHeightInUnitsMinus1(i);
+    }
+    else
+    {
+      sei->m_regionTopLeftInUnitsX[i] = 0;
+      sei->m_regionTopLeftInUnitsY[i] = 0;
+      sei->m_regionWidthInUnitsMinus1[i] = 0;
+      sei->m_regionHeightInUnitsMinus1[i] = 0;
+    }
+    sei->m_resamplingRatioIdx[i] = m_pcCfg->getPriSEIResamplingRatioIdx(i);
+    sei->m_targetRegionTopLeftInUnitsX[i] = m_pcCfg->getPriSEITargetRegionTopLeftInUnitsX(i);
+    sei->m_targetRegionTopLeftInUnitsY[i] = m_pcCfg->getPriSEITargetRegionTopLeftInUnitsY(i);
+  }
+}
+#endif
+
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+void SEIEncoder::initSEISourcePictureTimingInfo(SEISourcePictureTimingInfo *SEISourcePictureTimingInfo) 
+{
+
+  assert(m_isInitialized);
+  assert(SEISourcePictureTimingInfo != NULL);
+
+  SEISourcePictureTimingInfo->m_sptiSEIEnabled = m_pcCfg->getSptiSEIEnabled();
+  SEISourcePictureTimingInfo->m_sptiSourceTimingEqualsOutputTimingFlag = m_pcCfg->getmSptiSEISourceTimingEqualsOutputTimingFlag();
+  SEISourcePictureTimingInfo->m_sptiSourceType = m_pcCfg->getmSptiSEISourceType();
+  SEISourcePictureTimingInfo->m_sptiTimeScale = m_pcCfg->getmSptiSEITimeScale();
+  SEISourcePictureTimingInfo->m_sptiNumUnitsInElementalInterval = m_pcCfg->getmSptiSEINumUnitsInElementalInterval();
+  SEISourcePictureTimingInfo->m_sptiDirectionFlag = m_pcCfg->getmSptiSEIDirectionFlag();
+  SEISourcePictureTimingInfo->m_sptiMaxSublayersMinus1 = m_pcCfg->getMaxTempLayer() - 1;
+  SEISourcePictureTimingInfo->m_sptiCancelFlag = 0;
+  SEISourcePictureTimingInfo->m_sptiPersistenceFlag = 1;
+  SEISourcePictureTimingInfo->m_sptiSourceTypePresentFlag = (SEISourcePictureTimingInfo->m_sptiSourceType == 0 ? 0 : 1);
+
+  int sptiMinTemporalSublayer = (SEISourcePictureTimingInfo->m_sptiPersistenceFlag ? 0 : SEISourcePictureTimingInfo->m_sptiMaxSublayersMinus1);
+
+  for (int i = sptiMinTemporalSublayer; i <= SEISourcePictureTimingInfo->m_sptiMaxSublayersMinus1; i++) 
+  {
+    SEISourcePictureTimingInfo->m_sptiSublayerIntervalScaleFactor[i] = 1 << (SEISourcePictureTimingInfo->m_sptiMaxSublayersMinus1 - i);
+    SEISourcePictureTimingInfo->m_sptiSublayerSynthesizedPictureFlag[i] = false;
+  }
+#endif
+}
+
 //! \}

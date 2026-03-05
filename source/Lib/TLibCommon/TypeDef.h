@@ -125,6 +125,8 @@
 #define JVET_AK0194_DSC_SEI   0                      // Digitally signed content signing and verification (requires OpenSSL v3)
 #endif
 
+#define JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI        1
+
 // ====================================================================================================================
 // Debugging
 // ====================================================================================================================
@@ -180,12 +182,18 @@
 #define DPB_ENCODER_USAGE_CHECK                           1 ///< Adds DPB encoder usage check.
 #define JVET_X0048_X0103_FILM_GRAIN                       1 ///< JVET-X0048-X0103: SMPTE RDD-5 based film grain analysis and synthesis model for film grain characterstics (FGC) SEI
 #endif
+#define JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI        1 ///< JVET-AL0339: Spatial resolution for film grain characteristics SEI message.
+
 #define JVET_T0050_ANNOTATED_REGIONS_SEI                  1 ///< Detect static objects and use it in Annotated Regions SEI message
+
+#define JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI   1 ///< Support for encoder optimization information SEI message
 
 #if SHUTTER_INTERVAL_SEI_MESSAGE
 #define SHUTTER_INTERVAL_SEI_PROCESSING                   1 ///< JCTVC-AM0024: pre-/post-processing to use shutter interval SEI
 #endif
 #define JVET_AK0107_MODALITY_INFORMATION                  1 // Implementation of Modality Information SEI message
+
+#define JVET_AK2006_SPTI_SEI_MESSAGE                      1 // Implementation of Source Picture Timing Information SEI message
 // ====================================================================================================================
 // Tool Switches
 // ====================================================================================================================
@@ -677,7 +685,38 @@ enum SAOEOClasses
   SAO_CLASS_EO_FULL_PEAK   = 4,
   NUM_SAO_EO_CLASSES,
 };
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
 
+enum EOI_OptimizationType
+{
+  UNDEFINED = 0,
+  OBJECT_BASED_OPTIMIZATION = 1,
+  TEMPORAL_RESAMPLING = 2,
+  SPATIAL_RESAMPLING = 4,
+  TEMPORAL_QUALITY_OPTIMIZATION = 8,
+  SPATIAL_QUALITY_OPTIMIZATION = 16,
+  PRIVACY_PROTECTION_OPTIMIZATION = 32,
+};
+
+enum EOI_PRIVACY_PROTECTION
+{
+  BLURRING = 1,
+  REPLACING = 2,
+  MASKING = 4,
+  PIXELATION = 8
+};
+
+enum EOI_OBJECT_BASED
+{
+  BLURRED = 1,
+  COARSER_QUANTIZATION = 2,
+  OVERWRITTEN_CONSTANT = 4,
+  OVERWRITTEN_NONCONSTANT = 8,
+  SIZE_BASED = 16
+};
+
+
+#endif
 #define NUM_SAO_BO_CLASSES_LOG2  5
 #define NUM_SAO_BO_CLASSES       (1<<NUM_SAO_BO_CLASSES_LOG2)
 #if NH_MV

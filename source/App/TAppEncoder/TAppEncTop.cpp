@@ -267,6 +267,35 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setDigitallySignedContentSEICfg                      (m_cfgDigitallySignedContentSEI);
 #endif
 
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  m_cTEncTop.setPriSEIEnabled(m_priSEIEnabled);
+  m_cTEncTop.setPriSEICancelFlag(m_priSEICancelFlag);
+  m_cTEncTop.setPriSEIPersistenceFlag(m_priSEIPersistenceFlag);
+  m_cTEncTop.setPriSEINumRegionsMinus1(m_priSEINumRegionsMinus1);
+  m_cTEncTop.setPriSEIMultilayerFlag(false); // Only single layer in HM encoder
+  m_cTEncTop.setPriSEIUseMaxDimensionsFlag(m_priSEIUseMaxDimensionsFlag);
+  m_cTEncTop.setPriSEILog2UnitSize(m_priSEILog2UnitSize);
+  m_cTEncTop.setPriSEIRegionSizeLenMinus1(m_priSEIRegionSizeLenMinus1);
+  m_cTEncTop.setPriSEIRegionIdPresentFlag(m_priSEIRegionIdPresentFlag);
+  m_cTEncTop.setPriSEITargetPicParamsPresentFlag(m_priSEITargetPicParamsPresentFlag);
+  m_cTEncTop.setPriSEITargetPicWidthMinus1(m_priSEITargetPicWidthMinus1);
+  m_cTEncTop.setPriSEITargetPicHeightMinus1(m_priSEITargetPicHeightMinus1);
+  m_cTEncTop.setPriSEINumResamplingRatiosMinus1(m_priSEINumResamplingRatiosMinus1);
+  m_cTEncTop.setPriSEIResamplingWidthNumMinus1(m_priSEIResamplingWidthNumMinus1);
+  m_cTEncTop.setPriSEIResamplingWidthDenomMinus1(m_priSEIResamplingWidthDenomMinus1);
+  m_cTEncTop.setPriSEIFixedAspectRatioFlag(m_priSEIFixedAspectRatioFlag);
+  m_cTEncTop.setPriSEIResamplingHeightNumMinus1(m_priSEIResamplingHeightNumMinus1);
+  m_cTEncTop.setPriSEIResamplingHeightDenomMinus1(m_priSEIResamplingHeightDenomMinus1);
+  m_cTEncTop.setPriSEIRegionId(m_priSEIRegionId);
+  m_cTEncTop.setPriSEIRegionTopLeftInUnitsX(m_priSEIRegionTopLeftInUnitsX);
+  m_cTEncTop.setPriSEIRegionTopLeftInUnitsY(m_priSEIRegionTopLeftInUnitsY);
+  m_cTEncTop.setPriSEIRegionWidthInUnitsMinus1(m_priSEIRegionWidthInUnitsMinus1);
+  m_cTEncTop.setPriSEIRegionHeightInUnitsMinus1(m_priSEIRegionHeightInUnitsMinus1);
+  m_cTEncTop.setPriSEIResamplingRatioIdx(m_priSEIResamplingRatioIdx);
+  m_cTEncTop.setPriSEITargetRegionTopLeftInUnitsX(m_priSEITargetRegionTopLeftInUnitsX);
+  m_cTEncTop.setPriSEITargetRegionTopLeftInUnitsY(m_priSEITargetRegionTopLeftInUnitsY);
+#endif
+
   m_cTEncTop.setCabacZeroWordPaddingEnabled                       ( m_cabacZeroWordPaddingEnabled );
 
   m_cTEncTop.setFrameRate                                         ( m_iFrameRate );
@@ -675,6 +704,26 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setSiiSEITimeScale                                   (m_siiSEITimeScale);
   m_cTEncTop.setSiiSEISubLayerNumUnitsInSI                        (m_siiSEISubLayerNumUnitsInSI);
 #endif
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  m_cTEncTop.setEOISEIEnabled(m_eoiSEIEnabled);
+  m_cTEncTop.setEOISEICancelFlag(m_eoiSEICancelFlag);
+  m_cTEncTop.setEOISEIPersistenceFlag(m_eoiSEIPersistenceFlag);
+  m_cTEncTop.setEOISEIForHumanViewingIdc(m_eoiSEIForHumanViewingIdc);
+  m_cTEncTop.setEOISEIForMachineAnalysisIdc(m_eoiSEIForMachineAnalysisIdc);
+  m_cTEncTop.setEOISEIType(m_eoiSEIType);
+  m_cTEncTop.setEOISEIObjectBasedIdc(m_eoiSEIObjectBasedIdc);
+  m_cTEncTop.setEOISEIQuantThresholdDelta(m_eoiSEIQuantThresholdDelta);
+  m_cTEncTop.setEOISEIPicQuantObjectFlag(m_eoiSEIPicQuantObjectFlag);
+  m_cTEncTop.setEOISEITemporalResamplingTypeFlag(m_eoiSEITemporalResamplingTypeFlag);
+  m_cTEncTop.setEOISEINumIntPics(m_eoiSEINumIntPics);
+  m_cTEncTop.setEOISEISrcPicFlag(m_eoiSEISrcPicFlag);
+  m_cTEncTop.setEOISEIOrigPicDimensionsFlag(m_eoiSEIOrigPicDimensionsFlag);
+  m_cTEncTop.setEOISEIOrigPicWidth(m_eoiSEIOrigPicWidth);
+  m_cTEncTop.setEOISEIOrigPicHeight(m_eoiSEIOrigPicHeight);
+  m_cTEncTop.setEOISEISpatialResamplingTypeFlag(m_eoiSEISpatialResamplingTypeFlag);
+  m_cTEncTop.setEOISEIPrivacyProtectionTypeIdc(m_eoiSEIPrivacyProtectionTypeIdc);
+  m_cTEncTop.setEOISEIPrivacyProtectedInfoType(m_eoiSEIPrivacyProtectedInfoType);
+#endif
 #if SEI_ENCODER_CONTROL
 // film grain charcteristics
   m_cTEncTop.setFilmGrainCharactersticsSEIEnabled                 (m_fgcSEIEnabled);
@@ -684,6 +733,10 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setFilmGrainCharactersticsSEISepColourDescPresent    (m_fgcSEISepColourDescPresentFlag);
   m_cTEncTop.setFilmGrainCharactersticsSEIBlendingModeID          ((UChar)m_fgcSEIBlendingModeID);
   m_cTEncTop.setFilmGrainCharactersticsSEILog2ScaleFactor         ((UChar)m_fgcSEILog2ScaleFactor);
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  m_cTEncTop.setFilmGrainCharactersticsSEIPicWidthInLumaSamples   (m_fgcSEIPicWidthInLumaSamples);
+  m_cTEncTop.setFilmGrainCharactersticsSEIPicHeightInLumaSamples  (m_fgcSEIPicHeightInLumaSamples);
+#endif
 #if JVET_X0048_X0103_FILM_GRAIN
   m_cTEncTop.setFilmGrainAnalysisEnabled                          (m_fgcSEIAnalysisEnabled);
   m_cTEncTop.setFilmGrainExternalMask                             (m_fgcSEIExternalMask);
@@ -905,6 +958,17 @@ Void TAppEncTop::xInitLibCfg()
 #if JCTVC_AD0021_SEI_PREFIX_INDICATION
   m_cTEncTop.setSEIPrefixIndicationSEIEnabled(m_SEIPrefixIndicationSEIEnabled);
 #endif
+#endif
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+  m_cTEncTop.setSptiSEIEnabled(m_sptiSEIEnabled);
+  if (m_sptiSEIEnabled) 
+  {
+    m_cTEncTop.setmSptiSEISourceTimingEqualsOutputTimingFlag(m_sptiSourceTimingEqualsOutputTimingFlag);
+    m_cTEncTop.setmSptiSEISourceType(m_sptiSourceType);
+    m_cTEncTop.setmSptiSEITimeScale(m_sptiTimeScale);
+    m_cTEncTop.setmSptiSEINumUnitsInElementalInterval(m_sptiNumUnitsInElementalInterval);
+    m_cTEncTop.setmSptiSEIDirectionFlag(m_sptiDirectionFlag);
+  }
 #endif
 }
 

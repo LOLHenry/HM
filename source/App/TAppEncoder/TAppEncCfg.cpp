@@ -945,6 +945,20 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   SMultiValueInput<UInt>   cfg_siiSEIInputNumUnitsInSI                (0, MAX_UINT, 0, 7);
 #endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  SMultiValueInput<uint32_t> cfg_priSEIResamplingWidthNumMinus1       (0, 65535, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIResamplingWidthDenomMinus1     (0, 65535, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIResamplingHeightNumMinus1      (0, std::numeric_limits<uint32_t>::max() - 1, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIResamplingHeightDenomMinus1    (0, std::numeric_limits<uint32_t>::max() - 1, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIRegionId                       (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIRegionTopLeftInUnitsX          (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIRegionTopLeftInUnitsY          (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIRegionWidthInUnitsMinus1       (0, std::numeric_limits<uint32_t>::max() - 1, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIRegionHeightInUnitsMinus1      (0, std::numeric_limits<uint32_t>::max() - 1, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIResamplingRatioIdx             (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEITargetRegionTopLeftInUnitsX    (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEITargetRegionTopLeftInUnitsY    (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+#endif
 
   Int warnUnknowParameter = 0;
   po::Options opts;
@@ -1564,10 +1578,40 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("SEIPIVerPhaseNumFullResolution", m_piVerPhaseNumFullResolution, 0, "Specifies the Vertical Phase Numerator of Phase Indication SEI messages for full resolution pictures.")
   ("SEIPIVerPhaseDenMinus1FullResolution", m_piVerPhaseDenMinus1FullResolution, 0, "Specifies the Vertical Phase Denominator minus 1 of Phase Indication SEI messages for full resolution pictures.")
 #endif
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  ("SEIEOIEnabled", m_eoiSEIEnabled, false, "Control use of the Encoder Optimization Information SEI")
+  ("SEIEOICancelFlag", m_eoiSEICancelFlag, false, "Specifies that the persistence of the previous applied optimization")
+  ("SEIEOIPersistenceFlag", m_eoiSEIPersistenceFlag, false, "Specifies the persistence of the optimization the current layer")
+  ("SEIEOIForHumanViewingIdc", m_eoiSEIForHumanViewingIdc, 0u, "Indicates the level of optimization for human viewing")
+  ("SEIEOIForMachineAnalysisIdc", m_eoiSEIForMachineAnalysisIdc, 0u, "Indicates the level of optimization for  machine analsysis")
+  ("SEIEOIType", m_eoiSEIType, 0u, "Indicates the types of optimization method")
+  ("SEIEOIObjectBasedIdc", m_eoiSEIObjectBasedIdc, 0u, "Indicates the type of object-based optimization")
+  ("SEIEOIQuantThresholdDelta", m_eoiSEIQuantThresholdDelta, 0u, "Indicates the quantization parameter threshold determining areas classified to be outside the detected objects or to include one or more detected objects (0 = unknown or unspecified)")
+  ("SEIEOIPicQuantObjectFlag", m_eoiSEIPicQuantObjectFlag, false, "Value of 1 indicates that areas with QP >= PicQuant + SEIEOIQuantThresholdDelta represent areas outside the detected objects. Value of 0 indicates that areas with QP <= PicQuant - SEIEOIQuantThresholdDelta represent areas that include objects")
+  ("SEIEOITemporalResamplingTypeFlag", m_eoiSEITemporalResamplingTypeFlag, false, "specifies the type of the temporal resampling optimization.")
+  ("SEIEOINumIntPics", m_eoiSEINumIntPics, 0u, "indicates that the count of pictures that the encoding system excluded or added between each pair of coded pictures in output order within the persistence of this SEI message is constant")
+  ("SEIEOISrcPicFlag", m_eoiSEISrcPicFlag, false, "Value of 1 specifies that the picture in the same access unit that contains the EOI SEI message is a source picture. Value of 0 provides no such indication.that areas with QP >= PicQuant + SEIEOIQuantThresholdDelta represent areas outside the detected objects. Value of 0 indicates that areas with QP <= PicQuant - SEIEOIQuantThresholdDelta represent areas that include objects")
+  ("SEIEOIOrigPicDimensionsFlag", m_eoiSEIOrigPicDimensionsFlag, false, "specifies if original source picture dimensions are present.")
+  ("SEIEOIOrigPicWidth", m_eoiSEIOrigPicWidth, 0u, "indicates the width of the original source picture.")
+  ("SEIEOIOrigPicHeight", m_eoiSEIOrigPicHeight, 0u, "indicates the height of the original source picture.")
+  ("SEIEOISpatialResamplingTypeFlag", m_eoiSEISpatialResamplingTypeFlag, false, "specifies the type of the spatial resampling optimization.")
+  ("SEIEOIPrivacyProtectionTypeIdc", m_eoiSEIPrivacyProtectionTypeIdc, 0u, "indicates the type of privacy protection optimization")
+  ("SEIEOIPrivacyProtectedInfoType", m_eoiSEIPrivacyProtectedInfoType, 0u, "indicates the types of protected information")
+#endif 
+
+
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   ("SEIShutterIntervalEnabled",                       m_siiSEIEnabled,                           false,                                   "Controls if shutter interval information SEI message is enabled")
   ("SEISiiTimeScale",                                 m_siiSEITimeScale,                         27000000u,                               "Specifies sii_time_scale")
   ("SEISiiInputNumUnitsInShutterInterval",            cfg_siiSEIInputNumUnitsInSI,               cfg_siiSEIInputNumUnitsInSI,             "Specifies sub_layer_num_units_in_shutter_interval")
+#endif
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+  ("SEISourcePictureTimingInfo", m_sptiSEIEnabled, false, "Controls if source picture timing information SEI message is enabled")
+  ("SEISPTISourceTimingEqualsOutputTimingFlag", m_sptiSourceTimingEqualsOutputTimingFlag, true, "Indicates the timing of source pictures is the same as the timing of corresponding decoded output pictures")
+  ("SEISPTISourceType", m_sptiSourceType, 0u, "Indicates the timing relationship between source pictures and corresponding decoded output pictures.")
+  ("SEISPTITimeScale", m_sptiTimeScale, 27000000u, "Specifies the number of time units that pass in one second.")
+  ("SEISPTINumUnitsInElementalInterval", m_sptiNumUnitsInElementalInterval, 1080000u, "Specifies the number of time units of a clock operating at the frequency spti_time_scale Hz that corresponds to the indicated elemental source picture interval of consecutive pictures in output order in the CLVS.")
+  ("SEISPTIDirectionFlag", m_sptiDirectionFlag, false, "Indicates the direction of the signalled source picture intervals.")
 #endif
 #if SEI_ENCODER_CONTROL
 // film grain characteristics SEI
@@ -1581,6 +1625,10 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("SEIFGCCompModelPresentComp0",                     m_fgcSEICompModelPresent[0],                       false, "Specifies the presense of film grain modelling on colour component 0.")
   ("SEIFGCCompModelPresentComp1",                     m_fgcSEICompModelPresent[1],                       false, "Specifies the presense of film grain modelling on colour component 1.")
   ("SEIFGCCompModelPresentComp2",                     m_fgcSEICompModelPresent[2],                       false, "Specifies the presense of film grain modelling on colour component 2.")
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  ("SEIFGCPicWidthInLumaSamples",                     m_fgcSEIPicWidthInLumaSamples,                        0u, "Specifies the picture width in luma samples at which the film grain synthesis is intended to be applied.")
+  ("SEIFGCPicHeightInLumaSamples",                    m_fgcSEIPicHeightInLumaSamples,                       0u, "Specifies the picture height in luma samples at which the film grain synthesis is intended to be applied.")
+#endif
 #if JVET_X0048_X0103_FILM_GRAIN
   ("SEIFGCAnalysisEnabled",                           m_fgcSEIAnalysisEnabled,                           false, "Control adaptive film grain parameter estimation - film grain analysis")
   ("SEIFGCExternalMask",                              m_fgcSEIExternalMask,                       string( "" ), "Read external file with mask for film grain analysis. If empty string, use internally calculated mask.")
@@ -1723,6 +1771,32 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("SEIDSCVerificationKeyURI", m_cfgDigitallySignedContentSEI.publicKeyUri, std::string("") , "(Public) verification key URI for Digitally Signed Content SEI messages")
   ("SEIDSCKeyIDEnabled", m_cfgDigitallySignedContentSEI.keyIdEnabled, false, "Enable using a key ID addition to URI of public key of Digitally Signed Content SEI messages")
   ("SEIDSCKeyID", m_cfgDigitallySignedContentSEI.keyId, 0 , "Public Key ID for Digitally Signed Content SEI messages (if enabled)")
+#endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  ("SEIPRIEnabled",                                   m_priSEIEnabled,                                   false, "Specifies whether packet regions info SEI is enabled")
+  ("SEIPRICancelFlag",                                m_priSEICancelFlag,                                false, "Specifies the persistence of any previous packed regions info SEI message in output order")
+  ("SEIPRIPersistenceFlag",                           m_priSEIPersistenceFlag,                            true, "Specifies the persistence of the packed regions info SEI message for the current layer")
+  ("SEIPRINumRegionsMinus1",                          m_priSEINumRegionsMinus1,                             0u, "Specifies the number of regions minus 1 for which information is signalled")
+  ("SEIPRIUseMaxDimensionsFlag",                      m_priSEIUseMaxDimensionsFlag,                      false, "Specifies that max pic dimensions are used in variable calculations")
+  ("SEIPRILog2UnitSize",                              m_priSEILog2UnitSize,                                 0u, "Specifies a unit size used in variable calculations for the region parameters")
+  ("SEIPRIRegionSizeLenMinus1",                       m_priSEIRegionSizeLenMinus1,                         12u, "Specifies the number of bits minus 1 used to signal region top left offsets and region dimensions")
+  ("SEIPRIRegionIdPresentFlag",                       m_priSEIRegionIdPresentFlag,                       false, "Specifies whether region IDs are signalled")
+  ("SEIPRITargetPicParamsPresentFlag",                m_priSEITargetPicParamsPresentFlag,                false, "Specifies whether pri_target_region_top_left_x[ i ], pri_target_region_top_left_y[ i ], pri_target_pic_width_minus1, and pri_target_pic_height_minus1 are signalled")
+  ("SEIPRITargetPicWidthMinus1",                      m_priSEITargetPicWidthMinus1,                         0u, "Target output picture width minus 1")
+  ("SEIPRITargetPicHeightMinus1",                     m_priSEITargetPicHeightMinus1,                        0u, "Target output picture height minus 1")
+  ("SEIPRINumResamplingRatiosMinus1",                 m_priSEINumResamplingRatiosMinus1,                    0u, "Specifies the number resampling ratios minus 1 that are signalled")
+  ("SEIPRIResamplingWidthNumMinus1",                  cfg_priSEIResamplingWidthNumMinus1, cfg_priSEIResamplingWidthNumMinus1, "Specifies a list of numerators minus 1 values for width resampling of the resampling ratio")
+  ("SEIPRIResamplingWidthDenomMinus1",                cfg_priSEIResamplingWidthDenomMinus1, cfg_priSEIResamplingWidthDenomMinus1, "Specifies a list of denominators minus 1 values for width resampling of the resampling ratio")
+  ("SEIPRIResamplingHeightNumMinus1",                 cfg_priSEIResamplingHeightNumMinus1, cfg_priSEIResamplingHeightNumMinus1, "Specifies a list of numerators minus 1 values for height resampling of the resampling ratio")
+  ("SEIPRIResamplingHeightDenomMinus1",               cfg_priSEIResamplingHeightDenomMinus1, cfg_priSEIResamplingHeightDenomMinus1, "Specifies a list of denominators minus 1 values for height resampling of the resampling ratio")
+  ("SEIPRIRegionId",                                  cfg_priSEIRegionId, cfg_priSEIRegionId,                   "Specifies a list of IDs for the regions")
+  ("SEIPRIRegionTopLeftInUnitsX",                     cfg_priSEIRegionTopLeftInUnitsX, cfg_priSEIRegionTopLeftInUnitsX, "Specifies a list of horizontal top left positions for the regions")
+  ("SEIPRIRegionTopLeftInUnitsY",                     cfg_priSEIRegionTopLeftInUnitsY, cfg_priSEIRegionTopLeftInUnitsY, "Specifies a list of vertical top left positions for the regions")
+  ("SEIPRIRegionWidthInUnitsMinus1",                  cfg_priSEIRegionWidthInUnitsMinus1, cfg_priSEIRegionWidthInUnitsMinus1, "Specifies a list of widths minus 1 in units for the regions")
+  ("SEIPRIRegionHeightInUnitsMinus1",                 cfg_priSEIRegionHeightInUnitsMinus1, cfg_priSEIRegionHeightInUnitsMinus1, "Specifies a list of heights minus 1 in units for the regions")
+  ("SEIPRIResamplingRatioIdx",                        cfg_priSEIResamplingRatioIdx, cfg_priSEIResamplingRatioIdx, "Specifies a list of resampling ration indices for the regions")
+  ("SEIPRITargetRegionTopLeftInUnitsX",               cfg_priSEITargetRegionTopLeftInUnitsX, cfg_priSEITargetRegionTopLeftInUnitsX, "Specifies a list of horizontal top left postions in units of priUnitSize luma samples for the regions in reconstructed target picture")
+  ("SEIPRITargetRegionTopLeftInUnitsY",               cfg_priSEITargetRegionTopLeftInUnitsY, cfg_priSEITargetRegionTopLeftInUnitsY, "Specifies a list of vertical top left postions in units of priUnitSize luma samples for the regions in reconstructed target picture")
 #endif
   ;
 
@@ -2964,6 +3038,83 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     }
   }
 #endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  if (m_priSEIEnabled)
+  {
+    CHECK(m_priSEICancelFlag, "SEIPRICancelFlag must be 0 in this implementation");
+    CHECK(!m_priSEIPersistenceFlag, "SEIPRIPersistenceFlag must be 1 in this implementation");
+    CHECK(cfg_priSEIResamplingWidthNumMinus1.values.size() != (m_priSEINumResamplingRatiosMinus1 + 1), "Number of elements in SEIRPRIesamplingWidthNumMinus1 must be equal to SEIPRINumResamplingRatiosMinus1 + 1");
+    CHECK(cfg_priSEIResamplingWidthDenomMinus1.values.size() != (m_priSEINumResamplingRatiosMinus1 + 1), "Number of elements in SEIPRIResamplingWidthNumMinus1 must be equal to SEIPRIResamplingWidthDenomMinus1 + 1");
+    CHECK(cfg_priSEIResamplingHeightNumMinus1.values.size() != (m_priSEINumResamplingRatiosMinus1 + 1), "Number of elements in SEIPRIResamplingHeightNumMinus1 must be equal to SEIPRINumResamplingRatiosMinus1 + 1");
+    CHECK(cfg_priSEIResamplingHeightDenomMinus1.values.size() != (m_priSEINumResamplingRatiosMinus1 + 1), "Number of elements in SEIPRIResamplingHeightNumMinus1 must be equal to SEIPRIResamplingWidthDenomMinus1 + 1");
+    if (m_priSEINumResamplingRatiosMinus1 > 0)
+    {
+      m_priSEIResamplingWidthNumMinus1 = cfg_priSEIResamplingWidthNumMinus1.values;
+      m_priSEIResamplingWidthDenomMinus1 = cfg_priSEIResamplingWidthDenomMinus1.values;
+      m_priSEIResamplingHeightNumMinus1 = cfg_priSEIResamplingHeightNumMinus1.values;
+      m_priSEIResamplingHeightDenomMinus1 = cfg_priSEIResamplingHeightDenomMinus1.values;
+      m_priSEIFixedAspectRatioFlag.resize(m_priSEINumResamplingRatiosMinus1 + 1);
+      for (uint32_t i = 1; i <= m_priSEINumResamplingRatiosMinus1; i++)
+      {
+        m_priSEIFixedAspectRatioFlag[i] =
+          m_priSEIResamplingWidthNumMinus1[i] == m_priSEIResamplingHeightNumMinus1[i] &&
+          m_priSEIResamplingWidthDenomMinus1[i] == m_priSEIResamplingHeightDenomMinus1[i];
+      }
+      // First entry has fixed values
+      m_priSEIResamplingWidthNumMinus1[0] = 0;
+      m_priSEIResamplingWidthDenomMinus1[0] = 0;
+      m_priSEIFixedAspectRatioFlag[0] = true;
+      m_priSEIResamplingHeightNumMinus1[0] = 0;
+      m_priSEIResamplingHeightDenomMinus1[0] = 0;
+    }
+    else
+    {
+      m_priSEIResamplingWidthNumMinus1 = {0};
+      m_priSEIResamplingWidthDenomMinus1 = {0};
+      m_priSEIFixedAspectRatioFlag = {true};
+      m_priSEIResamplingHeightNumMinus1 = {0};
+      m_priSEIResamplingHeightDenomMinus1 = {0};
+    }
+
+    if (m_priSEIRegionIdPresentFlag)
+    {
+      CHECK(cfg_priSEIRegionId.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIRegionId must be equal to SEIPRINumRegionsMinus1 + 1");
+      std::vector<uint32_t> tmpVec = cfg_priSEIRegionId.values;
+      std::sort(tmpVec.begin(), tmpVec.end());
+      auto it = std::unique(tmpVec.begin(), tmpVec.end());
+      CHECK(it != tmpVec.end(), "SEIRegionId values must be unique");
+    }
+    CHECK(cfg_priSEIRegionTopLeftInUnitsX.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIRegionTopLeftInUnitsX must be equal to SEIPRINumRegionsMinus1 + 1");
+    CHECK(cfg_priSEIRegionTopLeftInUnitsY.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIRegionTopLeftInUnitsY must be equal to SEIPRINumRegionsMinus1 + 1");
+    CHECK(cfg_priSEIRegionWidthInUnitsMinus1.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIRegionWidthInUnitsMinus1 must be equal to SEIPRINumRegionsMinus1 + 1");
+    CHECK(cfg_priSEIRegionHeightInUnitsMinus1.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIRegionHeightInUnitsMinus1 must be equal to SEIPRINumRegionsMinus1 + 1");
+    if (m_priSEINumResamplingRatiosMinus1 > 0)
+    {
+      CHECK(cfg_priSEIResamplingRatioIdx.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIResamplingRatioIdx must be equal to SEIPRINumRegionsMinus1 + 1");
+    }
+    if (m_priSEITargetPicParamsPresentFlag)
+    {
+      CHECK(cfg_priSEITargetRegionTopLeftInUnitsX.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRITargetRegionTopLeftInUnitsX must be equal to SEIPRINumRegionsMinus1 + 1");
+      CHECK(cfg_priSEITargetRegionTopLeftInUnitsY.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRITargetRegionTopLeftInUnitsY must be equal to SEIPRINumRegionsMinus1 + 1");
+    }
+    m_priSEIRegionId = cfg_priSEIRegionId.values;
+    m_priSEIRegionTopLeftInUnitsX = cfg_priSEIRegionTopLeftInUnitsX.values;
+    m_priSEIRegionTopLeftInUnitsY = cfg_priSEIRegionTopLeftInUnitsY.values;
+    m_priSEIRegionWidthInUnitsMinus1 = cfg_priSEIRegionWidthInUnitsMinus1.values;
+    m_priSEIRegionHeightInUnitsMinus1 = cfg_priSEIRegionHeightInUnitsMinus1.values;
+    if (m_priSEINumResamplingRatiosMinus1 > 0)
+    {
+      m_priSEIResamplingRatioIdx = cfg_priSEIResamplingRatioIdx.values;
+    }
+    else
+    {
+      m_priSEIResamplingRatioIdx = {0};
+    }
+    m_priSEITargetRegionTopLeftInUnitsX = cfg_priSEITargetRegionTopLeftInUnitsX.values;
+    m_priSEITargetRegionTopLeftInUnitsY = cfg_priSEITargetRegionTopLeftInUnitsY.values;
+  }
+#endif
+
   // check validity of input parameters
   xCheckParameter();
 
@@ -4811,6 +4962,14 @@ Void TAppEncCfg::xCheckParameter()
     xConfirmPara( m_nominalBlackLevelLumaCodeValue >= m_nominalWhiteLevelLumaCodeValue, "SEIToneMapNominalWhiteLevelLumaCodeValue shall be greater than SEIToneMapNominalBlackLevelLumaCodeValue");
     xConfirmPara( m_extendedWhiteLevelLumaCodeValue < m_nominalWhiteLevelLumaCodeValue, "SEIToneMapExtendedWhiteLevelLumaCodeValue shall be greater than or equal to SEIToneMapNominalWhiteLevelLumaCodeValue");
   }
+
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  if (m_fgcSEIEnabled)
+  {
+    xConfirmPara(m_fgcSEIPicWidthInLumaSamples > 0 && m_fgcSEIPicHeightInLumaSamples == 0, "When SEIFGCPicWidthInLumaSamples is set, SEIFGCPicHeightInLumaSamples must also be set");
+    xConfirmPara(m_fgcSEIPicHeightInLumaSamples > 0 && m_fgcSEIPicWidthInLumaSamples == 0, "When SEIFGCPicHeightInLumaSamples is set, SEIFGCPicWidthInLumaSamples must also be set");
+  }
+#endif
 
   if (m_kneeSEIEnabled && !m_kneeFunctionInformationSEI.m_kneeFunctionCancelFlag)
   {

@@ -642,7 +642,14 @@ Void TEncGOP::xCreateIRAPLeadingSEIMessages (SEIMessages& seiMessages, const TCo
     seiMessages.push_back(seiShutterInterval);
   }
 #endif
-
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  if (m_pcCfg->getEOISEIEnabled())
+  {
+    SEIEncoderOptimizationInfo *eoiSEI = new SEIEncoderOptimizationInfo;
+    m_seiEncoder.initSEIEncoderOptimizationInfo(eoiSEI);
+    seiMessages.push_back(eoiSEI);
+  }
+#endif
 #if SEI_ENCODER_CONTROL
 #if JVET_X0048_X0103_FILM_GRAIN
   if (m_pcCfg->getFilmGrainCharactersticsSEIEnabled() && !m_pcCfg->getFilmGrainCharactersticsSEIPerPictureSEI())
@@ -768,6 +775,22 @@ Void TEncGOP::xCreateIRAPLeadingSEIMessages (SEIMessages& seiMessages, const TCo
     m_seiEncoder.initSEIDigitallySignedContentInitialization(sei);
     seiMessages.push_back(sei);
   }
+#endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  if (m_pcCfg->getPriSEIEnabled())
+  {
+    SEIPackedRegionsInfo *sei = new SEIPackedRegionsInfo;
+    m_seiEncoder.initSEIPackedRegionsInfo(sei);
+    seiMessages.push_back(sei);
+  }
+#endif
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+   if (m_pcCfg->getSptiSEIEnabled()) 
+   {
+     SEISourcePictureTimingInfo *seiSourcePictureTimingInfo = new SEISourcePictureTimingInfo(sps->getMaxTLayers() - 1);
+     m_seiEncoder.initSEISourcePictureTimingInfo(seiSourcePictureTimingInfo);
+     seiMessages.push_back(seiSourcePictureTimingInfo);
+   }
 #endif
 }
 

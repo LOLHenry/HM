@@ -1267,6 +1267,11 @@ Void TComSlice::applyReferencePictureSet( TComList<TComPic*>& rcListPic, const T
 
     if(!rpcPic->getSlice( 0 )->isReferenced())
     {
+      // Remove output non reference picture from DPB
+      if(!rpcPic->getOutputMark())
+      {
+        rpcPic->setReconMark(false);
+      }
       continue;
     }
 
@@ -1318,6 +1323,11 @@ Void TComSlice::applyReferencePictureSet( TComList<TComPic*>& rcListPic, const T
       rpcPic->getSlice( 0 )->setReferenced( false );
       rpcPic->setUsedByCurr(0);
       rpcPic->setIsLongTerm(0);
+    }
+    // Remove output non reference picture from DPB
+    if(!isReference && !rpcPic->getOutputMark())
+    {
+      rpcPic->setReconMark(false);
     }
     //check that pictures of higher temporal layers are not used
     assert(rpcPic->getSlice( 0 )->isReferenced()==0||rpcPic->getUsedByCurr()==0||rpcPic->getTLayer()<=this->getTLayer());

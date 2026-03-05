@@ -49,7 +49,11 @@ class TComBitIf;
 class SEIWriter:public SyntaxElementWriter
 {
 public:
-  SEIWriter() {};
+  SEIWriter()
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+    : m_SeiExtensionBitsPresentFlag(false)
+#endif
+  {};
   virtual ~SEIWriter() {};
 
   Void writeSEImessages(TComBitIf& bs, const SEIMessages &seiList, const TComSPS *sps, Bool isNested);
@@ -170,12 +174,18 @@ protected:
     return 2 * n + 1;
   }
 #endif 
+
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  void xWriteSEIEncoderOptimizationInfo           (const SEIEncoderOptimizationInfo &sei);
+#endif
 #if JVET_AK0194_DSC_SEI
   void xWriteSEIDigitallySignedContentInitialization(const SEIDigitallySignedContentInitialization &sei);
   void xWriteSEIDigitallySignedContentSelection(const SEIDigitallySignedContentSelection &sei);
   void xWriteSEIDigitallySignedContentVerification(const SEIDigitallySignedContentVerification &sei);
 #endif
-
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  void xWriteSEIPackedRegionsInfo(const SEIPackedRegionsInfo& sei);
+#endif
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   Void xWriteSEIShutterInterval                   (const SEIShutterIntervalInfo& sei);
 #endif
@@ -194,6 +204,13 @@ protected:
   Void  xTraceSEIHeader();
   Void  xTraceSEIMessageType(SEI::PayloadType payloadType);
   Void xWriteByteAlign();
+
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  Bool m_SeiExtensionBitsPresentFlag;
+#endif
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+  void xWriteSEISourcePictureTimingInfo(const SEISourcePictureTimingInfo &sei);
+#endif
 };
 
 //! \}

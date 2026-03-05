@@ -768,6 +768,28 @@ Bool      m_higherLayerIrapSkipFlag;
   int       m_piVerPhaseNumFullResolution;
   int       m_piVerPhaseDenMinus1FullResolution;
 #endif
+
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  bool  m_eoiSEIEnabled;
+  bool  m_eoiSEICancelFlag;
+  bool  m_eoiSEIPersistenceFlag;
+  uint32_t m_eoiSEIForHumanViewingIdc;
+  uint32_t m_eoiSEIForMachineAnalysisIdc;
+  uint32_t m_eoiSEIType;
+  uint32_t m_eoiSEIObjectBasedIdc;
+  uint32_t m_eoiSEIQuantThresholdDelta;
+  bool     m_eoiSEIPicQuantObjectFlag;
+  bool m_eoiSEITemporalResamplingTypeFlag;
+  uint32_t m_eoiSEINumIntPics;
+  bool     m_eoiSEISrcPicFlag;;
+  bool     m_eoiSEIOrigPicDimensionsFlag;
+  uint32_t m_eoiSEIOrigPicWidth;
+  uint32_t m_eoiSEIOrigPicHeight;
+  bool m_eoiSEISpatialResamplingTypeFlag;
+  uint32_t m_eoiSEIPrivacyProtectionTypeIdc;
+  uint32_t m_eoiSEIPrivacyProtectedInfoType;
+#endif
+
 #if SEI_ENCODER_CONTROL
   // film grain characterstics sei
   Bool      m_fgcSEIEnabled;
@@ -777,6 +799,10 @@ Bool      m_higherLayerIrapSkipFlag;
   Bool      m_fgcSEISepColourDescPresentFlag;
   UInt      m_fgcSEIBlendingModeID;
   UInt      m_fgcSEILog2ScaleFactor;
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  UInt      m_fgcSEIPicWidthInLumaSamples;
+  UInt      m_fgcSEIPicHeightInLumaSamples;
+#endif
   Bool      m_fgcSEICompModelPresent[MAX_NUM_COMPONENT];
 #if JVET_X0048_X0103_FILM_GRAIN
   Bool      m_fgcSEIAnalysisEnabled;
@@ -806,6 +832,14 @@ Bool      m_higherLayerIrapSkipFlag;
   std::string m_summaryPicFilenameBase;                       ///< Base filename to use for producing summary picture output files. The actual filenames used will have I.txt, P.txt and B.txt appended.
   UInt        m_summaryVerboseness;                           ///< Specifies the level of the verboseness of the text output.
 
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+  bool m_sptiSEIEnabled;
+  bool m_sptiSourceTimingEqualsOutputTimingFlag;
+  uint32_t m_sptiSourceType;
+  uint32_t m_sptiTimeScale;
+  uint32_t m_sptiNumUnitsInElementalInterval;
+  bool m_sptiDirectionFlag;
+#endif
 #if EXTENSION_360_VIDEO
   TExt360AppEncCfg m_ext360;
   friend class TExt360AppEncCfg;
@@ -834,6 +868,37 @@ Bool      m_higherLayerIrapSkipFlag;
   Int       m_miMinWavelengthExponentPlus15; 
   Int       m_miMaxWavelengthMantissa; 
   Int       m_miMaxWavelengthExponentPlus15; 
+#endif
+
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  bool     m_priSEIEnabled;
+  bool     m_priSEICancelFlag;
+  bool     m_priSEIPersistenceFlag;
+  uint32_t m_priSEINumRegionsMinus1;
+  bool     m_priSEIMultilayerFlag;
+  bool     m_priSEIUseMaxDimensionsFlag;
+  uint32_t m_priSEILog2UnitSize;
+  uint32_t m_priSEIRegionSizeLenMinus1;
+  bool     m_priSEIRegionIdPresentFlag;
+  bool     m_priSEITargetPicParamsPresentFlag;
+  uint32_t m_priSEITargetPicWidthMinus1;
+  uint32_t m_priSEITargetPicHeightMinus1;
+  uint32_t m_priSEINumResamplingRatiosMinus1;
+  std::vector<uint32_t> m_priSEIResamplingWidthNumMinus1;
+  std::vector<uint32_t> m_priSEIResamplingWidthDenomMinus1;
+  std::vector<bool>     m_priSEIFixedAspectRatioFlag;
+  std::vector<uint32_t> m_priSEIResamplingHeightNumMinus1;
+  std::vector<uint32_t> m_priSEIResamplingHeightDenomMinus1;
+  std::vector<uint32_t> m_priSEIRegionId;
+  std::vector<uint32_t> m_priSEIRegionLayerId;
+  std::vector<bool>     m_priSEIRegionIsALayerFlag;
+  std::vector<uint32_t> m_priSEIRegionTopLeftInUnitsX;
+  std::vector<uint32_t> m_priSEIRegionTopLeftInUnitsY;
+  std::vector<uint32_t> m_priSEIRegionWidthInUnitsMinus1;
+  std::vector<uint32_t> m_priSEIRegionHeightInUnitsMinus1;
+  std::vector<uint32_t> m_priSEIResamplingRatioIdx;
+  std::vector<uint32_t> m_priSEITargetRegionTopLeftInUnitsX;
+  std::vector<uint32_t> m_priSEITargetRegionTopLeftInUnitsY;
 #endif
 
   // internal member functions

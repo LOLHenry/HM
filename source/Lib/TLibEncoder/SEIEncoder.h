@@ -88,6 +88,9 @@ public:
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   Void initSEIShutterIntervalInfo(SEIShutterIntervalInfo *sei);
 #endif
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  void initSEIEncoderOptimizationInfo(SEIEncoderOptimizationInfo *sei);
+#endif
 #if SEI_ENCODER_CONTROL
   Void initSEIFilmGrainCharacteristics(SEIFilmGrainCharacteristics *sei);
   Void initSEIContentLightLevel(SEIContentLightLevelInfo *sei);
@@ -126,6 +129,9 @@ public:
   void initSEIDigitallySignedContentSelection(SEIDigitallySignedContentSelection *sei, int substream);
   void initSEIDigitallySignedContentVerification(SEIDigitallySignedContentVerification *sei, int32_t substream, const std::vector<uint8_t> &signature);
 #endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  void initSEIPackedRegionsInfo(SEIPackedRegionsInfo *sei);
+#endif
   // trailing SEIs
   Void initDecodedPictureHashSEI(SEIDecodedPictureHash *sei, TComPic *pcPic, std::string &rHashString, const BitDepths &bitDepths);
   Void initTemporalLevel0IndexSEI(SEITemporalLevel0Index *sei, TComSlice *slice);
@@ -133,6 +139,9 @@ public:
 
 #if NH_MV
   Void createAnnexFGISeiMessages( SEIMessages& seiMessage, const TComSlice* slice );;
+#endif
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+  void initSEISourcePictureTimingInfo(SEISourcePictureTimingInfo *SEISourcePictureTimingInfo);
 #endif
 private:
   TEncCfg* m_pcCfg;
