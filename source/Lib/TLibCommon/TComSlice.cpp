@@ -614,7 +614,7 @@ Void TComSlice::getTempRefPicLists( TComList<TComPic*>& rcListPic, std::vector<T
 
   std::vector<TComPic*>* refPicSetInterLayer[2] = { &refPicSetInterLayer0, &refPicSetInterLayer1};
   Int numPocInterLayer[2] = { getNumActiveRefLayerPics0( ), getNumActiveRefLayerPics1( ) };
-  
+
   TComPic**             refPicSetStCurr    [2] = { RefPicSetStCurr0, RefPicSetStCurr1 };
   Int numPocStCurr[2] = { (Int)NumPocStCurr0, (Int)NumPocStCurr1 };
 
@@ -630,7 +630,9 @@ Void TComSlice::getTempRefPicLists( TComList<TComPic*>& rcListPic, std::vector<T
       usedAsLongTerm [li][cIdx] = false;
     }
 
-    for ( i=0; i < numPocInterLayer[li];  i++, cIdx++)
+    // Use the actual size of the inter-layer reference picture set, not the signaled count
+    Int actualNumPocInterLayer = std::min(numPocInterLayer[li], (Int)refPicSetInterLayer[li]->size());
+    for ( i=0; i < actualNumPocInterLayer;  i++, cIdx++)
     {
       rpsCurrList[li][cIdx] = (*refPicSetInterLayer[li])[i];
       usedAsLongTerm [li][cIdx] = true;
@@ -648,7 +650,9 @@ Void TComSlice::getTempRefPicLists( TComList<TComPic*>& rcListPic, std::vector<T
       usedAsLongTerm [li][cIdx] = true;
     }
 
-    for ( i=0; i < numPocInterLayer[1-li];  i++, cIdx++)
+    // Use the actual size of the inter-layer reference picture set, not the signaled count
+    Int actualNumPocInterLayerOther = std::min(numPocInterLayer[1-li], (Int)refPicSetInterLayer[1-li]->size());
+    for ( i=0; i < actualNumPocInterLayerOther;  i++, cIdx++)
     {
       assert( cIdx < MAX_NUM_REF );
       rpsCurrList[li][cIdx] = (*refPicSetInterLayer[1-li])[i];
@@ -4275,6 +4279,9 @@ Void TComVPSVUI::init( Int numLayerSets, Int maxNumSubLayers, Int maxNumLayers )
   m_ctuBasedOffsetEnabledFlag             .resize( maxNumLayers );
   m_minHorizontalCtuOffsetPlus1           .resize( maxNumLayers );
   m_baseLayerParameterSetCompatibilityFlag.resize( maxNumLayers );
+  m_vpsVideoSignalInfoIdx                 .resize( maxNumLayers );
+  m_tilesInUseFlag                        .resize( maxNumLayers );
+  m_wppInUseFlag                          .resize( maxNumLayers );
 
   for ( Int i = 0; i < maxNumLayers; i++)
   {

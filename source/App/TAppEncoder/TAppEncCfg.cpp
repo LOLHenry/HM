@@ -830,12 +830,12 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
 #if NH_MV
   IntAry1d tmpInputChromaFormat;
   IntAry1d tmpChromaFormat;
-  IntAry2d tmpPad(2);
+  IntAry2d tmpPad(4);
 
-  IntAry2d tmpInputBitDepth      (2);
-  IntAry2d tmpOutputBitDepth     (2);
-  IntAry2d tmpMSBExtendedBitDepth(2);
-  IntAry2d tmpInternalBitDepth   (2);
+  IntAry2d tmpInputBitDepth      (4);
+  IntAry2d tmpOutputBitDepth     (4);
+  IntAry2d tmpMSBExtendedBitDepth(4);
+  IntAry2d tmpInternalBitDepth   (4);
 
 #else
   Int tmpChromaFormat;
@@ -1962,8 +1962,8 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
       }
 
 
-  for(Int i=1; i<MAX_GOP+1; i++)
-  {
+      for(Int i=1; i<MAX_GOP+1; i++)
+      {
         std::ostringstream cOSS2;
         cOSS2<<"Frame"<<i<<"_l"<<k;
         opts.addOptions()(cOSS2.str(), m_GOPListMvc[k][i-1], GOPEntry());
