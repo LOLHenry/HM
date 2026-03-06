@@ -2902,8 +2902,9 @@ Void TDecTop::x8331GenDecProcForGenUnavilRefPics()
 
   // This process is invoked once per coded picture when the current picture is a
   // BLA picture or is a CRA picture with NoRaslOutputFlag equal to 1.
+  // For MV-HEVC (Annex F.8.3.3), this is also invoked for IDR pictures with NoRaslOutputFlag equal to 1.
 
-  assert( m_pcPic->isBla() || (m_pcPic->isCra() && m_pcPic->getNoRaslOutputFlag() ) );
+  assert( m_pcPic->isBla() || m_pcPic->isIdr() || (m_pcPic->isCra() && m_pcPic->getNoRaslOutputFlag() ) );
   TComDecodedRps* decRps = m_pcPic->getDecodedRps();
 
   std::vector<TComPic*>& refPicSetStFoll      = decRps->m_refPicSetStFoll;
