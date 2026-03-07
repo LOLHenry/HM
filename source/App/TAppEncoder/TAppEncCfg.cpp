@@ -2456,8 +2456,8 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   m_inputColourSpaceConvert = stringToInputColourSpaceConvert(inputColourSpaceConvert, true);
 
   // Picture width and height must be multiples of 8 and minCuSize
-  const Int minCuSize = m_uiMaxCUHeight >> (m_uiMaxCUDepth - 1);
 #if !NH_MV
+  const Int minCuSize = m_uiMaxCUHeight >> (m_uiMaxCUDepth - 1);
   const Int minResolutionMultiple = std::max(8, minCuSize);
 #endif
 
