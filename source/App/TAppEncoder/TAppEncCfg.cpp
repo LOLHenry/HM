@@ -3606,6 +3606,7 @@ Void TAppEncCfg::xDeriveProfAndConstrFlags( const TComVPS& vps )
     Int          maxNumRefLayers          ;
 
     xGetMaxValuesOfApplicableLayers(vps, i, maxInternalBitDepthLuma,maxInternalBitDepthChroma, maxChromaFormatIdc, maxNumRefLayers );
+    (void)maxNumRefLayers;
 
     switch ( UIProfile )
     {

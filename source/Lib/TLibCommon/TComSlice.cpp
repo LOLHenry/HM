@@ -2094,7 +2094,7 @@ Void TComVPS::deriveTargetLayerIdList( Int i )
 
 Bool TComVPS::inferOutputLayerFlag( Int i, Int j ) const
 {
-  Bool outputLayerFlag;
+  Bool outputLayerFlag = false;
   switch ( getDefaultOutputLayerIdc( ) )
   {
   case 0:
@@ -2152,7 +2152,7 @@ Int TComVPS::inferProfileTierLevelIdx(Int i, Int j) const
   Bool inferGreaterZero = getNecessaryLayerFlag(i,j) && ( getVpsNumProfileTierLevelMinus1() == 0 );
   assert( inferZero || inferGreaterZero );
 
-  Bool ptlIdx = 0; // inference for greaterZero
+  Int ptlIdx = 0; // inference for greaterZero
   if ( inferZero )
   {
     ptlIdx = getMaxLayersMinus1() > 0 ? 1 : 0;
@@ -2676,14 +2676,13 @@ Void TComSPS::inferRepFormat( TComVPS* vps, Int layerIdCurr, Bool alreadySet )
   // respectively, of the vps_rep_format_idx[ j ]-th rep_format( ) syntax structure
   // in the active VPS, where j is equal to LayerIdxInVps[ layerIdCurr ].
 
-  Bool baseLayer               = ( layerIdCurr == 0 );
   Bool independentNonBaseLayer = vps->isIndependendNonBaseLayer( layerIdCurr );
   Bool multiLayerExtSpsFlag    = getMultiLayerExtSpsFlag();
 
   Int            repFormatIdx = getUpdateRepFormatFlag() ?  getSpsRepFormatIdx() : vps->getVpsRepFormatIdx( vps->getLayerIdInVps( layerIdCurr ) ) ;
   const TComRepFormat* repFormat    = vps->getRepFormat( repFormatIdx );
 
-  assert( !( multiLayerExtSpsFlag && ( independentNonBaseLayer || baseLayer )) );
+  assert( !( multiLayerExtSpsFlag && ( independentNonBaseLayer || layerIdCurr == 0 )) );
 
   Bool presentInSps = !multiLayerExtSpsFlag;
   if ( presentInSps )

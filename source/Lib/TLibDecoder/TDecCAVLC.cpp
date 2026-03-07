@@ -1201,6 +1201,7 @@ Void TDecCavlc::parsePpsMultilayerExtension(TComPPS* pcPPS)
       READ_SVLC( iCode, "ref_region_right_offset" );
       READ_SVLC( iCode, "ref_region_bottom_offset" );
     }
+    (void)iCode; // Values parsed to advance bitstream, not used
 
     READ_FLAG( uiCode, "resample_phase_set_present_flag" );
     if (uiCode)

@@ -1744,14 +1744,16 @@ Void TDecTop::initFromActiveVps( const TComVPS* vps )
       Int profileIdc = vps->getPTL( vps->getProfileTierLevelIdx( m_targetOlsIdx, lIdx ) )->getGeneralPTL()->getProfileIdc();
 
 #if !NH_MV_ALLOW_NON_CONFORMING
-      assert( profileIdc == Profile::MAIN || profileIdc == Profile::MAIN10 || profileIdc == Profile::MULTIVIEWMAIN
+      {
+        Bool validProfile = profileIdc == Profile::MAIN || profileIdc == Profile::MAIN10 || profileIdc == Profile::MULTIVIEWMAIN;
 #if JVET_AH0046
-             || profileIdc == Profile::MULTIVIEWEXTENDED || profileIdc == Profile::MULTIVIEWEXTENDED10
+        validProfile = validProfile || profileIdc == Profile::MULTIVIEWEXTENDED || profileIdc == Profile::MULTIVIEWEXTENDED10;
 #endif
 #if JVET_AM1018
-             || profileIdc == Profile::MAINREXT || profileIdc == Profile::MULTIVIEWREXT
+        validProfile = validProfile || profileIdc == Profile::MAINREXT || profileIdc == Profile::MULTIVIEWREXT;
 #endif
-             );
+        assert( validProfile );
+      }
 #else
         assert( profileIdc == Profile::MAIN || profileIdc == Profile::MAIN10 || profileIdc == Profile::MULTIVIEWMAIN || profileIdc == Profile::MAINREXT|| profileIdc == Profile::MULTIVIEWREXT || profileIdc == Profile::NONE || profileIdc == Profile::MULTIVIEWMAIN_NONCONFORMING );
 #endif
@@ -2784,13 +2786,12 @@ Void TDecTop::xF832DecProcForRefPicSet()
 
   // -  The constraints specified in clause 8.3.2 on the value of NumPicTotalCurr are replaced with the following:
   //    -  It is a requirement of bitstream conformance that the following applies to the value of NumPicTotalCurr:
-  Int numPicTotalCurr = m_pcPic->getSlice(0)->getNumPicTotalCurr();
   Int currPicLayerId  = m_pcPic->getLayerId();
   const TComVPS* vps  = m_pcPic->getSlice(0)->getVPS();
 
   if ( ( m_pcPic->isBla() || m_pcPic->isCra() ) && (  (currPicLayerId == 0 ) || ( vps->getNumDirectRefLayers( currPicLayerId ) == 0 ) ) )
   {
-    assert( numPicTotalCurr == 0 );
+    assert( m_pcPic->getSlice(0)->getNumPicTotalCurr() == 0 );
     // -  If the current picture is a BLA or CRA picture and either currPicLayerId is equal to 0 or
     //     NumDirectRefLayers[ currPicLayerId ] is equal to 0, the value of NumPicTotalCurr shall be equal to 0.
   }
@@ -2800,7 +2801,7 @@ Void TDecTop::xF832DecProcForRefPicSet()
     if ( m_pcPic->getSlice(0)->getSliceType() == P_SLICE  ||  m_pcPic->getSlice(0)->getSliceType() == B_SLICE )
     {
       // -  Otherwise, when the current picture contains a P or B slice, the value of NumPicTotalCurr shall not be equal to 0.
-      assert( numPicTotalCurr != 0 );
+      assert( m_pcPic->getSlice(0)->getNumPicTotalCurr() != 0 );
     }
   }
 }

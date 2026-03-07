@@ -2907,7 +2907,7 @@ Int TAppDecTop::xGetDecoderIdx( Int layerId, Bool createFlag /*= false */ )
     TChar* pchTempFilename = NULL;
     if ( !m_reconFileName.empty() )
     {
-      TChar buffer[4];
+      TChar buffer[16];
       snprintf(buffer, sizeof(buffer), "_%i", layerId );
       assert ( !m_reconFileName.empty() );
       xAppendToFileNameEnd( m_reconFileName.c_str() , buffer, pchTempFilename );
@@ -2944,7 +2944,7 @@ Int TAppDecTop::xPreDecodePoc( InputNALUnit& nalu )
   Int nuhLayerId        = nalu.m_nuhLayerId;
   Int smallestLayerId   = dec->getSmallestLayerId();
 
-  Int handleCraAsBlaFlag;
+  Int handleCraAsBlaFlag = 0;
   if ( nalu.isIrap() )
   {
     if ( !m_handleCraAsBlaFlagSetByExtMeans )

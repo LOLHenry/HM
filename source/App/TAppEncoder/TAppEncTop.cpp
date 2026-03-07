@@ -1845,8 +1845,7 @@ Void TAppEncTop::xSetDimensionIdAndLength( TComVPS& vps )
   Int maxViewId = xGetMax( m_viewId );
 
   Int viewIdLen = gCeilLog2( maxViewId + 1 );
-  const Int maxViewIdLen = ( 1 << 4 ) - 1;
-  assert( viewIdLen <= maxViewIdLen );
+  assert( viewIdLen <= ( 1 << 4 ) - 1 );
   vps.setViewIdLen( viewIdLen );
   for (Int i = 0; i < m_iNumberOfViews; i++)
   {
