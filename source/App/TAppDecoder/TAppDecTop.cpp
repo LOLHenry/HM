@@ -77,6 +77,14 @@ TAppDecTop::TAppDecTop()
     m_noRaslOutputFlagAssocIrap           [i] = false;
   }
 
+  for (Int i = 0; i < MAX_NUM_LAYERS; i++)
+  {
+    for (UInt ch = 0; ch < MAX_NUM_CHANNEL_TYPE; ch++)
+    {
+      m_outputBitDepth[i][ch] = 0;
+    }
+  }
+
   m_curPic                          = NULL;
   m_vps                             = NULL;
   m_sps                             = NULL;
@@ -3123,13 +3131,24 @@ Void TAppDecTop::xOpenReconFile( TComPic* curPic )
     const BitDepths &bitDepths= curPic->getPicSym()->getSPS().getBitDepths(); // use bit depths of first reconstructed picture.
     for (UInt channelType = 0; channelType < MAX_NUM_CHANNEL_TYPE; channelType++)
     {
+#if NH_MV
+      if (m_outputBitDepth[decIdx][channelType] == 0)
+      {
+        m_outputBitDepth[decIdx][channelType] = bitDepths.recon[channelType];
+      }
+#else
       if (m_outputBitDepth[channelType] == 0)
       {
         m_outputBitDepth[channelType] = bitDepths.recon[channelType];
       }
+#endif
     }
 
+#if NH_MV
+    m_tVideoIOYuvReconFile[decIdx]->open( m_pchReconFiles[decIdx], true, m_outputBitDepth[decIdx], m_outputBitDepth[decIdx], bitDepths.recon ); // write mode
+#else
     m_tVideoIOYuvReconFile[decIdx]->open( m_pchReconFiles[decIdx], true, m_outputBitDepth, m_outputBitDepth, bitDepths.recon ); // write mode
+#endif
     m_reconOpen[decIdx] = true;
   }
 }

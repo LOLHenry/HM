@@ -2689,16 +2689,34 @@ Void TComSPS::inferRepFormat( TComVPS* vps, Int layerIdCurr, Bool alreadySet )
   if ( presentInSps )
   {
     // Values have been set before in xInitSps
+    // NOTE: Real-world MV-HEVC bitstreams (e.g. Apple spatial video) may have VPS rep format
+    // values that don't match the SPS. Relaxed from assertions to warnings to allow decoding.
 
-    assert( getChromaFormatIdc()      <=  repFormat->getChromaFormatVpsIdc()         );
-    //// ToDo: add when supported:
-    ///  assert( getSeperateColourPlaneFlag() <=  repFormat->getSeparateColourPlaneVpsFlag() ) ;
-
-    assert( getPicWidthInLumaSamples()  <= repFormat->getPicWidthVpsInLumaSamples()    );
-    assert( getPicHeightInLumaSamples() <= repFormat->getPicHeightVpsInLumaSamples()   );
-
-    assert( getBitDepth( CHANNEL_TYPE_LUMA   )  <= repFormat->getBitDepthVpsLumaMinus8()   + 8 );
-    assert( getBitDepth( CHANNEL_TYPE_CHROMA )  <= repFormat->getBitDepthVpsChromaMinus8() + 8 );
+    if ( getChromaFormatIdc() > repFormat->getChromaFormatVpsIdc() )
+    {
+      fprintf(stderr, "Warning: SPS chroma_format_idc (%d) > rep_format chroma_format_vps_idc (%d) for layer %d\n",
+              getChromaFormatIdc(), repFormat->getChromaFormatVpsIdc(), layerIdCurr);
+    }
+    if ( getPicWidthInLumaSamples() > repFormat->getPicWidthVpsInLumaSamples() )
+    {
+      fprintf(stderr, "Warning: SPS pic_width (%d) > rep_format pic_width (%d) for layer %d\n",
+              getPicWidthInLumaSamples(), repFormat->getPicWidthVpsInLumaSamples(), layerIdCurr);
+    }
+    if ( getPicHeightInLumaSamples() > repFormat->getPicHeightVpsInLumaSamples() )
+    {
+      fprintf(stderr, "Warning: SPS pic_height (%d) > rep_format pic_height (%d) for layer %d\n",
+              getPicHeightInLumaSamples(), repFormat->getPicHeightVpsInLumaSamples(), layerIdCurr);
+    }
+    if ( getBitDepth( CHANNEL_TYPE_LUMA ) > repFormat->getBitDepthVpsLumaMinus8() + 8 )
+    {
+      fprintf(stderr, "Warning: SPS luma bit_depth (%d) > rep_format luma bit_depth (%d) for layer %d\n",
+              getBitDepth( CHANNEL_TYPE_LUMA ), repFormat->getBitDepthVpsLumaMinus8() + 8, layerIdCurr);
+    }
+    if ( getBitDepth( CHANNEL_TYPE_CHROMA ) > repFormat->getBitDepthVpsChromaMinus8() + 8 )
+    {
+      fprintf(stderr, "Warning: SPS chroma bit_depth (%d) > rep_format chroma bit_depth (%d) for layer %d\n",
+              getBitDepth( CHANNEL_TYPE_CHROMA ), repFormat->getBitDepthVpsChromaMinus8() + 8, layerIdCurr);
+    }
   }
 
   if ( !independentNonBaseLayer )
@@ -2709,24 +2727,44 @@ Void TComSPS::inferRepFormat( TComVPS* vps, Int layerIdCurr, Bool alreadySet )
     // Inference when not already done at the encoder.
     if ( alreadySet )
     {
-      assert( getChromaFormatIdc() ==  (ChromaFormat) repFormat->getChromaFormatVpsIdc() );
-      //// ToDo: add when supported:
-      // assert( getSeperateColourPlaneFlag( repFormat->getSeparateColourPlaneVpsFlag() ) ;
+      // NOTE: Relaxed from assertions to warnings for compatibility with real-world bitstreams.
+      if ( getChromaFormatIdc() != (ChromaFormat) repFormat->getChromaFormatVpsIdc() )
+      {
+        fprintf(stderr, "Warning: SPS chroma_format_idc (%d) != rep_format chroma_format_vps_idc (%d) for layer %d\n",
+                getChromaFormatIdc(), repFormat->getChromaFormatVpsIdc(), layerIdCurr);
+      }
+      if ( getPicWidthInLumaSamples() != repFormat->getPicWidthVpsInLumaSamples() )
+      {
+        fprintf(stderr, "Warning: SPS pic_width (%d) != rep_format pic_width (%d) for layer %d\n",
+                getPicWidthInLumaSamples(), repFormat->getPicWidthVpsInLumaSamples(), layerIdCurr);
+      }
+      if ( getPicHeightInLumaSamples() != repFormat->getPicHeightVpsInLumaSamples() )
+      {
+        fprintf(stderr, "Warning: SPS pic_height (%d) != rep_format pic_height (%d) for layer %d\n",
+                getPicHeightInLumaSamples(), repFormat->getPicHeightVpsInLumaSamples(), layerIdCurr);
+      }
+      if ( getBitDepth( CHANNEL_TYPE_LUMA ) != repFormat->getBitDepthVpsLumaMinus8() + 8 )
+      {
+        fprintf(stderr, "Warning: SPS luma bit_depth (%d) != rep_format luma bit_depth (%d) for layer %d\n",
+                getBitDepth( CHANNEL_TYPE_LUMA ), repFormat->getBitDepthVpsLumaMinus8() + 8, layerIdCurr);
+      }
+      // QpBDOffset is derived from SPS bit_depth, always consistent
+      assert( getQpBDOffset( CHANNEL_TYPE_LUMA ) == (Int) (6*( getBitDepth( CHANNEL_TYPE_LUMA ) - 8 )) );
 
-      assert( getPicWidthInLumaSamples()  ==  repFormat->getPicWidthVpsInLumaSamples()  );
-      assert( getPicHeightInLumaSamples() == repFormat->getPicHeightVpsInLumaSamples() );
+      if ( getBitDepth( CHANNEL_TYPE_CHROMA ) != repFormat->getBitDepthVpsChromaMinus8() + 8 )
+      {
+        fprintf(stderr, "Warning: SPS chroma bit_depth (%d) != rep_format chroma bit_depth (%d) for layer %d\n",
+                getBitDepth( CHANNEL_TYPE_CHROMA ), repFormat->getBitDepthVpsChromaMinus8() + 8, layerIdCurr);
+      }
+      assert( getQpBDOffset( CHANNEL_TYPE_CHROMA ) == (Int) (6* ( getBitDepth( CHANNEL_TYPE_CHROMA ) -8 ) ) );
 
-      assert( getBitDepth              ( CHANNEL_TYPE_LUMA ) == repFormat->getBitDepthVpsLumaMinus8()   + 8 );
-      assert( getQpBDOffset            ( CHANNEL_TYPE_LUMA ) == (Int) (6*( getBitDepth( CHANNEL_TYPE_LUMA ) - 8 )) );
-
-      assert( getBitDepth              ( CHANNEL_TYPE_CHROMA ) == repFormat->getBitDepthVpsChromaMinus8() + 8 );
-      assert( getQpBDOffset            ( CHANNEL_TYPE_CHROMA ) == (Int) (6* ( getBitDepth( CHANNEL_TYPE_CHROMA ) -8 ) ) );
-
-      
-      assert( spsConf.getWindowLeftOffset  () == repFormat->getConfWinVpsLeftOffset()    );
-      assert( spsConf.getWindowRightOffset () == repFormat->getConfWinVpsRightOffset()   );
-      assert( spsConf.getWindowTopOffset   () == repFormat->getConfWinVpsTopOffset()     );
-      assert( spsConf.getWindowBottomOffset() == repFormat->getConfWinVpsBottomOffset()  );
+      if ( spsConf.getWindowLeftOffset() != repFormat->getConfWinVpsLeftOffset() ||
+           spsConf.getWindowRightOffset() != repFormat->getConfWinVpsRightOffset() ||
+           spsConf.getWindowTopOffset() != repFormat->getConfWinVpsTopOffset() ||
+           spsConf.getWindowBottomOffset() != repFormat->getConfWinVpsBottomOffset() )
+      {
+        fprintf(stderr, "Warning: SPS conformance window doesn't match rep_format for layer %d\n", layerIdCurr);
+      }
 
     }
     else

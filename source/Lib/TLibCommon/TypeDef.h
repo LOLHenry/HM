@@ -61,7 +61,7 @@
 
 */
 #ifndef HEVC_EXT
-#define HEVC_EXT                    0
+#define HEVC_EXT                    1
 #endif
 #if ( HEVC_EXT < 0 )||( HEVC_EXT > 1 )
 #error HEVC_EXT must be in the range of 0 to 1, inclusive.
@@ -77,7 +77,8 @@
  */
 #define JVET_AE0295                               1  // MV-MAIN 10 implementation
 #define JVET_AH0046                               0  // Changes to the existing MV Main 10 to accommodate the Multiview Extended 10
-#define JVET_AM1018                               0  // Multiview Range Extended profiles support
+#define JVET_AM1018                               1  // Multiview Range Extended profiles support
+#define JVET_AN0293                               1  // Multiview 4:4:4 10 and Multiview 4:4:4 12 profiles
 
 /////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////   FIXES AND INTEGRATIONS     ////////////////////////

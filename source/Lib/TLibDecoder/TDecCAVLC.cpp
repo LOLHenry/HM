@@ -556,8 +556,7 @@ Void TDecCavlc::parsePPS(TComPPS* pcPPS)
     }
 #endif
   }
-  xReadRbspTrailingBits();
-}
+  xReadRbspTrailingBits();}
 
 Void  TDecCavlc::parseVUI(TComVUI* pcVUI, TComSPS *pcSPS)
 {
@@ -585,7 +584,13 @@ Void  TDecCavlc::parseVUI(TComVUI* pcVUI, TComSPS *pcSPS)
 
   READ_FLAG(     uiCode, "video_signal_type_present_flag");           pcVUI->setVideoSignalTypePresentFlag(uiCode);
 #if NH_MV
-  assert( pcSPS->getLayerId() == 0 || !pcVUI->getVideoSignalTypePresentFlag() );
+  // NOTE: Spec says video_signal_type_present_flag should be 0 for non-base layers,
+  // but real-world MV-HEVC bitstreams (e.g. Apple spatial video) include it in all layers.
+  // Relaxed to a warning to allow decoding of such bitstreams.
+  if ( pcSPS->getLayerId() != 0 && pcVUI->getVideoSignalTypePresentFlag() )
+  {
+    fprintf(stderr, "Warning: video_signal_type_present_flag is 1 in SPS for layer %d (expected 0 for non-base layers)\n", pcSPS->getLayerId());
+  }
 #endif
   if (pcVUI->getVideoSignalTypePresentFlag())
   {
@@ -1153,7 +1158,6 @@ Void TDecCavlc::parseSPS(TComSPS* pcSPS)
 #endif
   xReadRbspTrailingBits();
 }
-
 #if NH_MV
 Void TDecCavlc::parseSpsMultilayerExtension( TComSPS* pcSPS )
 {
@@ -1356,7 +1360,6 @@ Void TDecCavlc::parseVPS(TComVPS* pcVPS)
 
   xReadRbspTrailingBits();
 }
-
 #if NH_MV
 Void TDecCavlc::parseVPSExtension( TComVPS* pcVPS )
 {
@@ -1365,7 +1368,7 @@ Void TDecCavlc::parseVPSExtension( TComVPS* pcVPS )
   if( pcVPS->getMaxLayersMinus1() > 0  &&  pcVPS->getVpsBaseLayerInternalFlag() )
   {
     parsePTL( pcVPS->getPTL( 1 ),0, pcVPS->getMaxSubLayersMinus1()  );
-    
+
     pcVPS->getPTL( 1 )->inferGeneralValues ( false, 1, pcVPS->getPTL( 0 ) );
     pcVPS->getPTL( 1 )->inferSubLayerValues( pcVPS->getMaxSubLayersMinus1(), 1, pcVPS->getPTL( 0 ) );
   }
@@ -1489,6 +1492,7 @@ Void TDecCavlc::parseVPSExtension( TComVPS* pcVPS )
   }
 
   READ_FLAG( uiCode, "all_ref_layers_active_flag" );             pcVPS->setAllRefLayersActiveFlag( uiCode == 1 );
+
   READ_UVLC( uiCode, "vps_num_profile_tier_level_minus1" );  pcVPS->setVpsNumProfileTierLevelMinus1( uiCode );
 
   Int offsetVal =  ( pcVPS->getMaxLayersMinus1() > 0  &&  pcVPS->getVpsBaseLayerInternalFlag() ) ? 2 : 1;
@@ -1500,7 +1504,6 @@ Void TDecCavlc::parseVPSExtension( TComVPS* pcVPS )
     pcVPS->getPTL( offsetVal )->inferSubLayerValues( pcVPS->getMaxSubLayersMinus1()      , offsetVal, pcVPS->getPTL( offsetVal - 1 ) );
     offsetVal++;
   }
-
 
   if (pcVPS->getNumLayerSets() > 1)
   {
@@ -1521,6 +1524,7 @@ Void TDecCavlc::parseVPSExtension( TComVPS* pcVPS )
   {
     pcVPS->setProfileTierLevelIdx(0,0, pcVPS->inferProfileTierLevelIdx(0,0) );
   }
+
   for( Int i = 1; i < pcVPS->getNumOutputLayerSets( ); i++ )
   {
     if( pcVPS->getNumLayerSets() > 2 && i >= pcVPS->getNumLayerSets( ) )
@@ -1597,6 +1601,7 @@ Void TDecCavlc::parseVPSExtension( TComVPS* pcVPS )
   READ_FLAG( uiCode, "max_one_active_ref_layer_flag" ); pcVPS->setMaxOneActiveRefLayerFlag ( uiCode == 1 );
 
   READ_FLAG( uiCode, "vps_poc_lsb_aligned_flag" ); pcVPS->setVpsPocLsbAlignedFlag( uiCode == 1 );
+
   for( Int i = 1; i  <=  pcVPS->getMaxLayersMinus1(); i++ )
   {
     if( pcVPS->getNumDirectRefLayers( pcVPS->getLayerIdInNuh( i ) )  ==  0 )
@@ -1610,6 +1615,7 @@ Void TDecCavlc::parseVPSExtension( TComVPS* pcVPS )
   READ_UVLC( uiCode, "direct_dep_type_len_minus2")    ; pcVPS->setDirectDepTypeLenMinus2   ( uiCode );
 
   READ_FLAG( uiCode, "default_direct_dependency_flag" ); pcVPS->setDefaultDirectDependencyFlag( uiCode == 1 );
+
   if ( pcVPS->getDefaultDirectDependencyFlag( ) )
   {
     READ_CODE( pcVPS->getDirectDepTypeLenMinus2( ) + 2, uiCode, "default_direct_dependency_type" ); pcVPS->setDefaultDirectDependencyType( uiCode );
@@ -1639,7 +1645,7 @@ Void TDecCavlc::parseVPSExtension( TComVPS* pcVPS )
     READ_CODE( 8, uiCode, "vps_non_vui_extension_data_byte" );
   }
   READ_FLAG( uiCode, "vps_vui_present_flag" );  pcVPS->setVpsVuiPresentFlag( uiCode == 1 );
-  
+
   TComVPSVUI vpsVui;
   if( pcVPS->getVpsVuiPresentFlag() )
   {
@@ -2095,7 +2101,7 @@ Void TDecCavlc::parseSliceHeader (TComSlice* pcSlice, ParameterSetManager *param
   Int targetOlsIdx = m_decTop->getTargetOlsIdx();
 
   // Do inference
-  sps->inferRepFormat  ( vps , pcSlice->getLayerId(), false );
+  sps->inferRepFormat  ( vps , pcSlice->getLayerId(), !sps->getMultiLayerExtSpsFlag() );
   sps->inferScalingList( parameterSetManager->getActiveSPS( sps->getSpsScalingListRefLayerId() ) );
   sps->inferSpsMaxDecPicBufferingMinus1( vps, targetOlsIdx, pcSlice->getLayerId(), false );
 

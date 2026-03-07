@@ -215,25 +215,37 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setVPS(&vps);
 
 #if NH_MV
-  // These values go to the SPS of the base layer only and should apply as follows:
-  //   If the profile_tier_level( ) syntax structure is included in an active SPS for the base layer
-  //    or is the profile_tier_level( ) syntax structure VpsProfileTierLevel[ 0 ],
-  //    it applies to the OLS containing all layers in the bitstream but with only the base layer being the output layer.
-  //   Otherwise, if the profile_tier_level( ) syntax structure is included in an active SPS
-  //    for an independent non-base layer with nuh_layer_id equal to layerId, it applies to the output bitstream
-  //    of the independent non-base layer rewriting process of clause F.10.2 with the input variables assignedBaseLayerId equal to layerId and tIdTarget equal to 6.
+  // Determine the applicable PTL for this layer using the VPS profile_tier_level_idx mapping.
+  // The PTL entry is resolved from the output layer sets: we search OLSes in reverse order to
+  // find the one containing this layer and use its profile_tier_level_idx.
 
-  m_cTEncTop.setProfile                                           ( m_profiles[0]                       );
-  m_cTEncTop.setLevel                                             ( m_levelTier[0], m_level[0]          );
-  m_cTEncTop.setProgressiveSourceFlag                             ( m_progressiveSourceFlags        [0] );
-  m_cTEncTop.setInterlacedSourceFlag                              ( m_interlacedSourceFlags         [0] );
-  m_cTEncTop.setNonPackedConstraintFlag                           ( m_nonPackedConstraintFlags      [0] );
-  m_cTEncTop.setFrameOnlyConstraintFlag                           ( m_frameOnlyConstraintFlags      [0] );
-  m_cTEncTop.setBitDepthConstraintValue                           ( m_bitDepthConstraints           [0] );
-  m_cTEncTop.setChromaFormatConstraintValue                       ( m_chromaFormatConstraints       [0] );
-  m_cTEncTop.setIntraConstraintFlag                               ( m_intraConstraintFlags          [0] );
-  m_cTEncTop.setOnePictureOnlyConstraintFlag                      ( m_onePictureOnlyConstraintFlags [0] );
-  m_cTEncTop.setLowerBitRateConstraintFlag                        ( m_lowerBitRateConstraintFlags   [0] );
+  // Determine PTL index for this layer from VPS profile_tier_level_idx
+  Int ptlIdxForLayer = 0;
+  for (Int olsIdx = vps.getNumOutputLayerSets() - 1; olsIdx >= 0; olsIdx--)
+  {
+    Int lsIdx = vps.olsIdxToLsIdx(olsIdx);
+    for (Int k = 0; k < vps.getNumLayersInIdList(lsIdx); k++)
+    {
+      if (vps.getLayerSetLayerIdList(lsIdx, k) == vps.getLayerIdInNuh(layerIdInVps))
+      {
+        ptlIdxForLayer = vps.getProfileTierLevelIdx(olsIdx, k);
+        break;
+      }
+    }
+    if (ptlIdxForLayer > 0) break;
+  }
+
+  m_cTEncTop.setProfile                                           ( m_profiles[ptlIdxForLayer]                       );
+  m_cTEncTop.setLevel                                             ( m_levelTier[ptlIdxForLayer], m_level[ptlIdxForLayer]          );
+  m_cTEncTop.setProgressiveSourceFlag                             ( m_progressiveSourceFlags        [ptlIdxForLayer] );
+  m_cTEncTop.setInterlacedSourceFlag                              ( m_interlacedSourceFlags         [ptlIdxForLayer] );
+  m_cTEncTop.setNonPackedConstraintFlag                           ( m_nonPackedConstraintFlags      [ptlIdxForLayer] );
+  m_cTEncTop.setFrameOnlyConstraintFlag                           ( m_frameOnlyConstraintFlags      [ptlIdxForLayer] );
+  m_cTEncTop.setBitDepthConstraintValue                           ( m_bitDepthConstraints           [ptlIdxForLayer] );
+  m_cTEncTop.setChromaFormatConstraintValue                       ( m_chromaFormatConstraints       [ptlIdxForLayer] );
+  m_cTEncTop.setIntraConstraintFlag                               ( m_intraConstraintFlags          [ptlIdxForLayer] );
+  m_cTEncTop.setOnePictureOnlyConstraintFlag                      ( m_onePictureOnlyConstraintFlags [ptlIdxForLayer] );
+  m_cTEncTop.setLowerBitRateConstraintFlag                        ( m_lowerBitRateConstraintFlags   [ptlIdxForLayer] );
 #else
   m_cTEncTop.setProfile                                           ( m_profile);
   m_cTEncTop.setLevel                                             ( m_levelTier, m_level);
@@ -947,18 +959,6 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setSummaryPicFilenameBase                            ( m_summaryPicFilenameBase );
   m_cTEncTop.setSummaryVerboseness                                ( m_summaryVerboseness );
 
-#if NH_MV
-  }
-#endif
-
-#if !NH_MV
-#if JCTVC_AD0021_SEI_MANIFEST
-  m_cTEncTop.setSEIManifestSEIEnabled(m_SEIManifestSEIEnabled);
-#endif
-#if JCTVC_AD0021_SEI_PREFIX_INDICATION
-  m_cTEncTop.setSEIPrefixIndicationSEIEnabled(m_SEIPrefixIndicationSEIEnabled);
-#endif
-#endif
 #if JVET_AJ0207_GFV
   m_cTEncTop.setGenerativeFaceVideoSEIEnabled(m_generativeFaceVideoEnabled);
   m_cTEncTop.setGenerativeFaceVideoSEINumber(m_generativeFaceVideoSEINumber);
@@ -1037,6 +1037,18 @@ Void TAppEncTop::xInitLibCfg()
   }
 #endif
 
+#if NH_MV
+  }
+#endif
+
+#if !NH_MV
+#if JCTVC_AD0021_SEI_MANIFEST
+  m_cTEncTop.setSEIManifestSEIEnabled(m_SEIManifestSEIEnabled);
+#endif
+#if JCTVC_AD0021_SEI_PREFIX_INDICATION
+  m_cTEncTop.setSEIPrefixIndicationSEIEnabled(m_SEIPrefixIndicationSEIEnabled);
+#endif
+#endif
 
 }
 
@@ -2135,6 +2147,18 @@ Void TAppEncTop::xSetProfileTierLevel(TComVPS& vps, Int ptlIdx, Int subLayer, Pr
   ptl->setProfileCompatibilityFlag( m_profiles [ ptlIdx ], true );
   ptl->setInbldFlag               ( m_inblFlag [ ptlIdx ] );
 
+#if NH_MV
+  // Set backward-compatibility flags per H.265 Table A.2/Table F.3
+  if (m_profiles[ptlIdx] == Profile::MULTIVIEWREXT)
+  {
+    ptl->setProfileCompatibilityFlag(Profile::MAINREXT, true);
+  }
+  if (m_profiles[ptlIdx] == Profile::MULTIVIEWMAIN)
+  {
+    ptl->setProfileCompatibilityFlag(Profile::MAIN, true);
+  }
+#endif
+
   Int        bitDepth = m_bitDepthConstraints[ptlIdx];
   ChromaFormat chroma = m_chromaFormatConstraints[ptlIdx];
 
@@ -2158,8 +2182,8 @@ Void TAppEncTop::xSetRepFormat( TComVPS& vps )
   repFormat.resize( vps.getVpsNumRepFormatsMinus1() + 1 );
   for ( Int j = 0; j <= vps.getVpsNumRepFormatsMinus1(); j++ )
   {
-    repFormat[j].setBitDepthVpsChromaMinus8   ( m_internalBitDepths[j][CHANNEL_TYPE_LUMA  ] - 8 );
-    repFormat[j].setBitDepthVpsLumaMinus8     ( m_internalBitDepths[j][CHANNEL_TYPE_CHROMA] - 8 );
+    repFormat[j].setBitDepthVpsLumaMinus8     ( m_internalBitDepths[j][CHANNEL_TYPE_LUMA  ] - 8 );
+    repFormat[j].setBitDepthVpsChromaMinus8   ( m_internalBitDepths[j][CHANNEL_TYPE_CHROMA] - 8 );
     repFormat[j].setChromaFormatVpsIdc        ( m_chromaFormatIDCs[j] );
     repFormat[j].setPicHeightVpsInLumaSamples ( m_iSourceHeights[j] );
     repFormat[j].setPicWidthVpsInLumaSamples  ( m_iSourceWidths [j] );

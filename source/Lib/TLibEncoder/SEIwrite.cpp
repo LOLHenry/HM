@@ -1915,7 +1915,7 @@ void SEIWriter::xWriteSEIDigitallySignedContentInitialization(const SEIDigitally
   WRITE_CODE(sei.dsciHashMethodType, 8, "dsci_hash_method_type");
 #if NH_MV
   UInt ilength = (UInt) sei.dsciKeySourceUri.size();
-  UChar* stmp (UChar*) strdup( sei.dsciKeySourceUri.c_str() );
+  UChar* stmp = (UChar*) strdup( sei.dsciKeySourceUri.c_str() );
   WRITE_STRING(stmp, ilength, "dsci_key_source_uri");
   free(stmp);
 #else
@@ -2484,8 +2484,22 @@ void SEIWriter::xWriteSEIGenerativeFaceVideo(const SEIGenerativeFaceVideo &sei)
         {
           WRITE_FLAG(0, "gfv_reserved_zero_bit_a");
         }
+#if NH_MV
+        {
+          UChar* stmp; UInt ilength;
+          stmp = (UChar*) strdup( sei.m_nnTagURI.c_str() );
+          ilength = (UInt) sei.m_nnTagURI.size();
+          WRITE_STRING(stmp, ilength, "gfv_uri_tag");
+          free(stmp);
+          stmp = (UChar*) strdup( sei.m_nnURI.c_str() );
+          ilength = (UInt) sei.m_nnURI.size();
+          WRITE_STRING(stmp, ilength, "gfv_uri");
+          free(stmp);
+        }
+#else
         WRITE_STRING(sei.m_nnTagURI, "gfv_uri_tag");
         WRITE_STRING(sei.m_nnURI, "gfv_uri");
+#endif
       }
     }
     WRITE_FLAG(sei.m_chromaKeyInfoPresentFlag, "gfv_chroma_key_info_presentFlag");
@@ -2820,8 +2834,22 @@ Void SEIWriter::xWriteSEIGenerativeFaceVideoEnhancement(const SEIGenerativeFaceV
         {
           WRITE_FLAG(0, "gefv_nn_alignment_zero_bit_a");
         }
+#if NH_MV
+        {
+          UChar* stmp; UInt ilength;
+          stmp = (UChar*) strdup( sei.m_nnTagURI.c_str() );
+          ilength = (UInt) sei.m_nnTagURI.size();
+          WRITE_STRING(stmp, ilength, "gefv_uri_tag");
+          free(stmp);
+          stmp = (UChar*) strdup( sei.m_nnURI.c_str() );
+          ilength = (UInt) sei.m_nnURI.size();
+          WRITE_STRING(stmp, ilength, "gefv_uri");
+          free(stmp);
+        }
+#else
         WRITE_STRING(sei.m_nnTagURI, "gefv_uri_tag");
         WRITE_STRING(sei.m_nnURI, "gefv_uri");
+#endif
       }
     }
   }

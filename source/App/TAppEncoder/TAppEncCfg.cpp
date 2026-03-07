@@ -404,6 +404,12 @@ strToUIProfileName[] =
     {"multiview-rext"       , UI_MULTIVIEWREXT   },
     {"multiview-rext"       , UI_MULTIVIEWREXT   },
 #endif  // JVET_AM1018
+#if JVET_AN0293
+    {"multiview-444-10"    , UI_MULTIVIEW444_10 },
+    {"multiview_444_10"    , UI_MULTIVIEW444_10 },
+    {"multiview-444-12"    , UI_MULTIVIEW444_12 },
+    {"multiview_444_12"    , UI_MULTIVIEW444_12 },
+#endif  // JVET_AN0293
 #if NH_MV_ALLOW_NON_CONFORMING
     {"multiview-main_NONCONFORMING"     , UI_MULTIVIEWMAIN_NONCONF   },
 #endif
@@ -3637,6 +3643,24 @@ Void TAppEncCfg::xDeriveProfAndConstrFlags( const TComVPS& vps )
       m_onePictureOnlyConstraintFlags[i] = false;
       break;
 #endif //  JVET_AM1018
+#if JVET_AN0293
+    case UI_MULTIVIEW444_10:
+      m_profiles[i] = Profile::MULTIVIEWREXT;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      m_chromaFormatConstraints[i] = CHROMA_444;
+      m_bitDepthConstraints[i] = 10;
+      m_intraConstraintFlags[i] = false;
+      m_lowerBitRateConstraintFlags[i] = true;
+      break;
+    case UI_MULTIVIEW444_12:
+      m_profiles[i] = Profile::MULTIVIEWREXT;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      m_chromaFormatConstraints[i] = CHROMA_444;
+      m_bitDepthConstraints[i] = 12;
+      m_intraConstraintFlags[i] = false;
+      m_lowerBitRateConstraintFlags[i] = true;
+      break;
+#endif //  JVET_AN0293
     case UI_NONE:
       m_profiles[i] = Profile::NONE;
       m_onePictureOnlyConstraintFlags[i] = false;
@@ -3823,13 +3847,23 @@ Void TAppEncCfg::xDeriveProfAndConstrFlags( const TComVPS& vps )
       break;
 #if JVET_AM1018
     case Profile::MULTIVIEWREXT:
-      // Assume that the profile for each layer is identical during MV-HEVC encoding.
-      switch ((m_uiProfiles[0]/100)%10)
+      if (m_chromaFormatConstraints[i] == CHROMA_400 && m_bitDepthConstraints[i] == 0)
       {
-        case 0:  m_chromaFormatConstraints[i]=CHROMA_400; break;
-        case 1:  m_chromaFormatConstraints[i]=CHROMA_420; break;
-        case 2:  m_chromaFormatConstraints[i]=CHROMA_422; break;
-        default: m_chromaFormatConstraints[i]=CHROMA_444; break;
+        // Not yet derived from explicit sub-profile — derive from m_uiProfiles encoding
+        switch ((m_uiProfiles[i]/100)%10)
+        {
+          case 0:  m_chromaFormatConstraints[i]=CHROMA_400; break;
+          case 1:  m_chromaFormatConstraints[i]=CHROMA_420; break;
+          case 2:  m_chromaFormatConstraints[i]=CHROMA_422; break;
+          default: m_chromaFormatConstraints[i]=CHROMA_444; break;
+        }
+        m_bitDepthConstraints[i] = m_uiProfiles[i] % 100;
+        if (m_bitDepthConstraints[i] == 0)
+        {
+          m_bitDepthConstraints[i] = maxChromaFormatIdc==CHROMA_400
+              ? maxInternalBitDepthLuma
+              : std::max(maxInternalBitDepthLuma, maxInternalBitDepthChroma);
+        }
       }
       break;
 #endif //  JVET_AM1018
@@ -3950,10 +3984,9 @@ Void TAppEncCfg::xCheckProfiles( const TComVPS& vps )
 
 #if JVET_AM1018
     case Profile::MULTIVIEWREXT:
-    // Assume that the profile for each layer is identical during MV-HEVC encoding.
     {
        ChromaFormat  chromaFormat = CHROMA_400;
-       switch ((m_uiProfiles[0]/100)%10)
+       switch ((m_uiProfiles[i]/100)%10)
        {
            case 0:  chromaFormat=CHROMA_400; break;
            case 1:  chromaFormat=CHROMA_420; break;
@@ -3962,6 +3995,13 @@ Void TAppEncCfg::xCheckProfiles( const TComVPS& vps )
        }
 
        xConfirmPara(m_chromaFormatConstraints    [i] != chromaFormat   , "ChromaFormatConstraint must be a right format for multi-RExt profiles.");
+#if JVET_AN0293
+       if (m_chromaFormatConstraints[i] == CHROMA_444)
+       {
+         xConfirmPara(m_bitDepthConstraints[i] != 10 && m_bitDepthConstraints[i] != 12,
+             "BitDepthConstraint must be 10 or 12 for Multiview 4:4:4 profiles");
+       }
+#endif  // JVET_AN0293
      }
       break;
 #endif  // JVET_AM1018
@@ -6233,11 +6273,8 @@ Void TAppEncCfg::xConfirmRepFormat(const TComVPS& vps )
       Int refLayerId =  vps.getLayerIdInVps( vps.getIdDirectRefLayer( curLayerIdInNuh, i ));//   refLayers[i];
       const TComRepFormat* refRepFormat = vps.getRepFormat( vps.getVpsRepFormatIdx( refLayerId ) );
 
-      // Require equal size
-      xConfirmSingleRepFormat( checkFailed, "SourceHeight",curLayerId, refLayerId,  curRepFormat->getPicHeightVpsInLumaSamples(), refRepFormat->getPicHeightVpsInLumaSamples() );
-      xConfirmSingleRepFormat( checkFailed, "SourceWidth" ,curLayerId, refLayerId,  curRepFormat->getPicWidthVpsInLumaSamples() , refRepFormat->getPicWidthVpsInLumaSamples () );
-
-      // Sample dependency -> require same bit depth and chroma format
+      xConfirmSingleRepFormat( checkFailed, "SourceHeight"             ,curLayerId, refLayerId,  curRepFormat->getPicHeightVpsInLumaSamples(), refRepFormat->getPicHeightVpsInLumaSamples() );
+      xConfirmSingleRepFormat( checkFailed, "SourceWidth"              ,curLayerId, refLayerId,  curRepFormat->getPicWidthVpsInLumaSamples() , refRepFormat->getPicWidthVpsInLumaSamples () );
       xConfirmSingleRepFormat( checkFailed, "ChromaFormatIDC"          , curLayerId, refLayerId,  curRepFormat->getChromaFormatVpsIdc()     , refRepFormat->getChromaFormatVpsIdc()  );
       xConfirmSingleRepFormat( checkFailed, "InternalBitDepth (Luma)"  , curLayerId, refLayerId,  curRepFormat->getBitDepthVpsLumaMinus8()  , refRepFormat->getBitDepthVpsLumaMinus8());
       xConfirmSingleRepFormat( checkFailed, "InternalBitDepth (Chroma)", curLayerId, refLayerId,  curRepFormat->getBitDepthVpsChromaMinus8(), refRepFormat->getBitDepthVpsChromaMinus8());

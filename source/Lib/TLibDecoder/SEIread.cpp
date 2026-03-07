@@ -114,6 +114,21 @@ Void SEIReader::sei_read_flag(std::ostream *pOS, UInt& ruiCode, const TChar *pSy
   }
 }
 
+bool SEIReader::xPayloadExtensionPresent()
+{
+  if (getBitstream()->getNumBitsLeft() == 0)
+  {
+    return false;
+  }
+  else if (getBitstream()->getNumBitsLeft() > 8)
+  {
+    return true;
+  }
+
+  uint32_t remBits = getBitstream()->peekBits(getBitstream()->getNumBitsLeft());
+  return remBits != (1 << (getBitstream()->getNumBitsLeft() - 1));
+}
+
 #if NH_MV
 Void SEIReader::sei_read_string(std::ostream *pOS, UInt uiBufSize, UChar* pucCode, UInt& ruiLength, const TChar *pSymbolName)
 {
@@ -133,21 +148,6 @@ void SEIReader::sei_read_string(std::ostream* os, std::string& code, const TChar
   {
     (*os) << "  " << std::setw(55) << symbolName << ": " << code << "\n";
   }
-}
-
-bool SEIReader::xPayloadExtensionPresent()
-{
-  if (getBitstream()->getNumBitsLeft() == 0)
-  {
-    return false;
-  }
-  else if (getBitstream()->getNumBitsLeft() > 8)
-  {
-    return true;
-  }
-
-  uint32_t remBits = getBitstream()->peekBits(getBitstream()->getNumBitsLeft());
-  return remBits != (1 << (getBitstream()->getNumBitsLeft() - 1));
 }
 
 static inline Void output_sei_message_header(SEI &sei, std::ostream *pDecodedMessageOutputStream, UInt payloadSize)
@@ -2719,17 +2719,26 @@ void SEIReader::xParseSEIGenerativeFaceVideo(SEIGenerativeFaceVideo & sei, uint3
       sei.m_nnModeIdc = val;
       if (sei.m_nnModeIdc == 1)
       {
-        std::string val2;
         while (m_pcBitstream->getNumBitsRead() % 8 != 0)
         {
           sei_read_flag(pDecodedMessageOutputStream, val, "gfv_nn_alignment_zero_bit_a");
           assert(val == 0);
         }
+#if NH_MV
+        UChar sval[256];
+        UInt slen;
+        sei_read_string(pDecodedMessageOutputStream, 256, sval, slen, "gfv_uri_tag");
+        sei.m_nnTagURI = std::string((char*)sval);
+        sei_read_string(pDecodedMessageOutputStream, 256, sval, slen, "gfv_uri");
+        sei.m_nnURI = std::string((char*)sval);
+#else
+        std::string val2;
         sei_read_string(pDecodedMessageOutputStream, val2, "gfv_uri_tag");
         sei.m_nnTagURI = val2;
         val2 = "";
         sei_read_string(pDecodedMessageOutputStream, val2, "gfv_uri");
         sei.m_nnURI = val2;
+#endif
       }
     }
     sei_read_flag(pDecodedMessageOutputStream, val, "gfv_chroma_key_info_present_flag");
@@ -3291,17 +3300,26 @@ void SEIReader::xParseSEIGenerativeFaceVideoEnhancement(SEIGenerativeFaceVideoEn
       sei.m_nnModeIdc = val;
       if (sei.m_nnModeIdc == 1)
       {
-        std::string val2;
         while (m_pcBitstream->getNumBitsRead() % 8 != 0)
         {
           sei_read_flag(pDecodedMessageOutputStream, val, "gefv_nn_alignment_zero_bit_a");
           assert(val == 0);
         }
+#if NH_MV
+        UChar sval[256];
+        UInt slen;
+        sei_read_string(pDecodedMessageOutputStream, 256, sval, slen, "gefv_nn_uri_tag");
+        sei.m_nnTagURI = std::string((char*)sval);
+        sei_read_string(pDecodedMessageOutputStream, 256, sval, slen, "gefv_nn_uri");
+        sei.m_nnURI = std::string((char*)sval);
+#else
+        std::string val2;
         sei_read_string(pDecodedMessageOutputStream, val2, "gefv_nn_uri_tag");
         sei.m_nnTagURI = val2;
         val2 = "";
         sei_read_string(pDecodedMessageOutputStream, val2, "gefv_nn_uri");
         sei.m_nnURI = val2;
+#endif
       }
     }
   }
