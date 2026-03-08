@@ -229,9 +229,9 @@ Void TAppDecCfg::xAppendToFileNameEnd( const TChar* pchInputFileName, const TCha
   pCDot = pCDot ? pCDot : pchInputFileName + iInLength;
   size_t iCharsToDot = pCDot - pchInputFileName ;
   size_t iCharsToEnd = iInLength - iCharsToDot;
-  strncpy(rpchOutputFileName                            ,  pchInputFileName            , iCharsToDot  );
-  strncpy(rpchOutputFileName+ iCharsToDot               ,  pchStringToAppend           , iAppendLength);
-  strncpy(rpchOutputFileName+ iCharsToDot+iAppendLength ,  pchInputFileName+iCharsToDot, iCharsToEnd  );
+  memcpy(rpchOutputFileName                            ,  pchInputFileName            , iCharsToDot  );
+  memcpy(rpchOutputFileName+ iCharsToDot               ,  pchStringToAppend           , iAppendLength);
+  memcpy(rpchOutputFileName+ iCharsToDot+iAppendLength ,  pchInputFileName+iCharsToDot, iCharsToEnd  );
   rpchOutputFileName[iInLength+iAppendLength] = '\0';
 }
 #endif

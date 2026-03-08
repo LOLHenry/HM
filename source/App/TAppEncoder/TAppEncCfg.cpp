@@ -402,7 +402,6 @@ strToUIProfileName[] =
     {"multiview-RExt"       , UI_MULTIVIEWREXT   },
     {"multiview_rext"       , UI_MULTIVIEWREXT   },
     {"multiview-rext"       , UI_MULTIVIEWREXT   },
-    {"multiview-rext"       , UI_MULTIVIEWREXT   },
 #endif  // JVET_AM1018
 #if JVET_AN0293
     {"multiview-444-10"    , UI_MULTIVIEW444_10 },
@@ -3844,8 +3843,7 @@ Void TAppEncCfg::xDeriveProfAndConstrFlags( const TComVPS& vps )
       m_chromaFormatConstraints[i] = CHROMA_420;
       m_bitDepthConstraints[i]     = 10;
       break;
-#endif  // JVET_AH046
-      break;
+#endif  // JVET_AH0046
 #if JVET_AM1018
     case Profile::MULTIVIEWREXT:
       if (m_chromaFormatConstraints[i] == CHROMA_400 && m_bitDepthConstraints[i] == 0)
