@@ -1011,7 +1011,7 @@ Bool      m_higherLayerIrapSkipFlag;
     cElement = strtok( cString, " " );
     while ( cElement != NULL )
     {
-      T profile;
+      T profile{};
       std::istringstream ss( cElement );
       ss >> profile;
       val.push_back( profile );

@@ -4248,6 +4248,8 @@ Void TAppEncCfg::xCheckParameter()
     Int* m_internalBitDepth    = &m_internalBitDepths   [i][0];
     Int* m_inputBitDepth       = &m_inputBitDepths      [i][0];
     Int* m_MSBExtendedBitDepth = &m_MSBExtendedBitDepths[i][0];
+    (void)m_MSBExtendedBitDepth;
+    (void)m_internalBitDepth;
 #endif
   // check range of parameters
   xConfirmPara( m_inputBitDepth[CHANNEL_TYPE_LUMA  ] < 8,                                   "InputBitDepth must be at least 8" );
