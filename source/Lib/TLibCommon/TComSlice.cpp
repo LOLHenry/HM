@@ -2669,6 +2669,16 @@ Void TComSPS::inferRepFormat( TComVPS* vps, Int layerIdCurr, Bool alreadySet )
   // Parameters are present in the SPS
   // - base layer or muliLayerExpSpsFlag equal to zero
 
+  // If VPS has no extension, rep_format() syntax structures are not present — nothing to infer.
+  // Still need to scale conformance window offsets for correct output cropping.
+  if ( !vps->getVpsExtensionFlag() )
+  {
+    Int scal = TComSPS::getWinUnitX( getChromaFormatIdc() ) ;
+    getConformanceWindow().scaleOffsets( scal );
+    getVuiParameters()->getDefaultDisplayWindow().scaleOffsets( scal );
+    return;
+  }
+
   // It is a requirement of bitstream conformance that, when present, the value of chroma_format_idc,
   // separate_colour_plane_flag, pic_width_in_luma_samples, pic_height_in_luma_samples, bit_depth_luma_minus8 or
   // bit_depth_chroma_minus8 shall be less than or equal to chroma_format_vps_idc, separate_colour_plane_vps_flag,
