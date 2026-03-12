@@ -99,6 +99,13 @@ TEncGOP::TEncGOP()
   ::memset(m_ltRefPicUsedByCurrPicFlag, 0, sizeof(m_ltRefPicUsedByCurrPicFlag));
   m_lastBPSEI         = 0;
   m_bufferingPeriodSEIPresentInAU = false;
+  m_hrdFinalArrivalTime    = 0.0;
+  m_hrdRemovalTime         = 0.0;
+  m_hrdInitCpbRemovalTime  = 0.0;
+  m_hrdFirstBPSeen         = false;
+  m_hrdInitCpbRemovalDelay  = 0;
+  m_hrdInitCpbRemovalOffset = 0;
+  m_hrdBPAuRemovalTime      = 0.0;
 #if NH_MV
   m_layerId      = 0;
   m_viewId       = 0;
@@ -801,8 +808,38 @@ Void TEncGOP::xCreatePerPictureSEIMessages (Int picInGOP, SEIMessages& seiMessag
     ( ( slice->getSPS()->getVuiParameters()->getHrdParameters()->getNalHrdParametersPresentFlag() )
     || ( slice->getSPS()->getVuiParameters()->getHrdParameters()->getVclHrdParametersPresentFlag() ) ) )
   {
+    // For non-initial BPs, compute the removal time of this AU under the current
+    // (old) BP timing so initSEIBufferingPeriod can compute deltaTime for C-18/C-19.
+    Double hrdAuRemovalTime = 0.0;
+    if ( m_hrdFirstBPSeen )
+    {
+      const Double tc = (Double)slice->getSPS()->getVuiParameters()->getTimingInfo()->getNumUnitsInTick()
+                      / (Double)slice->getSPS()->getVuiParameters()->getTimingInfo()->getTimeScale();
+      const UInt auRemovalDelay = std::max<Int>(1, (Int)m_totalCoded - (Int)m_lastBPSEI);
+      hrdAuRemovalTime = m_hrdInitCpbRemovalTime + tc * auRemovalDelay;
+      m_hrdBPAuRemovalTime = hrdAuRemovalTime;  // save for post-encoding HRD update
+    }
+
     SEIBufferingPeriod *bufferingPeriodSEI = new SEIBufferingPeriod();
-    m_seiEncoder.initSEIBufferingPeriod(bufferingPeriodSEI, slice);
+    m_seiEncoder.initSEIBufferingPeriod(bufferingPeriodSEI, slice, m_hrdFirstBPSeen, m_hrdFinalArrivalTime, hrdAuRemovalTime);
+
+    // Store the signaled init_delay for HRD model tracking
+    if ( !m_hrdFirstBPSeen )
+    {
+      // First BP: initialize HRD model timing reference
+      m_hrdFirstBPSeen = true;
+      m_hrdInitCpbRemovalDelay  = bufferingPeriodSEI->m_initialCpbRemovalDelay[0][0];
+      m_hrdInitCpbRemovalOffset = bufferingPeriodSEI->m_initialCpbRemovalDelayOffset[0][0];
+      m_hrdInitCpbRemovalTime   = m_hrdInitCpbRemovalDelay / 90000.0;
+    }
+    else
+    {
+      // Non-initial BP: store new values; hrdInitCpbRemovalTime will be reset
+      // in the post-encoding HRD update when we know the AU size
+      m_hrdInitCpbRemovalDelay  = bufferingPeriodSEI->m_initialCpbRemovalDelay[0][0];
+      m_hrdInitCpbRemovalOffset = bufferingPeriodSEI->m_initialCpbRemovalDelayOffset[0][0];
+    }
+
     seiMessages.push_back(bufferingPeriodSEI);
     m_bufferingPeriodSEIPresentInAU = true;
 
@@ -2543,6 +2580,53 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
     m_bFirst = false;
     m_iNumPicCoded++;
     m_totalCoded ++;
+
+    // Update HRD arrival model for C-18/C-19 conformance
+    if ( m_hrdFirstBPSeen && pcSlice->getSPS()->getVuiParametersPresentFlag() )
+    {
+      const TComHRD *hrd = pcSlice->getSPS()->getVuiParameters()->getHrdParameters();
+      if ( hrd->getCpbDpbDelaysPresentFlag() )
+      {
+        const Int nalOrVcl = hrd->getNalHrdParametersPresentFlag() ? 0 : 1;
+        const UInt brScale = hrd->getBitRateScale();
+        const UInt bitRate = (hrd->getBitRateValueMinus1(0, 0, nalOrVcl) + 1) << (6 + brScale);
+        const Bool cbrFlag = hrd->getCbrFlag(0, 0, nalOrVcl);
+        const Double tc = (Double)pcSlice->getSPS()->getVuiParameters()->getTimingInfo()->getNumUnitsInTick()
+                        / (Double)pcSlice->getSPS()->getVuiParameters()->getTimingInfo()->getTimeScale();
+        const Double auSizeBits = (Double)actualTotalBits;
+
+        if ( m_bufferingPeriodSEIPresentInAU )
+        {
+          // BP AU: use the precomputed removal time (computed before m_lastBPSEI was updated)
+          m_hrdRemovalTime = m_hrdBPAuRemovalTime;
+        }
+        else
+        {
+          // Regular AU: compute removal time from current BP timing
+          const UInt auRemovalDelay = std::max<Int>(1, (Int)m_totalCoded - 1 - (Int)m_lastBPSEI);
+          m_hrdRemovalTime = m_hrdInitCpbRemovalTime + tc * auRemovalDelay;
+        }
+
+        // Compute arrival time
+        if ( !cbrFlag )
+        {
+          Double earliest = m_hrdRemovalTime - (m_hrdInitCpbRemovalDelay + m_hrdInitCpbRemovalOffset) / 90000.0;
+          Double initArrival = (m_totalCoded <= 1) ? 0.0 : std::max(m_hrdFinalArrivalTime, earliest);
+          m_hrdFinalArrivalTime = initArrival + auSizeBits / bitRate;
+        }
+        else
+        {
+          m_hrdFinalArrivalTime = m_hrdFinalArrivalTime + auSizeBits / bitRate;
+        }
+
+        // If this was a BP AU, reset the timing reference for the new BP period
+        if ( m_bufferingPeriodSEIPresentInAU )
+        {
+          m_hrdInitCpbRemovalTime = m_hrdRemovalTime + m_hrdInitCpbRemovalDelay / 90000.0;
+        }
+      }
+    }
+
     /* logging: insert a newline at end of picture period */
     printf("\n");
     fflush(stdout);

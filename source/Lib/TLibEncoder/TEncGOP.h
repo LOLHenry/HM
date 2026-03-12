@@ -166,6 +166,16 @@ private:
   UInt                    m_lastBPSEI;
   UInt                    m_totalCoded;
   Bool                    m_bufferingPeriodSEIPresentInAU;
+
+  // HRD arrival model state for C-18/C-19 conformance
+  Double                  m_hrdFinalArrivalTime;     // final arrival time of last coded AU (seconds)
+  Double                  m_hrdRemovalTime;          // CPB removal time of last coded AU (seconds)
+  Double                  m_hrdInitCpbRemovalTime;   // absolute time reference for current BP period
+  Bool                    m_hrdFirstBPSeen;          // whether first BP has been processed
+  UInt                    m_hrdInitCpbRemovalDelay;  // init_cpb_removal_delay of current BP
+  UInt                    m_hrdInitCpbRemovalOffset; // init_cpb_removal_delay_offset of current BP
+  Double                  m_hrdBPAuRemovalTime;      // removal time of current BP AU (precomputed)
+
   SEIEncoder              m_seiEncoder;
   TComPicYuv*             m_pcDeblockingTempPicYuv;
   Int                     m_DBParam[MAX_ENCODER_DEBLOCKING_QUALITY_LAYERS][4];   //[layer_id][0: available; 1: bDBDisabled; 2: Beta Offset Div2; 3: Tc Offset Div2;]

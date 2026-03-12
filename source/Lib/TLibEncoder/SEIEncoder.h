@@ -72,7 +72,7 @@ public:
   Void initSEIDisplayOrientation(SEIDisplayOrientation *sei);
   Void initSEIToneMappingInfo(SEIToneMappingInfo *sei);
   Void initSEISOPDescription(SEISOPDescription *sei, TComSlice *slice, Int picInGOP, Int lastIdr, Int currGOPSize);
-  Void initSEIBufferingPeriod(SEIBufferingPeriod *sei, TComSlice *slice);
+  Void initSEIBufferingPeriod(SEIBufferingPeriod *sei, TComSlice *slice, Bool hrdFirstBPSeen, Double hrdFinalArrivalTime, Double hrdRemovalTime);
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   void initSEIPhaseIndication(SEIPhaseIndication* sei);
 #endif

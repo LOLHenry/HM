@@ -224,13 +224,54 @@ Void SEIEncoder::initSEISOPDescription(SEISOPDescription *sopDescriptionSEI, TCo
   sopDescriptionSEI->m_numPicsInSopMinus1 = i - 1;
 }
 
-Void SEIEncoder::initSEIBufferingPeriod(SEIBufferingPeriod *bufferingPeriodSEI, TComSlice *slice)
+Void SEIEncoder::initSEIBufferingPeriod(SEIBufferingPeriod *bufferingPeriodSEI, TComSlice *slice, Bool hrdFirstBPSeen, Double hrdFinalArrivalTime, Double hrdRemovalTime)
 {
   assert (m_isInitialized);
   assert (bufferingPeriodSEI != NULL);
   assert (slice != NULL);
 
-  UInt uiInitialCpbRemovalDelay = (90000/2);                      // 0.5 sec
+  UInt uiInitialCpbRemovalDelay;
+  if ( !hrdFirstBPSeen )
+  {
+    // First BP: use 0.5 second initial buffering delay
+    uiInitialCpbRemovalDelay = (90000/2);
+  }
+  else
+  {
+    // Non-initial BP: compute from HRD model per C-18/C-19
+    // deltaTime90k = 90000 * (AuNominalRemovalTime[n] - AuFinalArrivalTime[n-1])
+    // where AuNominalRemovalTime[n] = hrdRemovalTime (removal time of this BP's AU,
+    // computed under the previous BP's timing) and AuFinalArrivalTime[n-1] is the
+    // final arrival time of the previous AU.
+    Double deltaTime = hrdRemovalTime - hrdFinalArrivalTime;
+    Double deltaTime90k = 90000.0 * deltaTime;
+
+    const TComHRD *hrd = slice->getSPS()->getVuiParameters()->getHrdParameters();
+    Int nalOrVcl = hrd->getNalHrdParametersPresentFlag() ? 0 : 1;
+    Bool cbrFlag = hrd->getCbrFlag(0, 0, nalOrVcl);
+
+    if ( !cbrFlag )
+    {
+      // VBR (C-18): InitCpbRemovalDelay <= Ceil(deltaTime90k)
+      uiInitialCpbRemovalDelay = (UInt)ceil(deltaTime90k);
+    }
+    else
+    {
+      // CBR (C-19): Floor(deltaTime90k) <= InitCpbRemovalDelay <= Ceil(deltaTime90k)
+      uiInitialCpbRemovalDelay = (UInt)(deltaTime90k + 0.5);  // round to nearest
+    }
+    if ( uiInitialCpbRemovalDelay < 1 )
+    {
+      uiInitialCpbRemovalDelay = 1;
+    }
+    // Clamp to fit within InitCpbRemovalDelayLength bits
+    const TComHRD *hrdClamp = slice->getSPS()->getVuiParameters()->getHrdParameters();
+    UInt maxDelay = (1u << (hrdClamp->getInitialCpbRemovalDelayLengthMinus1() + 1)) - 1;
+    if ( uiInitialCpbRemovalDelay > maxDelay )
+    {
+      uiInitialCpbRemovalDelay = maxDelay;
+    }
+  }
   bufferingPeriodSEI->m_initialCpbRemovalDelay      [0][0]     = uiInitialCpbRemovalDelay;
   bufferingPeriodSEI->m_initialCpbRemovalDelayOffset[0][0]     = uiInitialCpbRemovalDelay;
   bufferingPeriodSEI->m_initialCpbRemovalDelay      [0][1]     = uiInitialCpbRemovalDelay;
