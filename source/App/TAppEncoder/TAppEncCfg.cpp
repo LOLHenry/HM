@@ -4381,7 +4381,12 @@ Void TAppEncCfg::xCheckParameter()
 
   xConfirmPara( m_scalabilityMask != 2 && m_scalabilityMask != 8 && m_scalabilityMask != 10, "Scalability Mask must be equal to 2, 8 or 10");
 
-  m_dimIds.push_back( m_viewOrderIndex );
+  // Build m_dimIds in scalTypeToScalIdx order: only include dimensions
+  // whose scalability_mask_flag bit is set, matching the bitstream dimension indices.
+  if ( m_scalabilityMask & ( 1 << VIEW_ORDER_INDEX ) )
+  {
+    m_dimIds.push_back( m_viewOrderIndex );
+  }
   for (Int i = 0; i < m_auxId.size(); i++)
   {
     xConfirmPara( !( ( m_auxId[i] >= 0 && m_auxId[i] <= 2 ) || ( m_auxId[i] >= 128 && m_auxId[i] <= 159 ) ) , "AuxId shall be in the range of 0 to 2, inclusive, or 128 to 159, inclusive");
