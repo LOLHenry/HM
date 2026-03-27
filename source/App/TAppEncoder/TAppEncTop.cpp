@@ -2469,7 +2469,16 @@ Void TAppEncTop::xSetVPSVUI( TComVPS& vps )
     // however preliminary setting it from input parameters
 
     vpsVui.setCrossLayerPicTypeAlignedFlag( m_crossLayerPicTypeAlignedFlag );
-    vpsVui.setCrossLayerIrapAlignedFlag   ( m_crossLayerIrapAlignedFlag    );
+    // When cross_layer_pic_type_aligned_flag is equal to 1, cross_layer_irap_aligned_flag
+    // is not present and is inferred to be equal to vps_vui_present_flag (F.7.4.3.1.4).
+    if( m_crossLayerPicTypeAlignedFlag )
+    {
+      vpsVui.setCrossLayerIrapAlignedFlag( m_vpsVuiPresentFlag );
+    }
+    else
+    {
+      vpsVui.setCrossLayerIrapAlignedFlag( m_crossLayerIrapAlignedFlag );
+    }
     vpsVui.setAllLayersIdrAlignedFlag     ( m_allLayersIdrAlignedFlag      );
     vpsVui.setBitRatePresentVpsFlag( m_bitRatePresentVpsFlag );
     vpsVui.setPicRatePresentVpsFlag( m_picRatePresentVpsFlag );

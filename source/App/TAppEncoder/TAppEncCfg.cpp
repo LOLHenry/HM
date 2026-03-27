@@ -408,6 +408,14 @@ strToUIProfileName[] =
     {"multiview_444_10"    , UI_MULTIVIEW444_10 },
     {"multiview-444-12"    , UI_MULTIVIEW444_12 },
     {"multiview_444_12"    , UI_MULTIVIEW444_12 },
+    {"multiview-monochrome"      , UI_MULTIVIEW_MONO_8  },
+    {"multiview_monochrome"      , UI_MULTIVIEW_MONO_8  },
+    {"multiview-monochrome-10"   , UI_MULTIVIEW_MONO_10 },
+    {"multiview_monochrome_10"   , UI_MULTIVIEW_MONO_10 },
+    {"multiview-monochrome-12"   , UI_MULTIVIEW_MONO_12 },
+    {"multiview_monochrome_12"   , UI_MULTIVIEW_MONO_12 },
+    {"multiview-monochrome-16"   , UI_MULTIVIEW_MONO_16 },
+    {"multiview_monochrome_16"   , UI_MULTIVIEW_MONO_16 },
 #endif  // JVET_AN0293
 #if NH_MV_ALLOW_NON_CONFORMING
     {"multiview-main_NONCONFORMING"     , UI_MULTIVIEWMAIN_NONCONF   },
@@ -3660,6 +3668,38 @@ Void TAppEncCfg::xDeriveProfAndConstrFlags( const TComVPS& vps )
       m_intraConstraintFlags[i] = false;
       m_lowerBitRateConstraintFlags[i] = true;
       break;
+    case UI_MULTIVIEW_MONO_8:
+      m_profiles[i] = Profile::MULTIVIEWREXT;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      m_chromaFormatConstraints[i] = CHROMA_400;
+      m_bitDepthConstraints[i] = 8;
+      m_intraConstraintFlags[i] = false;
+      m_lowerBitRateConstraintFlags[i] = true;
+      break;
+    case UI_MULTIVIEW_MONO_10:
+      m_profiles[i] = Profile::MULTIVIEWREXT;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      m_chromaFormatConstraints[i] = CHROMA_400;
+      m_bitDepthConstraints[i] = 10;
+      m_intraConstraintFlags[i] = false;
+      m_lowerBitRateConstraintFlags[i] = true;
+      break;
+    case UI_MULTIVIEW_MONO_12:
+      m_profiles[i] = Profile::MULTIVIEWREXT;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      m_chromaFormatConstraints[i] = CHROMA_400;
+      m_bitDepthConstraints[i] = 12;
+      m_intraConstraintFlags[i] = false;
+      m_lowerBitRateConstraintFlags[i] = true;
+      break;
+    case UI_MULTIVIEW_MONO_16:
+      m_profiles[i] = Profile::MULTIVIEWREXT;
+      m_onePictureOnlyConstraintFlags[i] = false;
+      m_chromaFormatConstraints[i] = CHROMA_400;
+      m_bitDepthConstraints[i] = 16;
+      m_intraConstraintFlags[i] = false;
+      m_lowerBitRateConstraintFlags[i] = true;
+      break;
 #endif //  JVET_AN0293
     case UI_NONE:
       m_profiles[i] = Profile::NONE;
@@ -4084,19 +4124,28 @@ Void TAppEncCfg::xCheckProfiles( const TComVPS& vps )
   for (Int i = 0; i < m_profiles.size(); i++ )
   {
     anyMultiLayerProfile = ( anyMultiLayerProfile
-       
+
       ||  (m_profiles[i] == Profile::MULTIVIEWMAIN)
 #if JVET_AH0046
       ||  (m_profiles[i] == Profile::MULTIVIEWEXTENDED)
       ||  (m_profiles[i] == Profile::MULTIVIEWEXTENDED10)
 #endif  // JVET_AH0046
+#if JVET_AM1018
+      ||  (m_profiles[i] == Profile::MULTIVIEWREXT)
+#endif  // JVET_AM1018
       ) ;
   }
   
 #if JVET_AE0295
-  if ((( anyMultiLayerProfile && ( m_profiles[0] != Profile::MAIN || m_profiles[1] != Profile::MAIN  ) ))&&(( anyMultiLayerProfile && ( m_profiles[0] != Profile::MAIN10 || m_profiles[1] != Profile::MAIN10  ) )))
+  // Allow Main, Main 10, or Main RExt (covers Monochrome and other RExt sub-profiles)
+  // as base layer profiles for multilayer coding. Monochrome (profile_idc=4) has
+  // general_profile_compatibility_flag[1]=1, so it is Main-compatible per the spec.
+  if ( anyMultiLayerProfile
+    && ( m_profiles[0] != Profile::MAIN   || m_profiles[1] != Profile::MAIN   )
+    && ( m_profiles[0] != Profile::MAIN10 || m_profiles[1] != Profile::MAIN10 )
+    && ( m_profiles[0] != Profile::MAINREXT || m_profiles[1] != Profile::MAINREXT ) )
   {
-    fprintf(stderr, "Error: The base layer must conform to the Main profile or MAIN 10 for Multilayer coding.\n");
+    fprintf(stderr, "Error: The base layer must conform to Main, Main 10, or a Main RExt sub-profile for Multilayer coding.\n");
     exit(EXIT_FAILURE);
   }
 #else

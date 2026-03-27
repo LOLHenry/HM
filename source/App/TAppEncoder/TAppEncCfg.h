@@ -88,6 +88,10 @@ enum UIProfileName // this is used for determining profile strings, where multip
 #if JVET_AN0293
   UI_MULTIVIEW444_10     = 141310,  // MV-RExt: 4:4:4, 10-bit
   UI_MULTIVIEW444_12     = 141312,  // MV-RExt: 4:4:4, 12-bit
+  UI_MULTIVIEW_MONO_8    = 141008,  // MV-RExt: 4:0:0, 8-bit  (Multiview Monochrome, G.11.1.3)
+  UI_MULTIVIEW_MONO_10   = 141010,  // MV-RExt: 4:0:0, 10-bit (Multiview Monochrome 10, G.11.1.3)
+  UI_MULTIVIEW_MONO_12   = 141012,  // MV-RExt: 4:0:0, 12-bit (Multiview Monochrome 12, G.11.1.3)
+  UI_MULTIVIEW_MONO_16   = 141016,  // MV-RExt: 4:0:0, 16-bit (Multiview Monochrome 16, G.11.1.3)
 #endif
 #endif
   UI_MONOCHROME_8      = 1008,
