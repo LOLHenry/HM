@@ -69,6 +69,7 @@ TDecTop::TDecTop()
   , m_cSAO()
   , m_pcPic(NULL)
   , m_prevPOC(MAX_INT)
+  , m_prevNut(NAL_UNIT_INVALID)
   , m_prevTid0POC(0)
   , m_bFirstSliceInPicture(true)
 #if JVET_X0048_X0103_FILM_GRAIN
@@ -83,6 +84,7 @@ TDecTop::TDecTop()
   , m_lastPOCNoOutputPriorPics(-1)
   , m_isNoOutputPriorPics(false)
   , m_craNoRaslOutputFlag(false)
+  , m_noRaslOutputFlag(true)
 #if O0043_BEST_EFFORT_DECODING
   , m_forceDecodeBitDepth(8)
 #endif
@@ -701,9 +703,18 @@ Bool TDecTop::xDecodeSlice(InputNALUnit &nalu, Int &iSkipFrame, Int iPOCLastDisp
   // exit when a new picture is found
   if (!m_apcSlicePilot->getDependentSliceSegmentFlag() && (m_apcSlicePilot->getSliceCurStartCtuTsAddr() == 0 && !m_bFirstSliceInPicture) )
   {
-    if (m_prevPOC >= m_pocRandomAccess)
+    if (m_prevPOC >= m_pocRandomAccess || m_pocRandomAccess != m_pocCRA ||
+      (m_prevNut == NAL_UNIT_CODED_SLICE_RADL_N ||
+       m_prevNut == NAL_UNIT_CODED_SLICE_RADL_R) ||
+      ((m_prevNut == NAL_UNIT_CODED_SLICE_RASL_N ||
+        m_prevNut == NAL_UNIT_CODED_SLICE_RASL_R) && !m_noRaslOutputFlag))
     {
       m_prevPOC = m_apcSlicePilot->getPOC();
+      m_prevNut = m_apcSlicePilot->getNalUnitType();
+      if(m_apcSlicePilot->isIRAP())
+      {
+        m_noRaslOutputFlag = m_apcSlicePilot->getNoRaslOutputFlag();
+      }
 #if ENC_DEC_TRACE
       //rewind the trace counter since we didn't actually decode the slice
       g_nSymbolCounter = originalSymbolCount;
@@ -728,6 +739,7 @@ Bool TDecTop::xDecodeSlice(InputNALUnit &nalu, Int &iSkipFrame, Int iPOCLastDisp
   if (!m_apcSlicePilot->getDependentSliceSegmentFlag())
   {
     m_prevPOC = m_apcSlicePilot->getPOC();
+    m_prevNut = m_apcSlicePilot->getNalUnitType();
   }
 
   // actual decoding starts here
@@ -1157,7 +1169,10 @@ Bool TDecTop::isRandomAccessSkipPicture(Int& iSkipFrame,  Int& iPOCLastDisplay)
     }
   }
   // skip the reordered pictures, if necessary
-  else if (m_apcSlicePilot->getPOC() < m_pocRandomAccess && (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_R || m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N))
+  else if (m_apcSlicePilot->getPOC() < m_pocRandomAccess &&
+      (m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_R ||
+       m_apcSlicePilot->getNalUnitType() == NAL_UNIT_CODED_SLICE_RASL_N) &&
+      m_noRaslOutputFlag) // Skip only when NoRaslOutputFlag = 1
   {
     iPOCLastDisplay++;
     return true;
