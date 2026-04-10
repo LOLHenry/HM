@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,9 @@
 #include "TLibCommon/TComSlice.h"
 #include "TLibCommon/TComPicYuv.h"
 #include "SEIwrite.h"
-
+#if JVET_AK0239_GEFV || JVET_AJ0207_GFV
+#include <math.h>
+#endif
 
 //! \ingroup TLibEncoder
 //! \{
@@ -246,13 +248,16 @@ Void SEIWriter::xWriteSEIpayloadData(TComBitIf& bs, const SEI& sei, const TComSP
     xWriteSEIPhaseIndication(*static_cast<const SEIPhaseIndication *>(&sei));
     break;
 #endif
-
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
   case SEI::PayloadType::AI_USAGE_RESTRICTIONS:
     xWriteSEIAIUsageRestrictions(*static_cast<const SEIAIUsageRestrictions *>(&sei));
     break;
 #endif  
-
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  case SEI::ENCODER_OPTIMIZATION_INFO:
+    xWriteSEIEncoderOptimizationInfo(*static_cast<const SEIEncoderOptimizationInfo *>(&sei));
+    break;
+#endif
 #if JVET_AK0107_MODALITY_INFORMATION
   case SEI::PayloadType::MODALITY_INFORMATION:
     xWriteSEIModalityInfo(*static_cast<const SEIModalityInfo *>(&sei));
@@ -268,6 +273,25 @@ Void SEIWriter::xWriteSEIpayloadData(TComBitIf& bs, const SEI& sei, const TComSP
   case SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_VERIFICATION:
     xWriteSEIDigitallySignedContentVerification(*static_cast<const SEIDigitallySignedContentVerification *>(&sei));
     break;
+#endif
+#if JVET_AJ0207_GFV
+  case SEI::PayloadType::GENERATIVE_FACE_VIDEO:
+    xWriteSEIGenerativeFaceVideo(*static_cast<const SEIGenerativeFaceVideo*>(&sei));
+    break;
+#endif
+#if JVET_AK0239_GEFV
+  case SEI::PayloadType::GENERATIVE_ENHANCEMENT_FACE_VIDEO:
+    xWriteSEIGenerativeFaceVideoEnhancement(*static_cast<const SEIGenerativeFaceVideoEnhancement*>(&sei));
+    break;
+#endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  case SEI::PayloadType::PACKED_REGIONS_INFO:
+    xWriteSEIPackedRegionsInfo(*static_cast<const SEIPackedRegionsInfo*>(&sei));
+    break;
+#endif
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+  case SEI::PayloadType::SOURCE_PICTURE_TIMING_INFO:
+    xWriteSEISourcePictureTimingInfo(*static_cast<const SEISourcePictureTimingInfo *>(&sei));
 #endif
   default:
     assert(!"Trying to write unhandled SEI message");
@@ -600,6 +624,15 @@ Void SEIWriter::xWriteSEIFilmGrainCharacteristics(const SEIFilmGrainCharacterist
       }
     } // for c
     WRITE_FLAG( sei.m_filmGrainCharacteristicsPersistenceFlag, "film_grain_characteristics_persistence_flag" );
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+    WRITE_FLAG(sei.m_fgSpatialResolutionPresentFlag, "film_grain_spatial_resolution_present_flag");
+    if (sei.m_fgSpatialResolutionPresentFlag)
+    {
+      WRITE_UVLC(sei.m_fgPicWidthInLumaSamples, "fg_pic_width_in_luma_samples");
+      WRITE_UVLC(sei.m_fgPicHeightInLumaSamples, "fg_pic_height_in_luma_samples");
+      m_SeiExtensionBitsPresentFlag = true;
+    }
+#endif
   } // cancel flag
 }
 
@@ -1258,6 +1291,61 @@ void SEIWriter::xWriteSEIPhaseIndication(const SEIPhaseIndication& sei)
   WRITE_CODE((uint32_t)sei.m_verPhaseDenMinus1, 8, "ver_phase_den_minus1");
 }
 #endif
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+void SEIWriter::xWriteSEIEncoderOptimizationInfo(const SEIEncoderOptimizationInfo &sei)
+{
+  WRITE_FLAG(sei.m_cancelFlag, "eoi_cancel_flag");
+  if (!sei.m_cancelFlag)
+  {
+    WRITE_FLAG(sei.m_persistenceFlag, "eoi_persistence_flag");
+    WRITE_CODE(sei.m_forHumanViewingIdc, 2, "eoi_for_human_viewing_idc");
+    WRITE_CODE(sei.m_forMachineAnalysisIdc, 2, "eoi_for_machine_analysis_idc");
+    WRITE_CODE(0, 2, "eoi_reserved_zero_2bits");
+    WRITE_CODE(sei.m_type, 16, "eoi_type");
+
+
+    if ((sei.m_type & EOI_OptimizationType::OBJECT_BASED_OPTIMIZATION) != 0)
+    {
+      WRITE_CODE(sei.m_objectBasedIdc, 16, "eoi_object_based_idc");
+      if (sei.m_objectBasedIdc & EOI_OBJECT_BASED::COARSER_QUANTIZATION)
+      {
+        WRITE_UVLC(sei.m_quantThresholdDelta, "eoi_quant_threshold_delta");
+        if (sei.m_quantThresholdDelta > 0)
+        {
+          WRITE_FLAG(sei.m_picQuantObjectFlag, "eoi_pic_quant_object_flag");
+        }
+      }
+    }
+    if ((sei.m_type & EOI_OptimizationType::TEMPORAL_RESAMPLING) != 0)
+    {
+      WRITE_FLAG(sei.m_temporalResamplingTypeFlag, "eoi_temporal_resampling_type_flag");
+      WRITE_UVLC(sei.m_numIntPics, "eoi_num_int_pics");
+      if (sei.m_temporalResamplingTypeFlag && sei.m_numIntPics > 0)
+      {
+        WRITE_FLAG(sei.m_srcPicFlag, "eoi_src_pic_flag");
+      }
+    }
+    if ((sei.m_type & EOI_OptimizationType::SPATIAL_RESAMPLING) != 0)
+    {
+      WRITE_FLAG(sei.m_origPicDimensionsFlag, "eoi_orig_pic_dimensions_flag");
+      if (sei.m_origPicDimensionsFlag)
+      {
+        WRITE_CODE(sei.m_origPicWidth, 16, "eoi_orig_pic_width");
+        WRITE_CODE(sei.m_origPicHeight, 16, "eoi_orig_pic_height");
+      }
+      else
+      {
+        WRITE_FLAG(sei.m_spatialResamplingTypeFlag, "eoi_spatial_resampling_type_flag");
+      }
+    }
+    if ((sei.m_type & EOI_OptimizationType::PRIVACY_PROTECTION_OPTIMIZATION) != 0)
+    {
+      WRITE_CODE(sei.m_privacyProtectionTypeIdc, 16, "eoi_privacy_protection_type_idc");
+      WRITE_CODE(sei.m_privacyProtectedInfoType, 8, "eoi_privacy_protected_info_type");
+    }
+  }
+}
+#endif
 
 #if JVET_AK0107_MODALITY_INFORMATION
 Void SEIWriter::xWriteSEIModalityInfo(const SEIModalityInfo& sei)
@@ -1759,7 +1847,11 @@ Void SEIWriter::xWriteSEIPrefixIndicationByteAlign() {
 
 Void SEIWriter::xWriteByteAlign()
 {
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  if (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0 || m_SeiExtensionBitsPresentFlag)
+#else
   if (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0)
+#endif
   {
     WRITE_FLAG(1, "payload_bit_equal_to_one");
     while (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0)
@@ -1833,4 +1925,715 @@ void SEIWriter::xWriteSEIDigitallySignedContentVerification(const SEIDigitallySi
 }
 
 #endif
+
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+void SEIWriter::xWriteSEIPackedRegionsInfo(const SEIPackedRegionsInfo& sei)
+{
+  WRITE_FLAG(sei.m_cancelFlag, "pri_cancel_flag");
+  if (!sei.m_cancelFlag)
+  {
+    WRITE_FLAG(sei.m_persistenceFlag, "pri_persistence_flag");
+    WRITE_UVLC(sei.m_numRegionsMinus1, "pri_num_regions_minus1");
+    WRITE_FLAG(sei.m_multilayerFlag, "pri_multilayer_flag");
+    WRITE_FLAG(sei.m_useMaxDimensionsFlag, "pri_use_max_dimensions_flag");
+    WRITE_CODE(sei.m_log2UnitSize, 4, "pri_log2_unit_size");
+    WRITE_CODE(sei.m_regionSizeLenMinus1, 4, "pri_region_size_len_minus1");
+    WRITE_FLAG(sei.m_regionIdPresentFlag, "pri_region_id_present_flag");
+    WRITE_FLAG(sei.m_targetPicParamsPresentFlag, "pri_target_pic_params_present_flag");
+    if (sei.m_targetPicParamsPresentFlag)
+    {
+      WRITE_CODE(sei.m_targetPicWidthMinus1, 16, "pri_target_pic_width_minus1");
+      WRITE_CODE(sei.m_targetPicHeightMinus1, 16, "pri_target_pic_height_minus1");
+    }
+    WRITE_UVLC(sei.m_numResamplingRatiosMinus1, "pri_num_resampling_ratios_minus1");
+    for (uint32_t i = 1; i <= sei.m_numResamplingRatiosMinus1; i++)
+    {
+      WRITE_UVLC(sei.m_resamplingWidthNumMinus1[i], "pri_resampling_width_num_minus1[i]");
+      WRITE_UVLC(sei.m_resamplingWidthDenomMinus1[i], "pri_resampling_width_denom_minus1[i]");
+      WRITE_FLAG(sei.m_fixedAspectRatioFlag[i], "pri_fixed_aspect_ratio_flag[i]");
+      if (!sei.m_fixedAspectRatioFlag[i])
+      {
+        WRITE_UVLC(sei.m_resamplingHeightNumMinus1[i], "pri_resampling_height_num_minus1[i]");
+        WRITE_UVLC(sei.m_resamplingHeightDenomMinus1[i], "pri_resampling_height_denom_minus1[i]");
+      }
+    }
+    for (uint32_t i = 0; i <= sei.m_numRegionsMinus1; i++)
+    {
+      if (sei.m_regionIdPresentFlag)
+      {
+        WRITE_UVLC(sei.m_regionId[i], "pri_region_id[i]");
+      }
+      if (sei.m_multilayerFlag)
+      {
+        WRITE_UVLC(sei.m_regionLayerId[i], "pri_region_layer_id[i]");
+        WRITE_FLAG(sei.m_regionIsALayerFlag[i], "pri_region_is_a_layer_flag[i]");
+      }
+      if (!sei.m_regionIsALayerFlag[i])
+      {
+        WRITE_CODE(sei.m_regionTopLeftInUnitsX[i], sei.m_regionSizeLenMinus1 + 1, "pri_region_top_left_in_units_x[i]");
+        WRITE_CODE(sei.m_regionTopLeftInUnitsY[i], sei.m_regionSizeLenMinus1 + 1, "pri_region_top_left_in_units_y[i]");
+        WRITE_CODE(sei.m_regionWidthInUnitsMinus1[i], sei.m_regionSizeLenMinus1 + 1, "pri_region_width_in_units_minus1[i]");
+        WRITE_CODE(sei.m_regionHeightInUnitsMinus1[i], sei.m_regionSizeLenMinus1 + 1, "pri_region_height_in_units_minus1[i]");
+      }
+      if (sei.m_numResamplingRatiosMinus1 > 0)
+      {
+        uint32_t codeLen = 0;
+        for (uint32_t i = sei.m_numResamplingRatiosMinus1; i != 0; i >>= 1)
+        {
+          codeLen++;
+        }
+        WRITE_CODE(sei.m_resamplingRatioIdx[i], codeLen, "pri_resampling_ratio_idx[i]");
+      }
+      if (sei.m_targetPicParamsPresentFlag)
+      {
+        WRITE_CODE(sei.m_targetRegionTopLeftInUnitsX[i], sei.m_regionSizeLenMinus1 + 1, "pri_target_region_top_left_in_units_x[i]");
+        WRITE_CODE(sei.m_targetRegionTopLeftInUnitsY[i], sei.m_regionSizeLenMinus1 + 1, "pri_target_region_top_left_in_units_y[i]");
+      }
+    }
+  }
+}
+#endif
+#if JVET_AJ0207_GFV
+void SEIWriter::xWriteSEIGenerativeFaceVideo(const SEIGenerativeFaceVideo &sei)
+{
+  uint32_t basePicFlag = 0;
+  std::vector<double>  coordinateXRec;
+  std::vector<double>  coordinateYRec;
+  std::vector<double>  coordinateZRec;
+  std::vector<std::vector<std::vector<std::vector<double>>>>   matrixElementRec;
+  WRITE_UVLC(sei.m_id, "gfv_id");
+  WRITE_UVLC(sei.m_cnt, "gfv_cnt");
+  if (sei.m_cnt == 0)
+  {
+    WRITE_FLAG(sei.m_basePicFlag, "gfv_base_picture_flag");
+    basePicFlag = sei.m_basePicFlag;
+  }
+  else
+  {
+    basePicFlag = 0;
+  }
+  if (basePicFlag == 1)
+  {
+    WRITE_FLAG(sei.m_nnPresentFlag, "gfv_nn_present_flag");
+    if (sei.m_nnPresentFlag)
+    {
+      WRITE_UVLC(sei.m_nnModeIdc, "gfv_mode_idc");
+      if (sei.m_nnModeIdc == 1)
+      {
+        while (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0)
+        {
+          WRITE_FLAG(0, "gfv_reserved_zero_bit_a");
+        }
+        WRITE_STRING(sei.m_nnTagURI, "gfv_uri_tag");
+        WRITE_STRING(sei.m_nnURI, "gfv_uri");
+      }
+    }
+    WRITE_FLAG(sei.m_chromaKeyInfoPresentFlag, "gfv_chroma_key_info_presentFlag");
+    if (sei.m_chromaKeyInfoPresentFlag)
+    {
+      for (uint32_t chromac = 0; chromac < 3; chromac++)
+      {
+        WRITE_FLAG(sei.m_chromaKeyValuePresentFlag[chromac], "gfv_chroma_key_value_present_flag[c]");
+        if (sei.m_chromaKeyValuePresentFlag[chromac])
+        {
+          WRITE_CODE(sei.m_chromaKeyValue[chromac], 8, "gfv_chroma_key_value[chromac]");
+        }
+      }
+      for (uint32_t chromai = 0; chromai < 2; chromai++)
+      {
+        WRITE_FLAG(sei.m_chromaKeyThrPresentFlag[chromai], "gfv_chroma_key_thr_present_flag[i]");
+        if (sei.m_chromaKeyThrPresentFlag[chromai])
+        {
+          WRITE_UVLC(sei.m_chromaKeyThrValue[chromai], "gfv_chroma_key_thr_value[i]");
+        }
+      }
+    }
+  }
+  else
+  {
+    WRITE_FLAG(sei.m_drivePicFusionFlag, "gfv_drive_picture_fusion_flag");
+  }
+  WRITE_FLAG(sei.m_lowConfidenceFaceParameterFlag, "gfv_low_confidence_face_parameter_flag");
+  WRITE_FLAG(sei.m_coordinatePresentFlag, "gfv_coordinate_present_flag");
+  if (sei.m_coordinatePresentFlag)
+  {
+    WRITE_FLAG(sei.m_coordinatePredFlag, "gfv_kps_pred_flag");
+    if (basePicFlag || !sei.m_coordinatePredFlag)
+    {
+      uint32_t gfvCoordinatePrecisionFactorMinus1 = sei.m_coordinateQuantizationFactor - 1;
+      assert(gfvCoordinatePrecisionFactorMinus1 >= 0 && gfvCoordinatePrecisionFactorMinus1 <= 31);
+      WRITE_UVLC(gfvCoordinatePrecisionFactorMinus1, "gfv_coordinate_precision_factor_minus1");
+      uint32_t gfvNumKpsMinus1 = sei.m_coordinatePointNum - 1;
+      WRITE_UVLC(gfvNumKpsMinus1, "gfv_num_kps_minus1");
+      WRITE_FLAG(sei.m_3DCoordinateFlag, "gfv_coordinate_z_present_flag");
+      if (sei.m_3DCoordinateFlag == 1)
+      {
+        uint32_t gfvCoordinateZMaxValueMinus1 = sei.m_coordinateZMaxValue - 1;
+        assert(gfvCoordinateZMaxValueMinus1 >= 0 && gfvCoordinateZMaxValueMinus1 <= (1 << 16) - 1);
+        WRITE_UVLC(gfvCoordinateZMaxValueMinus1, "gfv_coordinate_z_max_value_minus1");
+      }
+    }
+    //X_coordinate_tensor && Y_coordinate_tensor  && Z_coordinate_tensor
+    for (uint32_t i = 0; i < sei.m_coordinatePointNum; i++)
+    {
+      if (!sei.m_coordinatePredFlag)
+      {
+        // X_coordinate_tensor
+        int curCoordinateXInt = (int)(sei.m_coordinateX[i] * (1 << sei.m_coordinateQuantizationFactor) + 0.5);
+        int curCoordinateXIntAbs = abs(curCoordinateXInt);
+        WRITE_UVLC(curCoordinateXIntAbs, "gfv_coordinate_x_abs[ i ]");
+        if (curCoordinateXIntAbs)
+        {
+          const int signflag = curCoordinateXInt <= 0;
+          WRITE_FLAG(signflag, "gfv_coordinate_x_sign_flag[ i ]");
+        }
+        double coordinateXTensorAbsRec = ((double)curCoordinateXInt) / (1 << sei.m_coordinateQuantizationFactor);
+        coordinateXRec.push_back(coordinateXTensorAbsRec);
+        // Y_coordinate_tensor
+        int curCoordinateYInt = (int)(sei.m_coordinateY[i] * (1 << sei.m_coordinateQuantizationFactor) + 0.5);
+        int curCoordinateYIntAbs = abs(curCoordinateYInt);
+        WRITE_UVLC(curCoordinateYIntAbs, "gfv_coordinate_y_abs[ i ]");
+        if (curCoordinateYIntAbs)
+        {
+          const int signflag = curCoordinateYInt <= 0;
+          WRITE_FLAG(signflag, "gfv_coordinate_y_sign_flag[ i ]");
+        }
+        double coordinateYTensorAbsRec = ((double)curCoordinateYInt) / (1 << sei.m_coordinateQuantizationFactor);
+        coordinateYRec.push_back(coordinateYTensorAbsRec);
+        // Z_coordinate_tensor
+        if (sei.m_3DCoordinateFlag == 1)
+        {
+          int curCoordinateZInt = (int)(sei.m_coordinateZ[i] * (1 << sei.m_coordinateQuantizationFactor) + 0.5);
+          int curCoordinateZIntAbs = abs(curCoordinateZInt);
+          WRITE_UVLC(curCoordinateZIntAbs, "gfv_coordinate_z_abs[ i ]");
+          if (curCoordinateZIntAbs)
+          {
+            const int signflag = curCoordinateZInt <= 0;
+            WRITE_FLAG(signflag, "gfv_coordinate_z_sign_flag[ i ]");
+          }
+          double coordinateZTensorAbsRec = (((double)curCoordinateZInt / (1 << sei.m_coordinateQuantizationFactor)));
+          coordinateZRec.push_back(coordinateZTensorAbsRec);
+        }
+      }
+      else
+      {
+        //Inter-frame difference
+        int curCoordinateXInt = (int)((sei.m_coordinateX[i] - (basePicFlag ? (i == 0 ? 0 : coordinateXRec[i - 1]) : (sei.m_cnt == 0 ? baseCoordinateXRec[i] : prevcoordinateXRec[i]))) * (1 << sei.m_coordinateQuantizationFactor) + 0.5);
+        double coordinateXTensorAbsRec = ((double)curCoordinateXInt) / (1 << sei.m_coordinateQuantizationFactor);
+        coordinateXRec.push_back(coordinateXTensorAbsRec + (basePicFlag ? (i == 0 ? 0 : coordinateXRec[i - 1]) : (sei.m_cnt == 0 ? baseCoordinateXRec[i] : prevcoordinateXRec[i])));
+        int curCoordinateXIntAbs = abs(curCoordinateXInt);
+        WRITE_UVLC(curCoordinateXIntAbs, "gfv_coordinate_dx_abs[ i ]");
+        if (curCoordinateXIntAbs)
+        {
+          const int signflag = curCoordinateXInt <= 0;
+          WRITE_FLAG(signflag, "gfv_coordinate_dx_sign_flag[ i ]");
+        }
+        int curCoordinateYInt = (int)((sei.m_coordinateY[i] - (basePicFlag ? (i == 0 ? 0 : coordinateYRec[i - 1]) : (sei.m_cnt == 0 ? baseCoordinateYRec[i] : prevcoordinateYRec[i]))) * (1 << sei.m_coordinateQuantizationFactor) + 0.5);
+        double coordinateYTensorAbsRec = ((double)curCoordinateYInt) / (1 << sei.m_coordinateQuantizationFactor);
+        coordinateYRec.push_back(coordinateYTensorAbsRec + (basePicFlag ? (i == 0 ? 0 : coordinateYRec[i - 1]) : (sei.m_cnt == 0 ? baseCoordinateYRec[i] : prevcoordinateYRec[i])));
+        int curCoordinateYIntAbs = abs(curCoordinateYInt);
+        WRITE_UVLC(curCoordinateYIntAbs, "gfv_coordinate_dy_abs[ i ]");
+        if (curCoordinateYIntAbs)
+        {
+          const int signflag = curCoordinateYInt <= 0;
+          WRITE_FLAG(signflag, "gfv_coordinate_dy_sign_flag[ i ]");
+        }
+        if (sei.m_3DCoordinateFlag == 1)
+        {
+          int curCoordinateZInt = (int)((sei.m_coordinateZ[i] - (basePicFlag ? (i == 0 ? 0 : coordinateZRec[i - 1]) : (sei.m_cnt == 0 ? baseCoordinateZRec[i] : prevcoordinateZRec[i]))) * (1 << sei.m_coordinateQuantizationFactor) + 0.5);
+          double coordinateZTensorAbsRec = ((double)curCoordinateZInt / (1 << sei.m_coordinateQuantizationFactor));
+          coordinateZRec.push_back(coordinateZTensorAbsRec + (basePicFlag ? (i == 0 ? 0 : coordinateZRec[i - 1]) : (sei.m_cnt == 0 ? baseCoordinateZRec[i] : prevcoordinateZRec[i])));
+          int curCoordinateZIntAbs = abs(curCoordinateZInt);
+          WRITE_UVLC(curCoordinateZIntAbs, "gfv_coordinate_dz_abs[ i ]");
+          if (curCoordinateZIntAbs)
+          {
+            const int signflag = curCoordinateZInt <= 0;
+            WRITE_FLAG(signflag, "gfv_coordinate_dz_sign_flag[ i ]");
+          }
+        }
+      }
+    }
+    if (doUpdateGFVcoordinate)
+    {
+      prevcoordinateXRec = coordinateXRec;
+      prevcoordinateYRec = coordinateYRec;
+      if (sei.m_3DCoordinateFlag == 1)
+      {
+        prevcoordinateZRec = coordinateZRec;
+      }
+      if (sei.m_basePicFlag)
+      {
+        baseCoordinateXRec = coordinateXRec;
+        baseCoordinateYRec = coordinateYRec;
+        if (sei.m_3DCoordinateFlag == 1)
+        {
+          baseCoordinateZRec = coordinateZRec;
+        }
+      }
+      doUpdateGFVcoordinate = false;
+    }
+    else
+    {
+      doUpdateGFVcoordinate = true;
+    }
+  }
+  // Matrix Parameters
+  assert(sei.m_coordinatePresentFlag || sei.m_matrixPresentFlag);
+  WRITE_FLAG(sei.m_matrixPresentFlag, "gfv_matrix_present_flag");
+
+  if (sei.m_matrixPresentFlag)
+  {
+    std::vector<uint32_t> matrixWidthVec;
+    std::vector<uint32_t> matrixHeightVec;
+    std::vector<uint32_t> numMatricesVec;
+    if (!basePicFlag)
+    {
+      WRITE_FLAG(sei.m_matrixPredFlag, "gfv_matrix_pred_flag");
+    }
+    if (!sei.m_matrixPredFlag)
+    {
+      uint32_t gfvMatrixElementPrecisionFactorMinus1 = sei.m_matrixElementPrecisionFactor - 1;
+      assert(gfvMatrixElementPrecisionFactorMinus1 >= 0 && gfvMatrixElementPrecisionFactorMinus1 <= 31);
+      WRITE_UVLC(gfvMatrixElementPrecisionFactorMinus1, "gfv_matrix_element_precision_factor_minus1");
+      uint32_t gfvNumMatrixTypesMinus1 = sei.m_numMatrixType - 1;
+      WRITE_UVLC(gfvNumMatrixTypesMinus1, "gfv_num_matrix_types_minus1");
+
+      for (uint32_t matrixId = 0; matrixId < sei.m_numMatrixType; matrixId++)
+      {
+        assert(sei.m_matrixTypeIdx[matrixId] >= 0 && sei.m_matrixTypeIdx[matrixId] <= 63);
+        WRITE_CODE(sei.m_matrixTypeIdx[matrixId], 6, "gfv_matrix_type_idx");
+        if (sei.m_matrixTypeIdx[matrixId] == 0 || sei.m_matrixTypeIdx[matrixId] == 1)
+        {
+          assert(sei.m_coordinatePresentFlag != 0);
+          WRITE_FLAG(sei.m_numMatricestonumKpsFlag[matrixId], "gfv_num_matrices_equal_to_num_kps_flag");
+          if (!sei.m_numMatricestonumKpsFlag[matrixId])
+          {
+            assert(sei.m_numMatricesInfo[matrixId] >= 0 && sei.m_numMatricesInfo[matrixId] <= (1 << 10) - 1);
+            WRITE_UVLC(sei.m_numMatricesInfo[matrixId], "gfv_num_matrices_info");
+          }
+        }
+        else if (sei.m_matrixTypeIdx[matrixId] == 2 || sei.m_matrixTypeIdx[matrixId] == 3 || sei.m_matrixTypeIdx[matrixId] >= 7)
+        {
+          if (sei.m_matrixTypeIdx[matrixId] >= 7)
+          {
+            uint32_t gfvNumMatricesMinus1 = sei.m_numMatrices[matrixId] - 1;
+            assert(gfvNumMatricesMinus1 >= 0 && gfvNumMatricesMinus1 <=(1 << 10) - 1);
+            WRITE_UVLC(gfvNumMatricesMinus1, "gfv_num_matrices_minus1");
+          }
+          uint32_t gfvMatrixWidthMinus1 = sei.m_matrixWidth[matrixId] - 1;
+          WRITE_UVLC(gfvMatrixWidthMinus1, "gfv_matrix_width_minus1");
+          assert(gfvMatrixWidthMinus1 >= 0 && gfvMatrixWidthMinus1 <=(1 << 10) - 1);
+          uint32_t gfvMatrixHeightMinus1 = sei.m_matrixHeight[matrixId] - 1;
+          WRITE_UVLC(gfvMatrixHeightMinus1, "gfv_matrix_height_minus1");
+          assert(gfvMatrixHeightMinus1 >= 0 && gfvMatrixHeightMinus1 <=(1 << 10) - 1);
+        }
+        else if (sei.m_matrixTypeIdx[matrixId] >= 4 && sei.m_matrixTypeIdx[matrixId] <= 6)
+        {
+          if (!sei.m_coordinatePresentFlag)
+          {
+            WRITE_FLAG(sei.m_matrix3DSpaceFlag[matrixId], "gfv_Matrix3DSpaceFlag");
+          }
+        }
+      }
+    }
+    if (sei.m_matrixPredFlag)
+    {
+      numMatricesVec = baseNumMatricesVec;
+      matrixHeightVec = baseMatrixHeightVec;
+      matrixWidthVec = baseMatrixWidthVec;
+    }
+    else
+    {
+      numMatricesVec = sei.m_numMatricesstore;
+      matrixHeightVec = sei.m_matrixHeightstore;
+      matrixWidthVec = sei.m_matrixWidthstore;
+    }
+    for (uint32_t matrixId = 0; matrixId < sei.m_numMatrixType; matrixId++)
+    {
+      matrixElementRec.push_back(std::vector<std::vector<std::vector<double>>>());
+      for (uint32_t j = 0; j < numMatricesVec[matrixId]; j++)
+      {
+        matrixElementRec[matrixId].push_back(std::vector<std::vector<double>>());
+        for (uint32_t k = 0; k < matrixHeightVec[matrixId]; k++)
+        {
+          matrixElementRec[matrixId][j].push_back(std::vector<double>());
+          for (uint32_t l = 0; l < matrixWidthVec[matrixId]; l++)
+          {
+            if (!sei.m_matrixPredFlag)
+            {
+              double curMatrixElementAbs = fabs(sei.m_matrixElement[matrixId][j][k][l]);
+              int curMatrixElementAbsInt = (int)(curMatrixElementAbs);
+              WRITE_UVLC(curMatrixElementAbsInt, "gfv_matrix_element_int");
+              double curMatrixElementAbsDecimal = curMatrixElementAbs - curMatrixElementAbsInt;
+              assert(curMatrixElementAbsDecimal >= 0);
+              int curMatrixElementAbsDecIntValue = Clip3(0, (1 << sei.m_matrixElementPrecisionFactor) - 1, (int)(curMatrixElementAbsDecimal * (1 << sei.m_matrixElementPrecisionFactor) + 0.5));
+              WRITE_CODE(curMatrixElementAbsDecIntValue, sei.m_matrixElementPrecisionFactor, "gfv_matrix_element_dec");
+              const int signflag = sei.m_matrixElement[matrixId][j][k][l] < 0;
+              if (curMatrixElementAbsInt || curMatrixElementAbsDecIntValue)
+              {
+                WRITE_FLAG(signflag, "gfv_matrix_element_sign_flag");
+              }
+              double matrixElementAbsRec = (double)(curMatrixElementAbsInt + (((double)curMatrixElementAbsDecIntValue) / (1 << sei.m_matrixElementPrecisionFactor)));
+              matrixElementRec[matrixId][j][k].push_back(signflag ? -matrixElementAbsRec : matrixElementAbsRec);
+
+            }
+            else
+            {
+              double curMatrixElementAbs = fabs(sei.m_matrixElement[matrixId][j][k][l] - (sei.m_cnt == 0 ? baseMatrixRec[matrixId][j][k][l] : prevMatrixRec[matrixId][j][k][l]));
+              int curMatrixElementAbsInt = (int)curMatrixElementAbs;
+              WRITE_UVLC(curMatrixElementAbsInt, "gfv_matrix_delta_element_int");
+              double curMatrixElementAbsDecimal = curMatrixElementAbs - curMatrixElementAbsInt;
+              assert(curMatrixElementAbsDecimal >= 0);
+              int curMatrixElementAbsDecIntValue = (int)(curMatrixElementAbsDecimal* (1 << sei.m_matrixElementPrecisionFactor) + 0.5);
+              WRITE_UVLC(curMatrixElementAbsDecIntValue, "gfv_matrix_element_dec");
+              const int signflag = (sei.m_matrixElement[matrixId][j][k][l] - (sei.m_cnt == 0 ? baseMatrixRec[matrixId][j][k][l] : prevMatrixRec[matrixId][j][k][l])) < 0;
+              if (curMatrixElementAbsInt || curMatrixElementAbsDecIntValue)
+              {
+                WRITE_FLAG(signflag, "gfv_matrix_delta_element_sign_flag");
+              }
+              double matrixElementAbsRec = (double)(curMatrixElementAbsInt + (((double)curMatrixElementAbsDecIntValue) / (1 << sei.m_matrixElementPrecisionFactor)));
+              matrixElementRec[matrixId][j][k].push_back((signflag ? -matrixElementAbsRec : matrixElementAbsRec) + (sei.m_cnt == 0 ? baseMatrixRec[matrixId][j][k][l] : prevMatrixRec[matrixId][j][k][l]));
+            }
+          }
+        }
+      }
+    }
+    if (doUpdateGFVmatrix)
+    {
+      prevMatrixRec = matrixElementRec;
+      if (basePicFlag)
+      {
+        baseMatrixRec = matrixElementRec;
+        baseNumMatricesVec = numMatricesVec;
+        baseMatrixHeightVec = matrixHeightVec;
+        baseMatrixWidthVec = matrixWidthVec;
+      }
+      doUpdateGFVmatrix = false;
+    }
+    else
+    {
+      doUpdateGFVmatrix = true;
+    }
+  }
+  if (sei.m_nnPresentFlag)
+  {
+    if (sei.m_nnModeIdc == 0)
+    {
+      while (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0)
+      {
+        WRITE_FLAG(0, "gfv_reserved_zero_bit_b");
+      }
+      for (long i = 0; i < sei.m_payloadLength; i++)
+      {
+        WRITE_SCODE(sei.m_payloadByte[i], 8, "gfv_nn_payload_byte[i]");
+      }
+    }
+  }
+}
+#endif
+#if JVET_AK0239_GEFV
+Void SEIWriter::xWriteSEIGenerativeFaceVideoEnhancement(const SEIGenerativeFaceVideoEnhancement &sei)
+{
+  uint32_t basePicFlag = 0;
+  WRITE_UVLC(sei.m_id, "gefv_id");
+  WRITE_UVLC(sei.m_gfvid, "gefv_gfv_id");
+  WRITE_UVLC(sei.m_gfvcnt, "gefv_gfv_cnt");
+
+  if (sei.m_gfvcnt == 0)
+  {
+    WRITE_FLAG(sei.m_basePicFlag, "gefv_base_picture_flag");
+    basePicFlag = sei.m_basePicFlag;
+  }
+  else
+  {
+    basePicFlag = 0;
+  }
+  if (basePicFlag)
+  {
+    WRITE_FLAG(sei.m_nnPresentFlag, "gefv_nnPresentFlag");
+    if (sei.m_nnPresentFlag)
+    {
+      WRITE_UVLC(sei.m_nnModeIdc, "gefv_mode_idc");
+      if (sei.m_nnModeIdc == 1)
+      {
+        while (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0)
+        {
+          WRITE_FLAG(0, "gefv_nn_alignment_zero_bit_a");
+        }
+        WRITE_STRING(sei.m_nnTagURI, "gefv_uri_tag");
+        WRITE_STRING(sei.m_nnURI, "gefv_uri");
+      }
+    }
+  }
+  // Matrix Parameters
+  WRITE_FLAG(sei.m_matrixPresentFlag, "gefv_matrix_present_flag");
+  if (sei.m_matrixPresentFlag)
+  {
+    std::vector<std::vector<std::vector<double>>>   gfveMatrixElementRec;
+    uint32_t numMatrices = 0;
+    uint32_t   matrixElementPrecisionFactor = 0;
+    std::vector<uint32_t> matrixHeightVec;
+    std::vector<uint32_t> matrixWidthVec;
+    if (!basePicFlag)
+    {
+      WRITE_FLAG(sei.m_matrixPredFlag, "gefv_matrix_pred_flag");
+    }
+    if (!sei.m_matrixPredFlag)
+    {
+      uint32_t gfveMatrixElementPrecisionFactorMinus1 = sei.m_matrixElementPrecisionFactor - 1;
+      assert(gfveMatrixElementPrecisionFactorMinus1 >= 0 && gfveMatrixElementPrecisionFactorMinus1 <= 31);
+      WRITE_UVLC(gfveMatrixElementPrecisionFactorMinus1, "gefv_matrix_element_precision_factor_minus1");
+      uint32_t gfveNumMatricesMinus1 = sei.m_numMatrices - 1;
+      assert(gfveNumMatricesMinus1 >= 0 && gfveNumMatricesMinus1 <=(1 << 10) - 1);
+      WRITE_UVLC(gfveNumMatricesMinus1, "gefv_num_matrices_minus1");
+      numMatrices = gfveNumMatricesMinus1 + 1;
+      matrixElementPrecisionFactor = gfveMatrixElementPrecisionFactorMinus1 + 1;
+      if (basePicFlag)
+      {
+        baseGfveNumMatrices = gfveNumMatricesMinus1 + 1;
+        baseMatrixElementPrecisionFactor = gfveMatrixElementPrecisionFactorMinus1 + 1;
+      }
+      for (uint32_t j = 0; j <= gfveNumMatricesMinus1; j++)
+      {
+        uint32_t gfveMatrixHeightMinus1 = sei.m_matrixHeight[j] - 1;
+        WRITE_UVLC(gfveMatrixHeightMinus1, "gefv_matrix_height_minus1");
+        uint32_t gfveMatrixWidthMinus1 = sei.m_matrixWidth[j] - 1;
+        WRITE_UVLC(gfveMatrixWidthMinus1, "gefv_matrix_width_minus1");
+        matrixHeightVec.push_back(sei.m_matrixHeight[j]);
+        matrixWidthVec.push_back(sei.m_matrixWidth[j]);
+        if (basePicFlag && doUpdateGFVEmatrix)
+        {
+          baseGfveMatrixHeightVec.push_back(sei.m_matrixHeight[j]);
+          baseGfveMatrixWidthVec.push_back(sei.m_matrixWidth[j]);
+        }
+      }
+    }
+    else
+    {
+      numMatrices = baseGfveNumMatrices;
+      matrixElementPrecisionFactor = baseMatrixElementPrecisionFactor;
+      matrixHeightVec = baseGfveMatrixHeightVec;
+      matrixWidthVec = baseGfveMatrixWidthVec;
+    }
+    for (uint32_t j = 0; j < numMatrices; j++)
+    {
+      gfveMatrixElementRec.push_back(std::vector<std::vector<double>>());
+      for (uint32_t k = 0; k < matrixHeightVec[j]; k++)
+      {
+        gfveMatrixElementRec[j].push_back(std::vector<double>());
+        for (uint32_t l = 0; l < matrixWidthVec[j]; l++)
+        {
+          if (!sei.m_matrixPredFlag)
+          {
+            double curMatrixElementAbs = fabs(sei.m_matrixElement[j][k][l]);
+            uint32_t curMatrixElementAbsInt = (int)(curMatrixElementAbs);
+            assert(curMatrixElementAbsInt >= 0 && curMatrixElementAbsInt <= 4294967294);
+            WRITE_UVLC(curMatrixElementAbsInt, "gefv_matrix_element_int");
+            double curMatrixElementAbsDecimal = curMatrixElementAbs - curMatrixElementAbsInt;
+            assert(curMatrixElementAbsDecimal >= 0);
+            int curMatrixElementAbsDecIntValue = Clip3(0, (1 << matrixElementPrecisionFactor) - 1, (int)(curMatrixElementAbsDecimal * (1 << matrixElementPrecisionFactor) + 0.5));
+            WRITE_CODE(curMatrixElementAbsDecIntValue, matrixElementPrecisionFactor, "gefv_matrix_element_dec");
+            const int signflag = sei.m_matrixElement[j][k][l] < 0;
+            if (curMatrixElementAbsInt || curMatrixElementAbsDecIntValue)
+            {
+              WRITE_FLAG(signflag, "gefv_matrix_element_sign_flag");
+            }
+            double matrixElementAbsRec = (double)(curMatrixElementAbsInt + (((double)curMatrixElementAbsDecIntValue) / (1 << matrixElementPrecisionFactor)));
+            gfveMatrixElementRec[j][k].push_back(signflag ? -matrixElementAbsRec : matrixElementAbsRec);
+          }
+          else
+          {
+            double curMatrixElementAbs = fabs(sei.m_matrixElement[j][k][l] - (sei.m_gfvcnt == 0 ? baseGfveMatrixRec[j][k][l] : prevGfveMatrixRec[j][k][l]));
+            uint32_t curMatrixElementAbsInt = (int)curMatrixElementAbs;
+            assert(curMatrixElementAbsInt >= 0 && curMatrixElementAbsInt <= 4294967294);
+            WRITE_UVLC(curMatrixElementAbsInt, "gefv_matrix_delta_element_int");
+            double curMatrixElementAbsDecimal = curMatrixElementAbs - curMatrixElementAbsInt;
+            assert(curMatrixElementAbsDecimal >= 0);
+            int curMatrixElementAbsDecIntValue = (int)(curMatrixElementAbsDecimal* (1 << matrixElementPrecisionFactor) + 0.5);
+            WRITE_CODE(curMatrixElementAbsDecIntValue, matrixElementPrecisionFactor, "gefv_matrix_delta_element_dec");
+            const int signflag = (sei.m_matrixElement[j][k][l] - (sei.m_gfvcnt == 0 ? baseGfveMatrixRec[j][k][l] : prevGfveMatrixRec[j][k][l])) < 0;
+            if (curMatrixElementAbsInt || curMatrixElementAbsDecIntValue)
+            {
+              WRITE_FLAG(signflag, "gefv_matrix_delta_element_sign_flag");
+            }
+            double matrixElementAbsRec = (double)(curMatrixElementAbsInt + (((double)curMatrixElementAbsDecIntValue) / (1 << baseMatrixElementPrecisionFactor)));
+            gfveMatrixElementRec[j][k].push_back((signflag ? -matrixElementAbsRec : matrixElementAbsRec) + (sei.m_gfvcnt == 0 ? baseGfveMatrixRec[j][k][l] : prevGfveMatrixRec[j][k][l]));
+          }
+        }
+      }
+    }
+    if (doUpdateGFVEmatrix)
+    {
+      prevGfveMatrixRec = gfveMatrixElementRec;
+      if (basePicFlag)
+      {
+        baseGfveMatrixRec = gfveMatrixElementRec;
+      }
+      doUpdateGFVEmatrix = false;
+    }
+    else
+    {
+      doUpdateGFVEmatrix = true;
+    }
+  }
+  double gfveLeftPupilCoordinateXRec;
+  double gfveLeftPupilCoordinateYRec;
+  double gfveRightPupilCoordinateXRec;
+  double gfveRightPupilCoordinateYRec;
+  assert(sei.m_pupilPresentIdx >= 0 && sei.m_pupilPresentIdx <= 3);
+  WRITE_CODE(sei.m_pupilPresentIdx, 2, "gefv_pupil_coordinate_present_idx");
+  if (sei.m_pupilPresentIdx != 0)
+  {
+    if (basePicFlag)
+    {
+      checkBasePicPupilPresentIdx = true;
+
+      uint32_t gfvePupilCoordinatePrecisionFactorMinus1 = sei.m_pupilCoordinatePrecisionFactor - 1;
+      assert(gfvePupilCoordinatePrecisionFactorMinus1 >= 0 && gfvePupilCoordinatePrecisionFactorMinus1 <= 31);
+      WRITE_UVLC(gfvePupilCoordinatePrecisionFactorMinus1, "gefv_pupil_coordinate_precision_factor_minus1");
+    }
+    assert(checkBasePicPupilPresentIdx);
+  }
+  if (checkBasePicPupilPresentIdx)
+  {
+    double gfveLeftPupilCoordinateXRef = 0.0;
+    double gfveLeftPupilCoordinateYRef = 0.0;
+    double gfveRightPupilCoordinateXRef = 0.0;
+    double gfveRightPupilCoordinateYRef = 0.0;
+    if (sei.m_gfvcnt == 0)
+    {
+      if (!basePicFlag)
+      {
+        gfveLeftPupilCoordinateXRef = basegfveLeftPupilCoordinateX;
+        gfveLeftPupilCoordinateYRef = basegfveLeftPupilCoordinateY;
+        gfveRightPupilCoordinateXRef = basegfveRightPupilCoordinateX;
+        gfveRightPupilCoordinateYRef = basegfveRightPupilCoordinateY;
+      }
+    }
+    else
+    {
+      gfveLeftPupilCoordinateXRef = prevgfveLeftPupilCoordinateX;
+      gfveLeftPupilCoordinateYRef = prevgfveLeftPupilCoordinateY;
+      gfveRightPupilCoordinateXRef = prevgfveRightPupilCoordinateX;
+      gfveRightPupilCoordinateYRef = prevgfveRightPupilCoordinateY;
+    }
+    if (sei.m_pupilPresentIdx == 1 || sei.m_pupilPresentIdx == 3)
+    {
+      gfveLeftPupilCoordinateXRec = xWriteSEIPupilCoordinate(sei.m_pupilLeftEyeCoordinateX, gfveLeftPupilCoordinateXRef, sei.m_pupilCoordinatePrecisionFactor, "left", "x");
+      gfveLeftPupilCoordinateYRec = xWriteSEIPupilCoordinate(sei.m_pupilLeftEyeCoordinateY, gfveLeftPupilCoordinateYRef, sei.m_pupilCoordinatePrecisionFactor, "left", "y");
+    }
+    else
+    {
+      gfveLeftPupilCoordinateXRec = gfveLeftPupilCoordinateXRef;
+      gfveLeftPupilCoordinateYRec = gfveLeftPupilCoordinateYRef;
+    }
+    if (basePicFlag)
+    {
+      gfveRightPupilCoordinateXRef = gfveLeftPupilCoordinateXRec;
+      gfveRightPupilCoordinateYRef = gfveLeftPupilCoordinateYRec;
+    }
+    if (2 == sei.m_pupilPresentIdx || 3 == sei.m_pupilPresentIdx)
+    {
+      gfveRightPupilCoordinateXRec = xWriteSEIPupilCoordinate(sei.m_pupilRightEyeCoordinateX, gfveRightPupilCoordinateXRef, sei.m_pupilCoordinatePrecisionFactor, "right", "x");
+      gfveRightPupilCoordinateYRec = xWriteSEIPupilCoordinate(sei.m_pupilRightEyeCoordinateY, gfveRightPupilCoordinateYRef, sei.m_pupilCoordinatePrecisionFactor, "right", "y");
+    }
+    else
+    {
+      gfveRightPupilCoordinateXRec = gfveRightPupilCoordinateXRef;
+      gfveRightPupilCoordinateYRec = gfveRightPupilCoordinateYRef;
+    }
+    if (doUpdateGFVPupilCoordinate)
+    {
+      if (basePicFlag)
+      {
+        basegfveLeftPupilCoordinateX = gfveLeftPupilCoordinateXRec;
+        basegfveLeftPupilCoordinateY = gfveLeftPupilCoordinateYRec;
+        basegfveRightPupilCoordinateX = gfveRightPupilCoordinateXRec;
+        basegfveRightPupilCoordinateY = gfveRightPupilCoordinateYRec;
+      }
+      prevgfveLeftPupilCoordinateX = gfveLeftPupilCoordinateXRec;
+      prevgfveLeftPupilCoordinateY = gfveLeftPupilCoordinateYRec;
+      prevgfveRightPupilCoordinateX = gfveRightPupilCoordinateXRec;
+      prevgfveRightPupilCoordinateY = gfveRightPupilCoordinateYRec;
+      doUpdateGFVPupilCoordinate = false;
+    }
+    else
+    {
+      doUpdateGFVPupilCoordinate = true;
+    }
+  }
+  if (sei.m_nnPresentFlag)
+  {
+    if (sei.m_nnModeIdc == 0)
+    {
+      while (m_pcBitIf->getNumberOfWrittenBits() % 8 != 0)
+      {
+        WRITE_FLAG(0, "gefv_nn_alignment_zero_bit_b");
+      }
+      for (long i = 0; i < sei.m_payloadLength; i++)
+      {
+        WRITE_SCODE(sei.m_payloadByte[i], 8, "gefv_nn_payload_byte[i]");
+      }
+    }
+  }
+}
+double SEIWriter::xWriteSEIPupilCoordinate(double coordinate, double refCoordinate, int precisionFactor, const char* eye, const char* axis)
+{
+  double deltaAbs = fabs(coordinate - refCoordinate);
+  int absIntValue;
+  absIntValue = static_cast<int>(deltaAbs * (1 << precisionFactor) + 0.5);
+
+  assert(std::string(eye) == "left" || std::string(eye) == "right");
+  assert(std::string(axis) == "x" || std::string(axis) == "y");
+  std::string checkMessage = "The value of gefv_pupil_" + std::string(eye) + "_eye_d" + std::string(axis) + "_coordinate_abs shall be be 0 to 1 << (gefv_pupil_coordinate_precision_factor_minus1 + 2), inclusive";
+  assert(absIntValue >= 0 && absIntValue <=(1 << (precisionFactor + 1)));
+  std::string absSymbolName = "gefv_pupil_" + std::string(eye) + "_eye_d" + std::string(axis) + "_coordinate_abs";
+  WRITE_UVLC(absIntValue, absSymbolName.c_str());
+
+  const int signFlag = (coordinate - refCoordinate < 0) ? 1 : 0;
+  if (absIntValue)
+  {
+  
+    std::string signSymbolName = "gefv_pupil_" + std::string(eye) + "_eye_d" + std::string(axis) + "_coordinate_sign_flag";
+    WRITE_FLAG(signFlag, signSymbolName.c_str());
+  }
+  double deltaAbsRec = static_cast<double>(absIntValue) / (1 << precisionFactor);
+  return (signFlag ? -deltaAbsRec : deltaAbsRec) + refCoordinate;
+}
+#endif
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+void SEIWriter::xWriteSEISourcePictureTimingInfo(const SEISourcePictureTimingInfo &sei) 
+{
+  WRITE_FLAG(sei.m_sptiCancelFlag, "spti_cancel_flag");
+  if (!sei.m_sptiCancelFlag)
+  {
+    WRITE_FLAG(sei.m_sptiPersistenceFlag, "spti_persistance_flag");
+    WRITE_FLAG(sei.m_sptiSourceTimingEqualsOutputTimingFlag, "spti_source_timing_equals_output_timing_flag");
+    if (!sei.m_sptiSourceTimingEqualsOutputTimingFlag)
+    {
+      WRITE_FLAG(sei.m_sptiSourceTypePresentFlag,"spti_source_type_present_flag");
+      if (sei.m_sptiSourceTypePresentFlag)
+      {
+        WRITE_CODE(sei.m_sptiSourceType, 16, "spti_source_type");
+      }
+      WRITE_CODE(sei.m_sptiTimeScale, 32, "spti_time_scale");
+      WRITE_CODE(sei.m_sptiNumUnitsInElementalInterval, 32, "spti_num_units_in_elemental_interval");
+      WRITE_FLAG(sei.m_sptiDirectionFlag, "spti_direction_flag");
+      if (sei.m_sptiPersistenceFlag)
+      {
+        WRITE_CODE(sei.m_sptiMaxSublayersMinus1, 3, "spti_max_sublayers_minus_1");
+      }
+      int sptiMinTemporalSublayer = (sei.m_sptiPersistenceFlag ? 0 : sei.m_sptiMaxSublayersMinus1);
+      for (int i = sptiMinTemporalSublayer; i <= sei.m_sptiMaxSublayersMinus1; i++)
+      {
+        WRITE_UVLC(sei.m_sptiSublayerIntervalScaleFactor[i],"spti_sublayer_interval_scale_factor");
+        WRITE_FLAG(sei.m_sptiSublayerSynthesizedPictureFlag[i],"spti_sublayer_synthesized_picture_flag");
+      }
+    }
+  }
+}
+
+#endif
+
+
 //! \}

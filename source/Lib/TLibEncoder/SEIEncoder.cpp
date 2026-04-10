@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -590,7 +590,58 @@ Void SEIEncoder::initSEIContentColourVolume(SEIContentColourVolume *seiContentCo
     seiContentColourVolume->m_ccvAvgLuminanceValue = (Int) (10000000 * m_pcCfg->getCcvSEIAvgLuminanceValue());
   }
 }
-
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+void SEIEncoder::initSEIEncoderOptimizationInfo(SEIEncoderOptimizationInfo *sei)
+{
+  sei->m_cancelFlag = m_pcCfg->getEOISEICancelFlag();
+  if (!sei->m_cancelFlag)
+  {
+    sei->m_persistenceFlag = m_pcCfg->getEOISEIPersistenceFlag();
+    sei->m_forHumanViewingIdc = m_pcCfg->getEOISEIForHumanViewingIdc();
+    sei->m_forMachineAnalysisIdc = m_pcCfg->getEOISEIForMachineAnalysisIdc();
+    sei->m_type = m_pcCfg->getEOISEIType();
+    if ((sei->m_type & EOI_OptimizationType::OBJECT_BASED_OPTIMIZATION) != 0)
+    {
+      sei->m_objectBasedIdc = m_pcCfg->getEOISEIObjectBasedIdc();
+      if (sei->m_objectBasedIdc & EOI_OBJECT_BASED::COARSER_QUANTIZATION)
+      {
+        sei->m_quantThresholdDelta = m_pcCfg->getEOISEIQuantThresholdDelta();
+        if (sei->m_quantThresholdDelta > 0)
+        {
+          sei->m_picQuantObjectFlag = m_pcCfg->getEOISEIPicQuantObjectFlag();
+        }
+      }
+    }
+    if ((sei->m_type & EOI_OptimizationType::TEMPORAL_RESAMPLING) != 0)
+    {
+      sei->m_temporalResamplingTypeFlag = m_pcCfg->getEOISEITemporalResamplingTypeFlag();
+      sei->m_numIntPics = m_pcCfg->getEOISEINumIntPics();
+      if (sei->m_temporalResamplingTypeFlag && sei->m_numIntPics > 0)
+      {
+        sei->m_srcPicFlag = m_pcCfg->getEOISEISrcPicFlag();
+      }
+    }
+    if ((sei->m_type & EOI_OptimizationType::SPATIAL_RESAMPLING) != 0)
+    {
+      sei->m_origPicDimensionsFlag = m_pcCfg->getEOISEIOrigPicDimensionsFlag();
+      if (sei->m_origPicDimensionsFlag)
+      {
+        sei->m_origPicWidth = m_pcCfg->getEOISEIOrigPicWidth();
+        sei->m_origPicHeight = m_pcCfg->getEOISEIOrigPicHeight();
+      }
+      else
+      {
+        sei->m_spatialResamplingTypeFlag = m_pcCfg->getEOISEISpatialResamplingTypeFlag();
+      }
+    }
+    if ((sei->m_type & EOI_OptimizationType::PRIVACY_PROTECTION_OPTIMIZATION) != 0)
+    {
+      sei->m_privacyProtectionTypeIdc = m_pcCfg->getEOISEIPrivacyProtectionTypeIdc();
+      sei->m_privacyProtectedInfoType = m_pcCfg->getEOISEIPrivacyProtectedInfoType();
+    }
+  }
+}
+#endif
 #if SHUTTER_INTERVAL_SEI_MESSAGE
 Void SEIEncoder::initSEIShutterIntervalInfo(SEIShutterIntervalInfo *seiShutterIntervalInfo)
 {
@@ -626,6 +677,14 @@ Void SEIEncoder::initSEIFilmGrainCharacteristics(SEIFilmGrainCharacteristics *se
   seiFilmGrain->m_separateColourDescriptionPresentFlag    = m_pcCfg->getFilmGrainCharactersticsSEISepColourDescPresent();
   seiFilmGrain->m_blendingModeId                          = m_pcCfg->getFilmGrainCharactersticsSEIBlendingModeID();
   seiFilmGrain->m_log2ScaleFactor                         = m_pcCfg->getFilmGrainCharactersticsSEILog2ScaleFactor();
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  seiFilmGrain->m_fgPicWidthInLumaSamples                 = m_pcCfg->getFilmGrainCharactersticsSEIPicWidthInLumaSamples();
+  seiFilmGrain->m_fgPicHeightInLumaSamples                = m_pcCfg->getFilmGrainCharactersticsSEIPicHeightInLumaSamples();
+  if (seiFilmGrain->m_fgPicWidthInLumaSamples > 0 || seiFilmGrain->m_fgPicHeightInLumaSamples > 0)
+  {
+    seiFilmGrain->m_fgSpatialResolutionPresentFlag = 1;
+  }
+#endif
   for (int i = 0; i < MAX_NUM_COMPONENT; i++)
   {
     seiFilmGrain->m_compModel[i].bPresentFlag = m_pcCfg->getFGCSEICompModelPresent(i);
@@ -1676,6 +1735,334 @@ void SEIEncoder::initSEIDigitallySignedContentVerification(SEIDigitallySignedCon
   sei->dscvSignature = signature;
 }
 #endif
+#if JVET_AJ0207_GFV
+Void SEIEncoder::initSEIGenerativeFaceVideo(SEIGenerativeFaceVideo *sei, int currframeindex)
+{
+  assert(m_isInitialized);
+  assert(sei != nullptr);
+  sei->m_number = m_pcCfg->getGenerativeFaceVideoSEINumber();
+  sei->m_basePicFlag = m_pcCfg->getGenerativeFaceVideoSEIBasePicFlag();
+  sei->m_nnPresentFlag = m_pcCfg->getGenerativeFaceVideoSEINNPresentFlag();
+  sei->m_nnModeIdc = m_pcCfg->getGenerativeFaceVideoSEINNModeIdc();
+  sei->m_nnTagURI = m_pcCfg->getGenerativeFaceVideoSEINNTagURI();
+  sei->m_nnURI = m_pcCfg->getGenerativeFaceVideoSEINNURI();
+  sei->m_chromaKeyInfoPresentFlag = m_pcCfg->getGenerativeFaceVideoSEIChromaKeyInfoPresentFlag();
+  sei->m_chromaKeyValuePresentFlag.resize(3);
+  sei->m_chromaKeyValue.resize(3);
+  sei->m_chromaKeyThrPresentFlag.resize(2);
+  sei->m_chromaKeyThrValue.resize(2);
+  if (sei->m_chromaKeyInfoPresentFlag)
+  {
+    for (uint32_t chromac = 0; chromac < 3; chromac++)
+    {
+      sei->m_chromaKeyValuePresentFlag[chromac] = m_pcCfg->getGenerativeFaceVideoSEIChromaKeyValuePresentFlag(chromac);
+      if (sei->m_chromaKeyValuePresentFlag[chromac])
+      {
+        sei->m_chromaKeyValue[chromac] = m_pcCfg->getGenerativeFaceVideoSEIChromaKeyValue(chromac);
+      }
+    }
+    for (uint32_t chromai = 0; chromai < 2; chromai++)
+    {
+      sei->m_chromaKeyThrPresentFlag[chromai] = m_pcCfg->getGenerativeFaceVideoSEIChromaKeyThrPresentFlag(chromai);
+      if (sei->m_chromaKeyThrPresentFlag[chromai])
+      {
+        sei->m_chromaKeyThrValue[chromai] = m_pcCfg->getGenerativeFaceVideoSEIChromaKeyThrValue(chromai);
+      }
+    }
+  }
+  sei->m_payloadFilename = m_pcCfg->getGenerativeFaceVideoSEIPayloadFilename();
+  sei->m_currentid = currframeindex;
+  sei->m_id = m_pcCfg->getGenerativeFaceVideoSEIId(sei->m_currentid);
+  sei->m_cnt = m_pcCfg->getGenerativeFaceVideoSEICnt(sei->m_currentid);
+  sei->m_drivePicFusionFlag = m_pcCfg->getGenerativeFaceVideoSEIDrivePicFusionFlag(sei->m_currentid);
+  sei->m_lowConfidenceFaceParameterFlag = m_pcCfg->getGenerativeFaceVideoSEILowConfidenceFaceParameterFlag(sei->m_currentid);
+  sei->m_coordinatePresentFlag = m_pcCfg->getGenerativeFaceVideoSEICoordinatePresentFlag(sei->m_currentid);
+  sei->m_coordinateQuantizationFactor = m_pcCfg->getGenerativeFaceVideoSEICoordinateQuantizationFactor(sei->m_currentid);
+  sei->m_coordinatePredFlag = m_pcCfg->getGenerativeFaceVideoSEICoordinatePredFlag(sei->m_currentid);
+  sei->m_3DCoordinateFlag = m_pcCfg->getGenerativeFaceVideoSEI3DCoordinateFlag(sei->m_currentid);
+  sei->m_coordinatePointNum = m_pcCfg->getGenerativeFaceVideoSEICoordinatePointNum(sei->m_currentid);
+  // Coordinate Parameters
+  if (sei->m_coordinatePresentFlag == 1)
+  {
+    for (uint32_t coordinateId = 0; coordinateId < sei->m_coordinatePointNum; coordinateId++)
+    {
+      sei->m_coordinateX.push_back(m_pcCfg->getGenerativeFaceVideoSEICoordinateXTesonr(sei->m_currentid, coordinateId));
+      sei->m_coordinateY.push_back(m_pcCfg->getGenerativeFaceVideoSEICoordinateYTesonr(sei->m_currentid, coordinateId));
+    }
+    if (sei->m_3DCoordinateFlag == 1)
+    {
+      sei->m_coordinateZMaxValue = m_pcCfg->getGenerativeFaceVideoSEIZCoordinateMaxValue(sei->m_currentid, 0);
+      for (uint32_t coordinateId = 0; coordinateId < sei->m_coordinatePointNum; coordinateId++)
+      {
+        sei->m_coordinateZ.push_back(m_pcCfg->getGenerativeFaceVideoSEICoordinateZTesonr(sei->m_currentid, coordinateId));
+      }
+    }
+  }
+  // Matrix Parameters
+  sei->m_matrixPresentFlag = m_pcCfg->getGenerativeFaceVideoSEIMatrixPresentFlag(sei->m_currentid);
+  sei->m_matrixElementPrecisionFactor = m_pcCfg->getGenerativeFaceVideoSEIMatrixElementPrecisionFactor(sei->m_currentid);
+  sei->m_numMatrixType = m_pcCfg->getGenerativeFaceVideoSEINumMatrixType(sei->m_currentid);
+  sei->m_matrixPredFlag = m_pcCfg->getGenerativeFaceVideoSEIMatrixPredFlag(sei->m_currentid);
+  if (sei->m_matrixPresentFlag == 1)
+  {
+    uint32_t matrixWidth = 0;
+    uint32_t matrixHeight = 0;
+    uint32_t numMatrices = 0;
+    for (uint32_t matrixId = 0; matrixId < sei->m_numMatrixType; matrixId++)
+    {
+      sei->m_matrixElement.push_back(std::vector<std::vector<std::vector<double>>>());
+      sei->m_matrixTypeIdx.push_back(m_pcCfg->getGenerativeFaceVideoSEIMatrixTypeIdx(sei->m_currentid, matrixId));
+      sei->m_matrix3DSpaceFlag.push_back(m_pcCfg->getGenerativeFaceVideoSEIMatrix3DSpaceFlag(sei->m_currentid, matrixId));
+      sei->m_numMatrices.push_back(m_pcCfg->getGenerativeFaceVideoSEINumMatrices(sei->m_currentid, matrixId));
+      sei->m_matrixWidth.push_back(m_pcCfg->getGenerativeFaceVideoSEIMatrixWidth(sei->m_currentid, matrixId));
+      sei->m_matrixHeight.push_back(m_pcCfg->getGenerativeFaceVideoSEIMatrixHeight(sei->m_currentid, matrixId));
+      sei->m_numMatricestonumKpsFlag.push_back(m_pcCfg->getGenerativeFaceVideoSEINumMatricestoNumKpsFlag(sei->m_currentid, matrixId));
+      sei->m_numMatricesInfo.push_back(m_pcCfg->getGenerativeFaceVideoSEINumMatricesInfo(sei->m_currentid, matrixId));
+      if (sei->m_matrixTypeIdx[matrixId] == 0 || sei->m_matrixTypeIdx[matrixId] == 1)
+      {
+        matrixHeight = sei->m_3DCoordinateFlag + 2;
+        matrixWidth = sei->m_3DCoordinateFlag + 2;
+      }
+      else if (sei->m_matrixTypeIdx[matrixId] == 4)
+      {
+        matrixWidth = (sei->m_coordinatePresentFlag ? sei->m_3DCoordinateFlag : sei->m_matrix3DSpaceFlag[matrixId]) + 2;
+        matrixHeight = (sei->m_coordinatePresentFlag ? sei->m_3DCoordinateFlag : sei->m_matrix3DSpaceFlag[matrixId]) + 2;
+      }
+      else if (sei->m_matrixTypeIdx[matrixId] == 5 || sei->m_matrixTypeIdx[matrixId] == 6)
+      {
+        matrixWidth = 1;
+        matrixHeight = (sei->m_coordinatePresentFlag ? sei->m_3DCoordinateFlag : sei->m_matrix3DSpaceFlag[matrixId]) + 2;
+      }
+      else
+      {
+        matrixHeight = sei->m_matrixHeight[matrixId];
+        matrixWidth = sei->m_matrixWidth[matrixId];
+      }
+      if (sei->m_matrixTypeIdx[matrixId] == 0 || sei->m_matrixTypeIdx[matrixId] == 1)
+      {
+        if (sei->m_coordinatePresentFlag)
+        {
+          numMatrices = sei->m_numMatricestonumKpsFlag[matrixId] ? sei->m_coordinatePointNum : (sei->m_numMatricesInfo[matrixId] < (sei->m_coordinatePointNum - 1) ? (sei->m_numMatricesInfo[matrixId] + 1) : (sei->m_numMatricesInfo[matrixId] + 2));
+        }
+        else
+        {
+          numMatrices = sei->m_numMatricesInfo[matrixId] + 1;
+        }
+      }
+      else if (sei->m_matrixTypeIdx[matrixId] >= 2 && sei->m_matrixTypeIdx[matrixId] < 7)
+      {
+        numMatrices = 1;
+      }
+      else
+      {
+        numMatrices = sei->m_numMatrices[matrixId];
+      }
+      sei->m_numMatricesstore.push_back(numMatrices);
+      sei->m_matrixWidthstore.push_back(matrixWidth);
+      sei->m_matrixHeightstore.push_back(matrixHeight);
+      for (uint32_t j = 0; j < numMatrices; j++)
+      {
+        sei->m_matrixElement[matrixId].push_back(std::vector< std::vector<double> >());
+        for (uint32_t k = 0; k < matrixHeight; k++)
+        {
+          sei->m_matrixElement[matrixId][j].push_back(std::vector<double>());
+          for (uint32_t l = 0; l < matrixWidth; l++)
+          {
+            sei->m_matrixElement[matrixId][j][k].push_back(m_pcCfg->getGenerativeFaceVideoSEIMatrixElement(sei->m_currentid, matrixId, j, k, l));
+          }
+        }
+      }
+    }
+  }
+  if (sei->m_nnPresentFlag)
+  {
+    if (sei->m_nnModeIdc == 0)
+    {
+      std::ifstream     bitstreamFile(sei->m_payloadFilename.c_str(), std::ifstream::in | std::ifstream::binary);
+      if (!bitstreamFile)
+      {
+        std::cerr << "Failed to open bitstream file " << sei->m_payloadFilename.c_str() << " for reading";
+        exit(1);
+      }
+      bitstreamFile.seekg(0, std::ifstream::end);
+      sei->m_payloadLength = bitstreamFile.tellg();
+      bitstreamFile.seekg(0, std::ifstream::beg);
+      sei->m_payloadByte = new char[sei->m_payloadLength];
+      bitstreamFile.read(sei->m_payloadByte, sei->m_payloadLength);
+      bitstreamFile.close();
+    }
+  }
+}
+#if JVET_AK0239_GEFV
+Void SEIEncoder::initSEIGenerativeFaceVideoEnhancement(SEIGenerativeFaceVideoEnhancement *sei, int currframeindex)
+{
+  assert(m_isInitialized);
+  assert(sei != nullptr);
+  sei->m_number = m_pcCfg->getGenerativeFaceVideoEnhancementSEINumber();
+  sei->m_basePicFlag = m_pcCfg->getGenerativeFaceVideoEnhancementSEIBasePicFlag();
+  sei->m_nnPresentFlag = m_pcCfg->getGenerativeFaceVideoEnhancementSEINNPresentFlag();
+  sei->m_nnModeIdc = m_pcCfg->getGenerativeFaceVideoEnhancementSEINNModeIdc();
+  sei->m_nnTagURI = m_pcCfg->getGenerativeFaceVideoEnhancementSEINNTagURI();
+  sei->m_nnURI = m_pcCfg->getGenerativeFaceVideoEnhancementSEINNURI();
+  sei->m_payloadFilename = m_pcCfg->getGenerativeFaceVideoEnhancementSEIPayloadFilename();
+  sei->m_currentid = currframeindex;
+  sei->m_id = m_pcCfg->getGenerativeFaceVideoEnhancementSEIId(sei->m_currentid);
+  sei->m_gfvcnt = m_pcCfg->getGenerativeFaceVideoEnhancementSEIGFVCnt(sei->m_currentid);
+  sei->m_gfvid = m_pcCfg->getGenerativeFaceVideoEnhancementSEIGFVId(sei->m_currentid);
+  sei->m_pupilPresentIdx = m_pcCfg->getGenerativeFaceVideoEnhancementSEIPupilPresentIdx(sei->m_currentid);
+  sei->m_pupilCoordinatePrecisionFactor = m_pcCfg->getGenerativeFaceVideoEnhancementSEIPupilCoordinatePrecisionFactor(sei->m_currentid);
+  sei->m_pupilLeftEyeCoordinateX = m_pcCfg->getGenerativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateX(sei->m_currentid);
+  sei->m_pupilLeftEyeCoordinateY = m_pcCfg->getGenerativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateY(sei->m_currentid);
+  sei->m_pupilRightEyeCoordinateX = m_pcCfg->getGenerativeFaceVideoEnhancementSEIPupilRightEyeCoordinateX(sei->m_currentid);
+  sei->m_pupilRightEyeCoordinateY = m_pcCfg->getGenerativeFaceVideoEnhancementSEIPupilRightEyeCoordinateY(sei->m_currentid);
+
+  sei->m_matrixElementPrecisionFactor = m_pcCfg->getGenerativeFaceVideoEnhancementSEIMatrixElementPrecisionFactor(sei->m_currentid);
+  sei->m_numMatrices = m_pcCfg->getGenerativeFaceVideoEnhancementSEINumMatrices(sei->m_currentid);
+  sei->m_matrixPresentFlag = m_pcCfg->getGenerativeFaceVideoEnhancementSEIMatrixPresentFlag(sei->m_currentid);
+  sei->m_matrixPredFlag = m_pcCfg->getGenerativeFaceVideoEnhancementSEIMatrixPredFlag(sei->m_currentid);
+  if (sei->m_matrixPresentFlag == 1)
+  {
+    for (uint32_t j = 0; j < sei->m_numMatrices; j++)
+    {
+      sei->m_matrixElement.push_back(std::vector< std::vector<double>>());
+
+      sei->m_matrixWidth.push_back(m_pcCfg->getGenerativeFaceVideoEnhancementSEIMatrixWidth(sei->m_currentid, j));
+      sei->m_matrixHeight.push_back(m_pcCfg->getGenerativeFaceVideoEnhancementSEIMatrixHeight(sei->m_currentid, j));
+      for (uint32_t k = 0; k < sei->m_matrixWidth[j]; k++)
+      {
+        sei->m_matrixElement[j].push_back(std::vector<double>());
+        for (uint32_t l = 0; l < sei->m_matrixHeight[j]; l++)
+        {
+          sei->m_matrixElement[j][k].push_back(m_pcCfg->getGenerativeFaceVideoEnhancementSEIMatrixElement(sei->m_currentid, j, k, l));
+        }
+      }
+    }
+  }
+  if (sei->m_nnPresentFlag)
+  {
+    if (sei->m_nnModeIdc == 0)
+    {
+      std::ifstream     bitstreamFile(sei->m_payloadFilename.c_str(), std::ifstream::in | std::ifstream::binary);
+      if (!bitstreamFile)
+      {
+        std::cerr << "Failed to open bitstream file " << sei->m_payloadFilename.c_str() << " for reading";
+        exit(1);
+      }
+      bitstreamFile.seekg(0, std::ifstream::end);
+      sei->m_payloadLength = bitstreamFile.tellg();
+      bitstreamFile.seekg(0, std::ifstream::beg);
+      sei->m_payloadByte = new char[sei->m_payloadLength];
+      bitstreamFile.read(sei->m_payloadByte, sei->m_payloadLength);
+      bitstreamFile.close();
+    }
+  }
+}
+#endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+void SEIEncoder::initSEIPackedRegionsInfo(SEIPackedRegionsInfo* sei)
+{
+  sei->m_cancelFlag = m_pcCfg->getPriSEICancelFlag();
+  sei->m_persistenceFlag = m_pcCfg->getPriSEIPersistenceFlag();
+  sei->m_numRegionsMinus1 = m_pcCfg->getPriSEINumRegionsMinus1();
+  sei->m_layerId = 0;  // Always 0 in HM encoder
+  sei->m_multilayerFlag = m_pcCfg->getPriSEIMultilayerFlag();
+  sei->m_useMaxDimensionsFlag = m_pcCfg->getPriSEIUseMaxDimensionsFlag();
+  sei->m_log2UnitSize = m_pcCfg->getPriSEILog2UnitSize();
+  sei->m_regionSizeLenMinus1 = m_pcCfg->getPriSEIRegionSizeLenMinus1();
+  sei->m_regionIdPresentFlag = m_pcCfg->getPriSEIRegionIdPresentFlag();
+  sei->m_targetPicParamsPresentFlag = m_pcCfg->getPriSEITargetPicParamsPresentFlag();
+  sei->m_targetPicWidthMinus1 = m_pcCfg->getPriSEITargetPicWidthMinus1();
+  sei->m_targetPicHeightMinus1 = m_pcCfg->getPriSEITargetPicHeightMinus1();
+  sei->m_numResamplingRatiosMinus1 = m_pcCfg->getPriSEINumResamplingRatiosMinus1();
+
+  sei->m_resamplingWidthNumMinus1.resize(sei->m_numResamplingRatiosMinus1 + 1);
+  sei->m_resamplingWidthDenomMinus1.resize(sei->m_numResamplingRatiosMinus1 + 1);
+  sei->m_fixedAspectRatioFlag.resize(sei->m_numResamplingRatiosMinus1 + 1);
+  sei->m_resamplingHeightNumMinus1.resize(sei->m_numResamplingRatiosMinus1 + 1);
+  sei->m_resamplingHeightDenomMinus1.resize(sei->m_numResamplingRatiosMinus1 + 1);
+  for (uint32_t i = 0; i <= sei->m_numResamplingRatiosMinus1; i++)
+  {
+    sei->m_resamplingWidthNumMinus1[i] = m_pcCfg->getPriSEIResamplingWidthNumMinus1(i);
+    sei->m_resamplingWidthDenomMinus1[i] = m_pcCfg->getPriSEIResamplingWidthDenomMinus1(i);
+    sei->m_fixedAspectRatioFlag[i] = m_pcCfg->getPriSEIFixedAspectRatioFlag(i);
+    sei->m_resamplingHeightNumMinus1[i] = m_pcCfg->getPriSEIResamplingHeightNumMinus1(i);
+    sei->m_resamplingHeightDenomMinus1[i] = m_pcCfg->getPriSEIResamplingHeightDenomMinus1(i);
+  }
+
+  sei->m_regionId.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionLayerId.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionIsALayerFlag.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionTopLeftInUnitsX.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionTopLeftInUnitsY.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionWidthInUnitsMinus1.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_regionHeightInUnitsMinus1.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_resamplingRatioIdx.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_targetRegionTopLeftInUnitsX.resize(sei->m_numRegionsMinus1 + 1);
+  sei->m_targetRegionTopLeftInUnitsY.resize(sei->m_numRegionsMinus1 + 1);
+  for (uint32_t i = 0; i <= sei->m_numRegionsMinus1; i++)
+  {
+    sei->m_regionId[i] = m_pcCfg->getPriSEIRegionId(i);
+    if (sei->m_multilayerFlag)
+    {
+      sei->m_regionLayerId[i] = m_pcCfg->getPriSEIRegionLayerId(i);
+      sei->m_regionIsALayerFlag[i] = m_pcCfg->getPriSEIRegionIsALayerFlag(i);
+    }
+    else
+    {
+      sei->m_regionLayerId[i] = 0;
+      sei->m_regionIsALayerFlag[i] = 0;
+    }
+    if (!sei->m_regionIsALayerFlag[i])
+    {
+      sei->m_regionTopLeftInUnitsX[i] = m_pcCfg->getPriSEIRegionTopLeftInUnitsX(i);
+      sei->m_regionTopLeftInUnitsY[i] = m_pcCfg->getPriSEIRegionTopLeftInUnitsY(i);
+      sei->m_regionWidthInUnitsMinus1[i] = m_pcCfg->getPriSEIRegionWidthInUnitsMinus1(i);
+      sei->m_regionHeightInUnitsMinus1[i] = m_pcCfg->getPriSEIRegionHeightInUnitsMinus1(i);
+    }
+    else
+    {
+      sei->m_regionTopLeftInUnitsX[i] = 0;
+      sei->m_regionTopLeftInUnitsY[i] = 0;
+      sei->m_regionWidthInUnitsMinus1[i] = 0;
+      sei->m_regionHeightInUnitsMinus1[i] = 0;
+    }
+    sei->m_resamplingRatioIdx[i] = m_pcCfg->getPriSEIResamplingRatioIdx(i);
+    sei->m_targetRegionTopLeftInUnitsX[i] = m_pcCfg->getPriSEITargetRegionTopLeftInUnitsX(i);
+    sei->m_targetRegionTopLeftInUnitsY[i] = m_pcCfg->getPriSEITargetRegionTopLeftInUnitsY(i);
+  }
+}
+#endif
+
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+void SEIEncoder::initSEISourcePictureTimingInfo(SEISourcePictureTimingInfo *SEISourcePictureTimingInfo) 
+{
+
+  assert(m_isInitialized);
+  assert(SEISourcePictureTimingInfo != NULL);
+
+  SEISourcePictureTimingInfo->m_sptiSEIEnabled = m_pcCfg->getSptiSEIEnabled();
+  SEISourcePictureTimingInfo->m_sptiSourceTimingEqualsOutputTimingFlag = m_pcCfg->getmSptiSEISourceTimingEqualsOutputTimingFlag();
+  SEISourcePictureTimingInfo->m_sptiSourceType = m_pcCfg->getmSptiSEISourceType();
+  SEISourcePictureTimingInfo->m_sptiTimeScale = m_pcCfg->getmSptiSEITimeScale();
+  SEISourcePictureTimingInfo->m_sptiNumUnitsInElementalInterval = m_pcCfg->getmSptiSEINumUnitsInElementalInterval();
+  SEISourcePictureTimingInfo->m_sptiDirectionFlag = m_pcCfg->getmSptiSEIDirectionFlag();
+  SEISourcePictureTimingInfo->m_sptiMaxSublayersMinus1 = m_pcCfg->getMaxTempLayer() - 1;
+  SEISourcePictureTimingInfo->m_sptiCancelFlag = 0;
+  SEISourcePictureTimingInfo->m_sptiPersistenceFlag = 1;
+  SEISourcePictureTimingInfo->m_sptiSourceTypePresentFlag = (SEISourcePictureTimingInfo->m_sptiSourceType == 0 ? 0 : 1);
+
+  int sptiMinTemporalSublayer = (SEISourcePictureTimingInfo->m_sptiPersistenceFlag ? 0 : SEISourcePictureTimingInfo->m_sptiMaxSublayersMinus1);
+
+  for (int i = sptiMinTemporalSublayer; i <= SEISourcePictureTimingInfo->m_sptiMaxSublayersMinus1; i++) 
+  {
+    SEISourcePictureTimingInfo->m_sptiSublayerIntervalScaleFactor[i] = 1 << (SEISourcePictureTimingInfo->m_sptiMaxSublayersMinus1 - i);
+    SEISourcePictureTimingInfo->m_sptiSublayerSynthesizedPictureFlag[i] = false;
+  }
+#endif
+}
+
+#endif
+
 
  
 //! \}
