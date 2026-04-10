@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -504,6 +504,7 @@ protected:
   UInt      m_siiSEITimeScale;
   std::vector<UInt>     m_siiSEISubLayerNumUnitsInSI;
 #endif
+
 #if NNPFC_SEI_MESSAGE
   Bool                  m_nnPostFilterSEICharacteristicsEnabled;
   Bool                  m_nnPostFilterSEICharacteristicsUseSuffixSEI;
@@ -589,6 +590,15 @@ protected:
   Bool      m_nnPostFilterSEIActivationSeedUpdateFlag;
   UInt      m_nnPostFilterSEIActivationSeed;
 #endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  bool  m_aurSEIEnabled;
+  bool  m_aurSEICancelFlag;
+  bool  m_aurSEIPersistenceFlag;
+  uint32_t  m_aurSEINumRestrictionsMinus1;
+  std::vector<uint32_t>  m_aurSEIRestrictions;
+  std::vector<bool>  m_aurSEIContextPresentFlag;
+  std::vector<uint32_t>  m_aurSEIContext;
+#endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   bool      m_phaseIndicationSEIEnabledFullResolution;
   int       m_piHorPhaseNumFullResolution;
@@ -596,6 +606,28 @@ protected:
   int       m_piVerPhaseNumFullResolution;
   int       m_piVerPhaseDenMinus1FullResolution;
 #endif
+
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  bool  m_eoiSEIEnabled;
+  bool  m_eoiSEICancelFlag;
+  bool  m_eoiSEIPersistenceFlag;
+  uint32_t m_eoiSEIForHumanViewingIdc;
+  uint32_t m_eoiSEIForMachineAnalysisIdc;
+  uint32_t m_eoiSEIType;
+  uint32_t m_eoiSEIObjectBasedIdc;
+  uint32_t m_eoiSEIQuantThresholdDelta;
+  bool     m_eoiSEIPicQuantObjectFlag;
+  bool m_eoiSEITemporalResamplingTypeFlag;
+  uint32_t m_eoiSEINumIntPics;
+  bool     m_eoiSEISrcPicFlag;;
+  bool     m_eoiSEIOrigPicDimensionsFlag;
+  uint32_t m_eoiSEIOrigPicWidth;
+  uint32_t m_eoiSEIOrigPicHeight;
+  bool m_eoiSEISpatialResamplingTypeFlag;
+  uint32_t m_eoiSEIPrivacyProtectionTypeIdc;
+  uint32_t m_eoiSEIPrivacyProtectedInfoType;
+#endif
+
 #if SEI_ENCODER_CONTROL
   // film grain characterstics sei
   Bool      m_fgcSEIEnabled;
@@ -605,6 +637,10 @@ protected:
   Bool      m_fgcSEISepColourDescPresentFlag;
   UInt      m_fgcSEIBlendingModeID;
   UInt      m_fgcSEILog2ScaleFactor;
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  UInt      m_fgcSEIPicWidthInLumaSamples;
+  UInt      m_fgcSEIPicHeightInLumaSamples;
+#endif
   Bool      m_fgcSEICompModelPresent[MAX_NUM_COMPONENT];
 #if JVET_X0048_X0103_FILM_GRAIN
   Bool      m_fgcSEIAnalysisEnabled;
@@ -634,6 +670,81 @@ protected:
   std::string m_summaryPicFilenameBase;                       ///< Base filename to use for producing summary picture output files. The actual filenames used will have I.txt, P.txt and B.txt appended.
   UInt        m_summaryVerboseness;                           ///< Specifies the level of the verboseness of the text output.
 
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+  bool m_sptiSEIEnabled;
+  bool m_sptiSourceTimingEqualsOutputTimingFlag;
+  uint32_t m_sptiSourceType;
+  uint32_t m_sptiTimeScale;
+  uint32_t m_sptiNumUnitsInElementalInterval;
+  bool m_sptiDirectionFlag;
+#endif
+#if JVET_AJ0207_GFV
+  bool                                 m_generativeFaceVideoEnabled;
+  uint32_t                             m_generativeFaceVideoSEINumber;
+  bool                                 m_generativeFaceVideoSEIBasePicFlag;
+  bool                                 m_generativeFaceVideoSEINNPresentFlag;
+  uint32_t                             m_generativeFaceVideoSEINNModeIdc;
+  std::string                          m_generativeFaceVideoSEINNTagURI;
+  std::string                          m_generativeFaceVideoSEINNURI;
+  bool                                 m_generativeFaceVideoSEIChromaKeyInfoPresentFlag;
+  std::vector<bool>                    m_generativeFaceVideoSEIChromaKeyValuePresentFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEIChromaKeyValue;
+  std::vector<bool>                    m_generativeFaceVideoSEIChromaKeyThrPresentFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEIChromaKeyThrValue;
+  std::vector<bool>                    m_generativeFaceVideoSEIDrivePicFusionFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEIId;
+  std::vector<uint32_t>                m_generativeFaceVideoSEICnt;
+  std::vector<bool>                    m_generativeFaceVideoSEILowConfidenceFaceParameterFlag;
+  std::vector<bool>                    m_generativeFaceVideoSEICoordinatePresentFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEICoordinateQuantizationFactor;
+  std::vector<bool>                    m_generativeFaceVideoSEICoordinatePredFlag;
+  std::vector<bool>                    m_generativeFaceVideoSEI3DCoordinateFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEICoordinatePointNum;
+  std::vector<std::vector<double>>     m_generativeFaceVideoSEICoordinateXTesonr;
+  std::vector<std::vector<double>>     m_generativeFaceVideoSEICoordinateYTesonr;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEIZCoordinateMaxValue;
+  std::vector<std::vector<double>>     m_generativeFaceVideoSEICoordinateZTesonr;
+  std::vector<bool>                    m_generativeFaceVideoSEIMatrixPresentFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEIMatrixElementPrecisionFactor;
+  std::vector<bool>                    m_generativeFaceVideoSEIMatrixPredFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoSEINumMatrixType;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEIMatrixTypeIdx;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEINumMatricestoNumKpsFlag;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEINumMatricesInfo;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEIMatrix3DSpaceFlag;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEINumMatrices;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEIMatrixWidth;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoSEIMatrixHeight;
+  std::vector < std::vector<std::vector<std::vector<std::vector<double>>>>>   m_generativeFaceVideoSEIMatrixElement;
+  std::string                          m_generativeFaceVideoSEIPayloadFilename;
+#endif
+#if JVET_AK0239_GEFV
+  bool                                 m_generativeFaceVideoEnhancementEnabled;
+  uint32_t                             m_generativeFaceVideoEnhancementSEINumber;
+  bool                                 m_generativeFaceVideoEnhancementSEIBasePicFlag;
+  bool                                 m_generativeFaceVideoEnhancementSEINNPresentFlag;
+  uint32_t                             m_generativeFaceVideoEnhancementSEINNModeIdc;
+  std::string                          m_generativeFaceVideoEnhancementSEINNTagURI;
+  std::string                          m_generativeFaceVideoEnhancementSEINNURI;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIId;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIGFVId;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIGFVCnt;
+  std::vector<bool>                    m_generativeFaceVideoEnhancementSEIMatrixPresentFlag;
+  std::vector<bool>                    m_generativeFaceVideoEnhancementSEIMatrixPredFlag;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIMatrixElementPrecisionFactor;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEINumMatrices;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoEnhancementSEIMatrixWidth;
+  std::vector<std::vector<uint32_t>>   m_generativeFaceVideoEnhancementSEIMatrixHeight;
+  std::vector<std::vector<std::vector<std::vector<double>>>>   m_generativeFaceVideoEnhancementSEIMatrixElement;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIPupilPresentIdx;
+  std::vector<uint32_t>                m_generativeFaceVideoEnhancementSEIPupilCoordinatePrecisionFactor;
+  std::vector<double>                  m_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateX;
+  std::vector<double>                  m_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateY;
+  std::vector<double>                  m_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateX;
+  std::vector<double>                  m_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateY;
+  std::string                          m_generativeFaceVideoEnhancementSEIPayloadFilename;
+#endif
+
 #if EXTENSION_360_VIDEO
   TExt360AppEncCfg m_ext360;
   friend class TExt360AppEncCfg;
@@ -657,6 +768,37 @@ protected:
   Int       m_miMinWavelengthExponentPlus15; 
   Int       m_miMaxWavelengthMantissa; 
   Int       m_miMaxWavelengthExponentPlus15; 
+#endif
+
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  bool     m_priSEIEnabled;
+  bool     m_priSEICancelFlag;
+  bool     m_priSEIPersistenceFlag;
+  uint32_t m_priSEINumRegionsMinus1;
+  bool     m_priSEIMultilayerFlag;
+  bool     m_priSEIUseMaxDimensionsFlag;
+  uint32_t m_priSEILog2UnitSize;
+  uint32_t m_priSEIRegionSizeLenMinus1;
+  bool     m_priSEIRegionIdPresentFlag;
+  bool     m_priSEITargetPicParamsPresentFlag;
+  uint32_t m_priSEITargetPicWidthMinus1;
+  uint32_t m_priSEITargetPicHeightMinus1;
+  uint32_t m_priSEINumResamplingRatiosMinus1;
+  std::vector<uint32_t> m_priSEIResamplingWidthNumMinus1;
+  std::vector<uint32_t> m_priSEIResamplingWidthDenomMinus1;
+  std::vector<bool>     m_priSEIFixedAspectRatioFlag;
+  std::vector<uint32_t> m_priSEIResamplingHeightNumMinus1;
+  std::vector<uint32_t> m_priSEIResamplingHeightDenomMinus1;
+  std::vector<uint32_t> m_priSEIRegionId;
+  std::vector<uint32_t> m_priSEIRegionLayerId;
+  std::vector<bool>     m_priSEIRegionIsALayerFlag;
+  std::vector<uint32_t> m_priSEIRegionTopLeftInUnitsX;
+  std::vector<uint32_t> m_priSEIRegionTopLeftInUnitsY;
+  std::vector<uint32_t> m_priSEIRegionWidthInUnitsMinus1;
+  std::vector<uint32_t> m_priSEIRegionHeightInUnitsMinus1;
+  std::vector<uint32_t> m_priSEIResamplingRatioIdx;
+  std::vector<uint32_t> m_priSEITargetRegionTopLeftInUnitsX;
+  std::vector<uint32_t> m_priSEITargetRegionTopLeftInUnitsY;
 #endif
 
   // internal member functions

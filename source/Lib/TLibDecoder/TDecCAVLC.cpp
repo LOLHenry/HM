@@ -3,7 +3,7 @@
 * and contributor rights, including patent rights, and no such rights are
 * granted under this license.
 *
-* Copyright (c) 2010-2025, ITU/ISO/IEC
+* Copyright (c) 2010-2026, ITU/ISO/IEC
 * All rights reserved.
 *
 * Redistribution and use in source and binary forms, with or without
@@ -1100,11 +1100,11 @@ Void TDecCavlc::parseSliceHeader (TComSlice* pcSlice, ParameterSetManager *param
       {
         iPOCmsb = iPrevPOCmsb;
       }
-      if ( pcSlice->getNalUnitType() == NAL_UNIT_CODED_SLICE_BLA_W_LP
-        || pcSlice->getNalUnitType() == NAL_UNIT_CODED_SLICE_BLA_W_RADL
-        || pcSlice->getNalUnitType() == NAL_UNIT_CODED_SLICE_BLA_N_LP )
+
+      if ( pcSlice->isIRAP() && pcSlice->getNoRaslOutputFlag() )
       {
-        // For BLA picture types, POCmsb is set to 0.
+        // For IRAP picture types, when NoRaslOutputFlag is equal to 1,
+        // POCmsb is set to 0.
         iPOCmsb = 0;
       }
       pcSlice->setPOC              (iPOCmsb+iPOClsb);

@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -88,6 +88,7 @@ private:
   TComPicYuv*           m_pcPicYuvResi;           //  Residual
   Bool                  m_bReconstructed;
   Bool                  m_bNeededForOutput;
+  UInt                  m_picLatencyCount = 0;
   UInt                  m_uiCurrSliceIdx;         // Index of current slice
   Bool                  m_bCheckLTMSB;
 
@@ -192,6 +193,8 @@ public:
   Bool          getReconMark () const      { return m_bReconstructed;  }
   Void          setOutputMark (Bool b) { m_bNeededForOutput = b;     }
   Bool          getOutputMark () const      { return m_bNeededForOutput;  }
+  Void          setPicLatencyCount (UInt i) { m_picLatencyCount = i;  }
+  UInt          getPicLatencyCount () const { return m_picLatencyCount;  }
 
   Void          compressMotion();
   UInt          getCurrSliceIdx() const           { return m_uiCurrSliceIdx;                }
@@ -202,6 +205,7 @@ public:
 
   const Window& getConformanceWindow() const { return m_picSym.getSPS().getConformanceWindow(); }
   Window        getDefDisplayWindow() const  { return m_picSym.getSPS().getVuiParametersPresentFlag() ? m_picSym.getSPS().getVuiParameters()->getDefaultDisplayWindow() : Window(); }
+  BitDepths     getBitDepths() const         { return m_picSym.getSPS().getBitDepths(); }
 
   Bool          getSAOMergeAvailability(Int currAddr, Int mergeAddr);
 

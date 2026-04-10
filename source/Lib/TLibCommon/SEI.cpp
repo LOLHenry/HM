@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -104,6 +104,12 @@ const std::vector<SEI::PayloadType> SEI::prefix_sei_messages({
   SEI::DIGITALLY_SIGNED_CONTENT_INITIALIZATION,
   SEI::DIGITALLY_SIGNED_CONTENT_SELECTION,
 #endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  SEI::AI_USAGE_RESTRICTIONS,
+#endif
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  SEI::ENCODER_OPTIMIZATION_INFO,
+#endif
 });
 
 const std::vector<SEI::PayloadType> SEI::suffix_sei_messages({
@@ -114,8 +120,17 @@ const std::vector<SEI::PayloadType> SEI::suffix_sei_messages({
   SEI::POST_FILTER_HINT,
   SEI::DECODED_PICTURE_HASH,
   SEI::CODED_REGION_COMPLETION,
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  SEI::ENCODER_OPTIMIZATION_INFO,
+#endif
 #if JVET_AK0194_DSC_SEI_DECODER_SYNTAX
   SEI::DIGITALLY_SIGNED_CONTENT_VERIFICATION,
+#endif
+  #if JVET_AJ0207_GFV
+  SEI::GENERATIVE_FACE_VIDEO,
+#endif
+#if JVET_AK0239_GEFV
+  SEI::GENERATIVE_ENHANCEMENT_FACE_VIDEO
 #endif
 });
 
@@ -498,6 +513,98 @@ SEINeuralNetworkPostFilterActivation::SEINeuralNetworkPostFilterActivation(
 }
 #endif
 
+#if JVET_AJ0207_GFV
+SEIGenerativeFaceVideo::SEIGenerativeFaceVideo(const SEIGenerativeFaceVideo& sei)
+{
+    m_number = sei.m_number;
+    m_currentid = sei.m_currentid;
+    m_id = sei.m_id;
+    m_cnt = sei.m_cnt;
+    m_basePicFlag = sei.m_basePicFlag;
+    m_nnPresentFlag = sei.m_nnPresentFlag;
+    m_nnModeIdc = sei.m_nnModeIdc;
+    m_nnTagURI = sei.m_nnTagURI;
+    m_nnURI = sei.m_nnURI;
+    m_chromaKeyInfoPresentFlag = sei.m_chromaKeyInfoPresentFlag;
+    m_chromaKeyValuePresentFlag = sei.m_chromaKeyValuePresentFlag;
+    m_chromaKeyValue = sei.m_chromaKeyValue;
+    m_chromaKeyThrPresentFlag = sei.m_chromaKeyThrPresentFlag;
+    m_chromaKeyThrValue = sei.m_chromaKeyThrValue;
+    m_drivePicFusionFlag = sei.m_drivePicFusionFlag;
+    m_lowConfidenceFaceParameterFlag = sei.m_lowConfidenceFaceParameterFlag;
+    m_coordinatePresentFlag = sei.m_coordinatePresentFlag;
+    m_coordinateQuantizationFactor = sei.m_coordinateQuantizationFactor;
+    m_coordinatePredFlag = sei.m_coordinatePredFlag;
+    m_3DCoordinateFlag = sei.m_3DCoordinateFlag;
+    m_coordinatePointNum = sei.m_coordinatePointNum;
+    m_coordinateX = sei.m_coordinateX;
+    m_coordinateY = sei.m_coordinateY;
+    m_coordinateZMaxValue = sei.m_coordinateZMaxValue;
+    m_coordinateZ = sei.m_coordinateZ;
+    m_matrixPresentFlag = sei.m_matrixPresentFlag;
+    m_matrixElementPrecisionFactor = sei.m_matrixElementPrecisionFactor;
+    m_matrixPredFlag = sei.m_matrixPredFlag;
+    m_numMatricestonumKpsFlag = sei.m_numMatricestonumKpsFlag;
+    m_numMatricesInfo = sei.m_numMatricesInfo;
+    m_numMatrixType = sei.m_numMatrixType;
+    m_matrixTypeIdx = sei.m_matrixTypeIdx;
+    m_matrix3DSpaceFlag = sei.m_matrix3DSpaceFlag;
+    m_numMatrices = sei.m_numMatrices;
+    m_matrixWidth = sei.m_matrixWidth;
+    m_matrixHeight = sei.m_matrixHeight;
+    m_matrixElement = sei.m_matrixElement;
+    m_payloadFilename = sei.m_payloadFilename;
+    m_payloadLength = sei.m_payloadLength;
+    m_payloadByte = sei.m_payloadByte ? new char(*sei.m_payloadByte) : nullptr;
+    m_numMatricesstore = sei.m_numMatricesstore;
+    m_matrixWidthstore = sei.m_matrixWidthstore;
+    m_matrixHeightstore = sei.m_matrixHeightstore;
+}
+#endif
+#if JVET_AK0239_GEFV
+SEIGenerativeFaceVideoEnhancement::SEIGenerativeFaceVideoEnhancement(const SEIGenerativeFaceVideoEnhancement& sei)
+{
+    m_number = sei.m_number;
+    m_currentid = sei.m_currentid;
+    m_id = sei.m_id;
+    m_gfvcnt = sei.m_gfvcnt;
+    m_gfvid = sei.m_gfvid;
+    m_basePicFlag = sei.m_basePicFlag;
+    m_nnPresentFlag = sei.m_nnPresentFlag;
+    m_nnModeIdc = sei.m_nnModeIdc;
+    m_nnTagURI = sei.m_nnTagURI;
+    m_nnURI = sei.m_nnURI;
+    m_matrixElementPrecisionFactor = sei.m_matrixElementPrecisionFactor;
+    m_matrixPresentFlag = sei.m_matrixPresentFlag;
+    m_matrixPredFlag = sei.m_matrixPredFlag;
+    m_numMatrices = sei.m_numMatrices;
+    m_matrixWidth = sei.m_matrixWidth;
+    m_matrixHeight = sei.m_matrixHeight;
+    m_matrixElement = sei.m_matrixElement;
+    m_payloadFilename = sei.m_payloadFilename;
+    m_payloadLength = sei.m_payloadLength;
+    m_payloadByte = sei.m_payloadByte ? new char(*sei.m_payloadByte) : nullptr;
+    m_pupilPresentIdx = sei.m_pupilPresentIdx;
+    m_pupilCoordinatePrecisionFactor = sei.m_pupilCoordinatePrecisionFactor;
+    m_pupilLeftEyeCoordinateX = sei.m_pupilLeftEyeCoordinateX;
+    m_pupilLeftEyeCoordinateY = sei.m_pupilLeftEyeCoordinateY;
+    m_pupilRightEyeCoordinateX = sei.m_pupilRightEyeCoordinateX;
+    m_pupilRightEyeCoordinateY = sei.m_pupilRightEyeCoordinateY;
+}
+#endif
+
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+SEISourcePictureTimingInfo::SEISourcePictureTimingInfo(const SEISourcePictureTimingInfo &sei)
+{
+  m_sptiSEIEnabled = sei.m_sptiSEIEnabled;
+  m_sptiSourceTimingEqualsOutputTimingFlag = sei.m_sptiSourceTimingEqualsOutputTimingFlag;
+  m_sptiSourceType = sei.m_sptiSourceType;
+  m_sptiTimeScale = sei.m_sptiTimeScale;
+  m_sptiNumUnitsInElementalInterval = sei.m_sptiNumUnitsInElementalInterval;
+  m_sptiDirectionFlag = sei.m_sptiDirectionFlag;
+#endif
+}
+
 // Static member
 const TChar *SEI::getSEIMessageString(SEI::PayloadType payloadType)
 {
@@ -571,9 +678,26 @@ const TChar *SEI::getSEIMessageString(SEI::PayloadType payloadType)
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     case SEI::PHASE_INDICATION:                     return "Phase Indication";
 #endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+    case SEI::AI_USAGE_RESTRICTIONS:                return "AI usage restrictions";
+#endif   
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+    case SEI::ENCODER_OPTIMIZATION_INFO:            return "Encoder optimization information";
+#endif
 #if JVET_AK0107_MODALITY_INFORMATION
     case SEI::MODALITY_INFORMATION:                 return "Modality information";
+#endif
+#if JVET_AJ0207_GFV
+    case SEI::GENERATIVE_FACE_VIDEO:                return "Generative face video";
+#endif
+#if JVET_AK0239_GEFV
+    case SEI::GENERATIVE_ENHANCEMENT_FACE_VIDEO:    return "Generative enhancement face video";
+#endif
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+    case SEI::SOURCE_PICTURE_TIMING_INFO:           return "Source picture timing info";
 #endif
     default:                                        return "Unknown";
   }
 }
+
+

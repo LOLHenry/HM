@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -111,6 +111,7 @@ private:
   TComPic*                m_pcPic;
   UInt                    m_uiSliceIdx;
   Int                     m_prevPOC;
+  NalUnitType             m_prevNut;
   Int                     m_prevTid0POC;
   Bool                    m_bFirstSliceInPicture;
 #if JVET_X0048_X0103_FILM_GRAIN
@@ -125,6 +126,7 @@ private:
   Int                     m_lastPOCNoOutputPriorPics;
   Bool                    m_isNoOutputPriorPics;
   Bool                    m_craNoRaslOutputFlag;    //value of variable NoRaslOutputFlag of the last CRA pic
+  Bool                    m_noRaslOutputFlag;
 #if SHUTTER_INTERVAL_SEI_PROCESSING
   Bool                    m_ShutterFilterEnable;    // Shutter Interval SEI Processing
 #endif

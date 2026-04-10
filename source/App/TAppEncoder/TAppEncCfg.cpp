@@ -3,7 +3,7 @@
  * and contributor rights, including patent rights, and no such rights are
  * granted under this license.
  *
- * Copyright (c) 2010-2025, ITU/ISO/IEC
+ * Copyright (c) 2010-2026, ITU/ISO/IEC
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -779,6 +779,76 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   SMultiValueInput<Bool>   cfg_nnPostFilterSEIActivationOutputFlagList(0, 1, 1, 0);
 #endif
 
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  SMultiValueInput<uint32_t>  cfg_aurSEIRestrictions(0, 2, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<bool>      cfg_aurSEIContextPresentFlag(0, 1, 0, 4096);
+  SMultiValueInput<uint32_t>  cfg_aurSEIContext(0, 15, 0, std::numeric_limits<uint32_t>::max());
+#endif
+
+#if JVET_AJ0207_GFV
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIId(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEICnt(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIDrivePicFusionFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEILowConfidenceFaceParameterFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEICoordinatePresentFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEICoordinateQuantizationFactor(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEICoordinatePredFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEI3DCoordinateFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEICoordinatePointNum(0, 2550, 0, 102400);
+  SMultiValueInput<double>     cfg_generativeFaceVideoSEICoordinateXTesonr(-1.0, 1.0, 0, 102400);
+  SMultiValueInput<double>     cfg_generativeFaceVideoSEICoordinateYTesonr(-1.0, 1.0, 0, 10240);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIZCoordinateMaxValue(0, 10240, 0, 10240);
+  SMultiValueInput<double>     cfg_generativeFaceVideoSEICoordinateZTesonr(-10240.0, 10240.0, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIMatrixPresentFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIMatrixElementPrecisionFactor(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIMatrixPredFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEINumMatrixType(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIMatrixTypeIdx(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIMatrix3DSpaceFlag(0, 1, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEINumMatrices(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIMatrixWidth(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIMatrixHeight(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEINumMatricestoNumKpsFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEINumMatricesInfo(0, 2550, 0, 102400);
+  SMultiValueInput<double>     cfg_generativeFaceVideoSEIMatrixElement(-50960.0, 50960.0, 0, 5095000);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIChromaKeyValuePresentFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIChromaKeyValue(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIChromaKeyThrPresentFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIChromaKeyThrValue(0, 2550, 0, 102400);
+#endif
+#if JVET_AK0239_GEFV
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEIId(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEIGFVId(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEIGFVCnt(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEIMatrixPresentFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEIMatrixPredFlag(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEIMatrixElementPrecisionFactor(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEINumMatrices(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEIMatrixWidth(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEIMatrixHeight(0, 2550, 0, 102400);
+  SMultiValueInput<double>     cfg_generativeFaceVideoEnhancementSEIMatrixElement(-50960.0, 50960.0, 0, 5095000);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEIPupilPresentIdx(0, 2550, 0, 102400);
+  SMultiValueInput<uint32_t>   cfg_generativeFaceVideoEnhancementSEIPupilCoordinatePrecisionFactor(0, 2550, 0, 102400);
+  SMultiValueInput<double>     cfg_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateX(-50960.0, 50960.0, 0, 5095000);
+  SMultiValueInput<double>     cfg_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateY(-50960.0, 50960.0, 0, 5095000);
+  SMultiValueInput<double>     cfg_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateX(-50960.0, 50960.0, 0, 5095000);
+  SMultiValueInput<double>     cfg_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateY(-50960.0, 50960.0, 0, 5095000);
+#endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  SMultiValueInput<uint32_t> cfg_priSEIResamplingWidthNumMinus1       (0, 65535, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIResamplingWidthDenomMinus1     (0, 65535, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIResamplingHeightNumMinus1      (0, std::numeric_limits<uint32_t>::max() - 1, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIResamplingHeightDenomMinus1    (0, std::numeric_limits<uint32_t>::max() - 1, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIRegionId                       (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIRegionTopLeftInUnitsX          (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIRegionTopLeftInUnitsY          (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIRegionWidthInUnitsMinus1       (0, std::numeric_limits<uint32_t>::max() - 1, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIRegionHeightInUnitsMinus1      (0, std::numeric_limits<uint32_t>::max() - 1, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEIResamplingRatioIdx             (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEITargetRegionTopLeftInUnitsX    (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<uint32_t> cfg_priSEITargetRegionTopLeftInUnitsY    (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
+#endif
+
   Int warnUnknowParameter = 0;
   po::Options opts;
   opts.addOptions()
@@ -1238,10 +1308,40 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("SEIPIVerPhaseNumFullResolution", m_piVerPhaseNumFullResolution, 0, "Specifies the Vertical Phase Numerator of Phase Indication SEI messages for full resolution pictures.")
   ("SEIPIVerPhaseDenMinus1FullResolution", m_piVerPhaseDenMinus1FullResolution, 0, "Specifies the Vertical Phase Denominator minus 1 of Phase Indication SEI messages for full resolution pictures.")
 #endif
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  ("SEIEOIEnabled", m_eoiSEIEnabled, false, "Control use of the Encoder Optimization Information SEI")
+  ("SEIEOICancelFlag", m_eoiSEICancelFlag, false, "Specifies that the persistence of the previous applied optimization")
+  ("SEIEOIPersistenceFlag", m_eoiSEIPersistenceFlag, false, "Specifies the persistence of the optimization the current layer")
+  ("SEIEOIForHumanViewingIdc", m_eoiSEIForHumanViewingIdc, 0u, "Indicates the level of optimization for human viewing")
+  ("SEIEOIForMachineAnalysisIdc", m_eoiSEIForMachineAnalysisIdc, 0u, "Indicates the level of optimization for  machine analsysis")
+  ("SEIEOIType", m_eoiSEIType, 0u, "Indicates the types of optimization method")
+  ("SEIEOIObjectBasedIdc", m_eoiSEIObjectBasedIdc, 0u, "Indicates the type of object-based optimization")
+  ("SEIEOIQuantThresholdDelta", m_eoiSEIQuantThresholdDelta, 0u, "Indicates the quantization parameter threshold determining areas classified to be outside the detected objects or to include one or more detected objects (0 = unknown or unspecified)")
+  ("SEIEOIPicQuantObjectFlag", m_eoiSEIPicQuantObjectFlag, false, "Value of 1 indicates that areas with QP >= PicQuant + SEIEOIQuantThresholdDelta represent areas outside the detected objects. Value of 0 indicates that areas with QP <= PicQuant - SEIEOIQuantThresholdDelta represent areas that include objects")
+  ("SEIEOITemporalResamplingTypeFlag", m_eoiSEITemporalResamplingTypeFlag, false, "specifies the type of the temporal resampling optimization.")
+  ("SEIEOINumIntPics", m_eoiSEINumIntPics, 0u, "indicates that the count of pictures that the encoding system excluded or added between each pair of coded pictures in output order within the persistence of this SEI message is constant")
+  ("SEIEOISrcPicFlag", m_eoiSEISrcPicFlag, false, "Value of 1 specifies that the picture in the same access unit that contains the EOI SEI message is a source picture. Value of 0 provides no such indication.that areas with QP >= PicQuant + SEIEOIQuantThresholdDelta represent areas outside the detected objects. Value of 0 indicates that areas with QP <= PicQuant - SEIEOIQuantThresholdDelta represent areas that include objects")
+  ("SEIEOIOrigPicDimensionsFlag", m_eoiSEIOrigPicDimensionsFlag, false, "specifies if original source picture dimensions are present.")
+  ("SEIEOIOrigPicWidth", m_eoiSEIOrigPicWidth, 0u, "indicates the width of the original source picture.")
+  ("SEIEOIOrigPicHeight", m_eoiSEIOrigPicHeight, 0u, "indicates the height of the original source picture.")
+  ("SEIEOISpatialResamplingTypeFlag", m_eoiSEISpatialResamplingTypeFlag, false, "specifies the type of the spatial resampling optimization.")
+  ("SEIEOIPrivacyProtectionTypeIdc", m_eoiSEIPrivacyProtectionTypeIdc, 0u, "indicates the type of privacy protection optimization")
+  ("SEIEOIPrivacyProtectedInfoType", m_eoiSEIPrivacyProtectedInfoType, 0u, "indicates the types of protected information")
+#endif 
+
+
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   ("SEIShutterIntervalEnabled",                       m_siiSEIEnabled,                           false,                                   "Controls if shutter interval information SEI message is enabled")
   ("SEISiiTimeScale",                                 m_siiSEITimeScale,                         27000000u,                               "Specifies sii_time_scale")
   ("SEISiiInputNumUnitsInShutterInterval",            cfg_siiSEIInputNumUnitsInSI,               cfg_siiSEIInputNumUnitsInSI,             "Specifies sub_layer_num_units_in_shutter_interval")
+#endif
+#if JVET_AK2006_SPTI_SEI_MESSAGE
+  ("SEISourcePictureTimingInfo", m_sptiSEIEnabled, false, "Controls if source picture timing information SEI message is enabled")
+  ("SEISPTISourceTimingEqualsOutputTimingFlag", m_sptiSourceTimingEqualsOutputTimingFlag, true, "Indicates the timing of source pictures is the same as the timing of corresponding decoded output pictures")
+  ("SEISPTISourceType", m_sptiSourceType, 0u, "Indicates the timing relationship between source pictures and corresponding decoded output pictures.")
+  ("SEISPTITimeScale", m_sptiTimeScale, 27000000u, "Specifies the number of time units that pass in one second.")
+  ("SEISPTINumUnitsInElementalInterval", m_sptiNumUnitsInElementalInterval, 1080000u, "Specifies the number of time units of a clock operating at the frequency spti_time_scale Hz that corresponds to the indicated elemental source picture interval of consecutive pictures in output order in the CLVS.")
+  ("SEISPTIDirectionFlag", m_sptiDirectionFlag, false, "Indicates the direction of the signalled source picture intervals.")
 #endif
 #if SEI_ENCODER_CONTROL
 // film grain characteristics SEI
@@ -1255,6 +1355,10 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("SEIFGCCompModelPresentComp0",                     m_fgcSEICompModelPresent[0],                       false, "Specifies the presense of film grain modelling on colour component 0.")
   ("SEIFGCCompModelPresentComp1",                     m_fgcSEICompModelPresent[1],                       false, "Specifies the presense of film grain modelling on colour component 1.")
   ("SEIFGCCompModelPresentComp2",                     m_fgcSEICompModelPresent[2],                       false, "Specifies the presense of film grain modelling on colour component 2.")
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  ("SEIFGCPicWidthInLumaSamples",                     m_fgcSEIPicWidthInLumaSamples,                        0u, "Specifies the picture width in luma samples at which the film grain synthesis is intended to be applied.")
+  ("SEIFGCPicHeightInLumaSamples",                    m_fgcSEIPicHeightInLumaSamples,                       0u, "Specifies the picture height in luma samples at which the film grain synthesis is intended to be applied.")
+#endif
 #if JVET_X0048_X0103_FILM_GRAIN
   ("SEIFGCAnalysisEnabled",                           m_fgcSEIAnalysisEnabled,                           false, "Control adaptive film grain parameter estimation - film grain analysis")
   ("SEIFGCExternalMask",                              m_fgcSEIExternalMask,                       string( "" ), "Read external file with mask for film grain analysis. If empty string, use internally calculated mask.")
@@ -1398,8 +1502,109 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("SEIDSCKeyIDEnabled", m_cfgDigitallySignedContentSEI.keyIdEnabled, false, "Enable using a key ID addition to URI of public key of Digitally Signed Content SEI messages")
   ("SEIDSCKeyID", m_cfgDigitallySignedContentSEI.keyId, 0 , "Public Key ID for Digitally Signed Content SEI messages (if enabled)")
 #endif
+#if JVET_AJ0207_GFV
+  ("SEIGenerativeFaceVideoEnabled", m_generativeFaceVideoEnabled, false, "Control use of the Generative Face Video SEI on current picture")
+  ("SEIGenerativeFaceVideoNumber", m_generativeFaceVideoSEINumber, 0u, "Total number of Generative Face Video SEI to be carried")
+  ("SEIGenerativeFaceVideoBasePicFlag", m_generativeFaceVideoSEIBasePicFlag, false, "Specifies whether to indicates the current decoded output picture corresponds to a base picture")
+  ("SEIGenerativeFaceVideoNNPresentFlag", m_generativeFaceVideoSEINNPresentFlag, false, "indicates a neural network that may be used as a TranslatorNN( ) ")
+  ("SEIGenerativeFaceVideoNNModeIdc", m_generativeFaceVideoSEINNModeIdc, 0u, "specify a neural network that may be used as a TranslatorNN( )")
+  ("SEIGenerativeFaceVideoNNTagURI", m_generativeFaceVideoSEINNTagURI, std::string(""), "specify path to gfv_uri_tag")
+  ("SEIGenerativeFaceVideoNNURI", m_generativeFaceVideoSEINNURI, std::string(""), "specify path to gfv_uri")
+  ("SEIGenerativeFaceVideoId", cfg_generativeFaceVideoSEIId, cfg_generativeFaceVideoSEIId, "Target id of Generative Face Video SEI on current picture")
+  ("SEIGenerativeFaceVideoCnt", cfg_generativeFaceVideoSEICnt, cfg_generativeFaceVideoSEICnt, "Target cnt of Generative Face Video SEI on current picture")
+  ("SEIGenerativeFaceVideoCoordinatePresentFlag", cfg_generativeFaceVideoSEICoordinatePresentFlag, cfg_generativeFaceVideoSEICoordinatePresentFlag, "Specifies whether to carry coorinate parameter")
+  ("SEIGenerativeFaceVideoLowConfidenceFaceParameterFlag", cfg_generativeFaceVideoSEILowConfidenceFaceParameterFlag, cfg_generativeFaceVideoSEILowConfidenceFaceParameterFlag, "Indicates the facial parameters have been derived with low confidence ")
+  ("SEIGenerativeFaceVideoDrivePicFusionFlag", cfg_generativeFaceVideoSEIDrivePicFusionFlag, cfg_generativeFaceVideoSEIDrivePicFusionFlag, "Specifies whether to use DrivePicFusion function")
+  ("SEIGenerativeFaceVideoCoordinateQuantizationFactor", cfg_generativeFaceVideoSEICoordinateQuantizationFactor, cfg_generativeFaceVideoSEICoordinateQuantizationFactor, "Specifies the quantization factor to process the facial coordinate paramters")
+  ("SEIGenerativeFaceVideoCoordinatePredFlag", cfg_generativeFaceVideoSEICoordinatePredFlag, cfg_generativeFaceVideoSEICoordinatePredFlag, "Specifies whether to use the difference operation to process data")
+  ("SEIGenerativeFaceVideo3DCoordinateFlag", cfg_generativeFaceVideoSEI3DCoordinateFlag, cfg_generativeFaceVideoSEI3DCoordinateFlag, "Specifies whether to carry 3D coordinate-type paramters")
+  ("SEIGenerativeFaceVideoCoordinatePointNum", cfg_generativeFaceVideoSEICoordinatePointNum, cfg_generativeFaceVideoSEICoordinatePointNum, "the number of facial coordinate parameter set")
+  ("SEIGenerativeFaceVideoXCoordinate", cfg_generativeFaceVideoSEICoordinateXTesonr, cfg_generativeFaceVideoSEICoordinateXTesonr, "the x-axis value for i_th coordinate")
+  ("SEIGenerativeFaceVideoYCoordinate", cfg_generativeFaceVideoSEICoordinateYTesonr, cfg_generativeFaceVideoSEICoordinateYTesonr, "the y-axis value for i_th coordinate")
+  ("SEIGenerativeFaceVideoZCoordinateMaxValue", cfg_generativeFaceVideoSEIZCoordinateMaxValue, cfg_generativeFaceVideoSEIZCoordinateMaxValue, "the max value of z-axis coordinate parameter")
+  ("SEIGenerativeFaceVideoZCoordinate", cfg_generativeFaceVideoSEICoordinateZTesonr, cfg_generativeFaceVideoSEICoordinateZTesonr, "the z-axis value for i_th coordinate")
+  ("SEIGenerativeFaceVideoMatrixPresentFlag", cfg_generativeFaceVideoSEIMatrixPresentFlag, cfg_generativeFaceVideoSEIMatrixPresentFlag, "Specifies whether to carry matrix parameter")
+  ("SEIGenerativeFaceVideoMatrixElementPrecisionFactor", cfg_generativeFaceVideoSEIMatrixElementPrecisionFactor, cfg_generativeFaceVideoSEIMatrixElementPrecisionFactor, "Specifies the precision factor to process the facial matrix paramters (decimal part)")
+  ("SEIGenerativeFaceVideoNumMatrixType", cfg_generativeFaceVideoSEINumMatrixType, cfg_generativeFaceVideoSEINumMatrixType, "Specifies the number of used facial matrix type")
+  ("SEIGenerativeFaceVideoMatrixTypeIdx", cfg_generativeFaceVideoSEIMatrixTypeIdx, cfg_generativeFaceVideoSEIMatrixTypeIdx, "an identifying number vector regarding which facial matrix may be used")
+  ("SEIGenerativeFaceVideoMatrix3DSpaceFlag", cfg_generativeFaceVideoSEIMatrix3DSpaceFlag, cfg_generativeFaceVideoSEIMatrix3DSpaceFlag, "an identifying number vector regarding which facial matrix may be in 3d space")
+  ("SEIGenerativeFaceVideoNumMatrices", cfg_generativeFaceVideoSEINumMatrices, cfg_generativeFaceVideoSEINumMatrices, "the number of matrices of the i-th matrix type")
+  ("SEIGenerativeFaceVideoMatrixWidth", cfg_generativeFaceVideoSEIMatrixWidth, cfg_generativeFaceVideoSEIMatrixWidth, "the width of matrices of the i-th matrix type")
+  ("SEIGenerativeFaceVideoMatrixHeight", cfg_generativeFaceVideoSEIMatrixHeight, cfg_generativeFaceVideoSEIMatrixHeight, "the height of matrices of the i-th matrix type")
+  ("SEIGenerativeFaceVideoMatrixElement", cfg_generativeFaceVideoSEIMatrixElement, cfg_generativeFaceVideoSEIMatrixElement, "the value of the matrix element at position (k, l) of the j-th matrix of the i-th matrix type. ")
+  ("SEIGenerativeFaceVideoMatrixPredFlag", cfg_generativeFaceVideoSEIMatrixPredFlag, cfg_generativeFaceVideoSEIMatrixPredFlag, "indicates whether to use difference operation for GFV matrix ")
+  ("SEIGenerativeFaceVideoNumMatricestoNumKpsFlag", cfg_generativeFaceVideoSEINumMatricestoNumKpsFlag, cfg_generativeFaceVideoSEINumMatricestoNumKpsFlag, "indicates whether  the number of matrices of the i-th matrix type is equal to gfv_num_kps_minus1 + 1")
+  ("SEIGenerativeFaceVideoNumMatricesInfo", cfg_generativeFaceVideoSEINumMatricesInfo, cfg_generativeFaceVideoSEINumMatricesInfo, "provides information to derive the number of the matrices of the i-th matrix type.")
+  ("SEIGenerativeFaceVideoPayloadFilename", m_generativeFaceVideoSEIPayloadFilename, std::string(""), "specify path to payloadfile")
+  ("SEIGenerativeFaceVideoChromaKeyInfoPresentFlag", m_generativeFaceVideoSEIChromaKeyInfoPresentFlag, false, "Specifies the syntax elements gfv_chroma_key information")
+  ("SEIGenerativeFaceVideoChromaKeyValuePresentFlag", cfg_generativeFaceVideoSEIChromaKeyValuePresentFlag, cfg_generativeFaceVideoSEIChromaKeyValuePresentFlag, "indicates that the syntax element gfv_chroma_key_value[ c ] is present.")
+  ("SEIGenerativeFaceVideoChromaKeyValue", cfg_generativeFaceVideoSEIChromaKeyValue, cfg_generativeFaceVideoSEIChromaKeyValue, "specifies the chroma key value corresponding to the c-th colour component")
+  ("SEIGenerativeFaceVideoChromaKeyThrPresentFlag", cfg_generativeFaceVideoSEIChromaKeyThrPresentFlag, cfg_generativeFaceVideoSEIChromaKeyThrPresentFlag, "indicates that the syntax element gfv_chroma_thr_value[ i ] is present")
+  ("SEIGenerativeFaceVideoChromaKeyThrValue", cfg_generativeFaceVideoSEIChromaKeyThrValue, cfg_generativeFaceVideoSEIChromaKeyThrValue, "specifies the i-th chroma key threshold value")
+#endif
+#if JVET_AK0239_GEFV
+  ("SEIGenerativeFaceVideoEnhancementEnabled", m_generativeFaceVideoEnhancementEnabled, false, "Control use of the Generative Enhancement Face Video SEI on current picture")
+  ("SEIGenerativeFaceVideoEnhancementNumber", m_generativeFaceVideoEnhancementSEINumber, 0u, "Total number of Generative Enhancement Face Video SEI to be carried")
+  ("SEIGenerativeFaceVideoEnhancementBasePicFlag", m_generativeFaceVideoEnhancementSEIBasePicFlag, false, "Specifies whether to indicates the current decoded output picture corresponds to a base picture")
+  ("SEIGenerativeFaceVideoEnhancementNNPresentFlag", m_generativeFaceVideoEnhancementSEINNPresentFlag, false, "indicates a neural network that may be used as a EnhancerNN( ) ")
+  ("SEIGenerativeFaceVideoEnhancementNNModeIdc", m_generativeFaceVideoEnhancementSEINNModeIdc, 0u, "specify a neural network that may be used as a EnhancerNN( )")
+  ("SEIGenerativeFaceVideoEnhancementNNTagURI", m_generativeFaceVideoEnhancementSEINNTagURI, std::string(""), "specify path to gfv_uri_tag")
+  ("SEIGenerativeFaceVideoEnhancementNNURI", m_generativeFaceVideoEnhancementSEINNURI, std::string(""), "specify path to gfv_uri")
+  ("SEIGenerativeFaceVideoEnhancementId", cfg_generativeFaceVideoEnhancementSEIId, cfg_generativeFaceVideoEnhancementSEIId, "Target id of Generative Enhancement Face Video SEI on current picture")
+  ("SEIGenerativeFaceVideoEnhancementGFVCnt", cfg_generativeFaceVideoEnhancementSEIGFVCnt, cfg_generativeFaceVideoEnhancementSEIGFVCnt, "Target cnt of Generative Enhancement Face Video SEI on current picture")
+  ("SEIGenerativeFaceVideoEnhancementGFVId", cfg_generativeFaceVideoEnhancementSEIGFVId, cfg_generativeFaceVideoEnhancementSEIGFVId, "Target id of Generative Enhancement Face Video SEI on current picture")
+  ("SEIGenerativeFaceVideoEnhancementMatrixPredFlag", cfg_generativeFaceVideoEnhancementSEIMatrixPredFlag, cfg_generativeFaceVideoEnhancementSEIMatrixPredFlag, "indicates whether to use difference operation for GEFV matrix ")
+  ("SEIGenerativeFaceVideoEnhancementMatrixPresentFlag", cfg_generativeFaceVideoEnhancementSEIMatrixPresentFlag, cfg_generativeFaceVideoEnhancementSEIMatrixPresentFlag, "Specifies whether to carry gefv matrix parameter ")
+  ("SEIGenerativeFaceVideoEnhancementMatrixElementPrecisionFactor", cfg_generativeFaceVideoEnhancementSEIMatrixElementPrecisionFactor, cfg_generativeFaceVideoEnhancementSEIMatrixElementPrecisionFactor, "Specifies the precision factor to process the facial matrix paramters (decimal part)")
+  ("SEIGenerativeFaceVideoEnhancementNumMatrices", cfg_generativeFaceVideoEnhancementSEINumMatrices, cfg_generativeFaceVideoEnhancementSEINumMatrices, "the number of matrices of the i-th matrix type")
+  ("SEIGenerativeFaceVideoEnhancementMatrixWidth", cfg_generativeFaceVideoEnhancementSEIMatrixWidth, cfg_generativeFaceVideoEnhancementSEIMatrixWidth, "the width of matrices of the i-th matrix type")
+  ("SEIGenerativeFaceVideoEnhancementMatrixHeight", cfg_generativeFaceVideoEnhancementSEIMatrixHeight, cfg_generativeFaceVideoEnhancementSEIMatrixHeight, "the height of matrices of the i-th matrix type")
+  ("SEIGenerativeFaceVideoEnhancementMatrixElement", cfg_generativeFaceVideoEnhancementSEIMatrixElement, cfg_generativeFaceVideoEnhancementSEIMatrixElement, "the value of the matrix element at position (k, l) of the j-th matrix of the i-th matrix type. ")
+  ("SEIGenerativeFaceVideoEnhancementPupilPresentIdx", cfg_generativeFaceVideoEnhancementSEIPupilPresentIdx, cfg_generativeFaceVideoEnhancementSEIPupilPresentIdx, "Indicate the pupil information for transmission")
+  ("SEIGenerativeFaceVideoEnhancementPupilCoordinatePrecisionFactor", cfg_generativeFaceVideoEnhancementSEIPupilCoordinatePrecisionFactor, cfg_generativeFaceVideoEnhancementSEIPupilCoordinatePrecisionFactor, "the quantization precision factor of pupil coordinates")
+  ("SEIGenerativeFaceVideoEnhancementPupilLeftEyeCoordinateX", cfg_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateX, cfg_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateX, "the X coordinate of the left eye pupil")
+  ("SEIGenerativeFaceVideoEnhancementPupilLeftEyeCoordinateY", cfg_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateY, cfg_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateY, "the Y coordinate of the left eye pupil")
+  ("SEIGenerativeFaceVideoEnhancementPupilRightEyeCoordinateX", cfg_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateX, cfg_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateX, "the X coordinate of the right eye pupil")
+  ("SEIGenerativeFaceVideoEnhancementPupilRightEyeCoordinateY", cfg_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateY, cfg_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateY, "the Y coordinate of the right eye pupil")
+  ("SEIGenerativeFaceVideoEnhancementPayloadFilename", m_generativeFaceVideoEnhancementSEIPayloadFilename, std::string(""), "specify path to payloadfile")
+#endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  ("SEIPRIEnabled",                                   m_priSEIEnabled,                                   false, "Specifies whether packet regions info SEI is enabled")
+  ("SEIPRICancelFlag",                                m_priSEICancelFlag,                                false, "Specifies the persistence of any previous packed regions info SEI message in output order")
+  ("SEIPRIPersistenceFlag",                           m_priSEIPersistenceFlag,                            true, "Specifies the persistence of the packed regions info SEI message for the current layer")
+  ("SEIPRINumRegionsMinus1",                          m_priSEINumRegionsMinus1,                             0u, "Specifies the number of regions minus 1 for which information is signalled")
+  ("SEIPRIUseMaxDimensionsFlag",                      m_priSEIUseMaxDimensionsFlag,                      false, "Specifies that max pic dimensions are used in variable calculations")
+  ("SEIPRILog2UnitSize",                              m_priSEILog2UnitSize,                                 0u, "Specifies a unit size used in variable calculations for the region parameters")
+  ("SEIPRIRegionSizeLenMinus1",                       m_priSEIRegionSizeLenMinus1,                         12u, "Specifies the number of bits minus 1 used to signal region top left offsets and region dimensions")
+  ("SEIPRIRegionIdPresentFlag",                       m_priSEIRegionIdPresentFlag,                       false, "Specifies whether region IDs are signalled")
+  ("SEIPRITargetPicParamsPresentFlag",                m_priSEITargetPicParamsPresentFlag,                false, "Specifies whether pri_target_region_top_left_x[ i ], pri_target_region_top_left_y[ i ], pri_target_pic_width_minus1, and pri_target_pic_height_minus1 are signalled")
+  ("SEIPRITargetPicWidthMinus1",                      m_priSEITargetPicWidthMinus1,                         0u, "Target output picture width minus 1")
+  ("SEIPRITargetPicHeightMinus1",                     m_priSEITargetPicHeightMinus1,                        0u, "Target output picture height minus 1")
+  ("SEIPRINumResamplingRatiosMinus1",                 m_priSEINumResamplingRatiosMinus1,                    0u, "Specifies the number resampling ratios minus 1 that are signalled")
+  ("SEIPRIResamplingWidthNumMinus1",                  cfg_priSEIResamplingWidthNumMinus1, cfg_priSEIResamplingWidthNumMinus1, "Specifies a list of numerators minus 1 values for width resampling of the resampling ratio")
+  ("SEIPRIResamplingWidthDenomMinus1",                cfg_priSEIResamplingWidthDenomMinus1, cfg_priSEIResamplingWidthDenomMinus1, "Specifies a list of denominators minus 1 values for width resampling of the resampling ratio")
+  ("SEIPRIResamplingHeightNumMinus1",                 cfg_priSEIResamplingHeightNumMinus1, cfg_priSEIResamplingHeightNumMinus1, "Specifies a list of numerators minus 1 values for height resampling of the resampling ratio")
+  ("SEIPRIResamplingHeightDenomMinus1",               cfg_priSEIResamplingHeightDenomMinus1, cfg_priSEIResamplingHeightDenomMinus1, "Specifies a list of denominators minus 1 values for height resampling of the resampling ratio")
+  ("SEIPRIRegionId",                                  cfg_priSEIRegionId, cfg_priSEIRegionId,                   "Specifies a list of IDs for the regions")
+  ("SEIPRIRegionTopLeftInUnitsX",                     cfg_priSEIRegionTopLeftInUnitsX, cfg_priSEIRegionTopLeftInUnitsX, "Specifies a list of horizontal top left positions for the regions")
+  ("SEIPRIRegionTopLeftInUnitsY",                     cfg_priSEIRegionTopLeftInUnitsY, cfg_priSEIRegionTopLeftInUnitsY, "Specifies a list of vertical top left positions for the regions")
+  ("SEIPRIRegionWidthInUnitsMinus1",                  cfg_priSEIRegionWidthInUnitsMinus1, cfg_priSEIRegionWidthInUnitsMinus1, "Specifies a list of widths minus 1 in units for the regions")
+  ("SEIPRIRegionHeightInUnitsMinus1",                 cfg_priSEIRegionHeightInUnitsMinus1, cfg_priSEIRegionHeightInUnitsMinus1, "Specifies a list of heights minus 1 in units for the regions")
+  ("SEIPRIResamplingRatioIdx",                        cfg_priSEIResamplingRatioIdx, cfg_priSEIResamplingRatioIdx, "Specifies a list of resampling ration indices for the regions")
+  ("SEIPRITargetRegionTopLeftInUnitsX",               cfg_priSEITargetRegionTopLeftInUnitsX, cfg_priSEITargetRegionTopLeftInUnitsX, "Specifies a list of horizontal top left postions in units of priUnitSize luma samples for the regions in reconstructed target picture")
+  ("SEIPRITargetRegionTopLeftInUnitsY",               cfg_priSEITargetRegionTopLeftInUnitsY, cfg_priSEITargetRegionTopLeftInUnitsY, "Specifies a list of vertical top left postions in units of priUnitSize luma samples for the regions in reconstructed target picture")
+#endif
   ;
-
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  opts.addOptions()
+    ("SEIAUREnabled", m_aurSEIEnabled, false, "Control use of the AI usage restrictions SEI")
+    ("SEIAURCancelFlag", m_aurSEICancelFlag, false, " Specifies the persistence of any previous AI usage restrictions SEI message in output order")
+    ("SEIAURPersistenceFlag", m_aurSEIPersistenceFlag, false, "Specifies the persistence of the AI usage restrictions SEI message for the current layer.")
+    ("SEIAURNumRestrictionsMinus1", m_aurSEINumRestrictionsMinus1, 0u, "plus one specifies the number of restriction")
+    ("SEIAURRestrictions", cfg_aurSEIRestrictions, cfg_aurSEIRestrictions, "List of restrictions")
+    ("SEIAURContextPresentFlag", cfg_aurSEIContextPresentFlag, cfg_aurSEIContextPresentFlag, "List of flags indicating whether aur_context syntax elements are present")
+    ("SEIAURContext", cfg_aurSEIContext, cfg_aurSEIContext, "List of context");
+#endif
   opts.addOptions()
     ("TemporalFilter", m_gopBasedTemporalFilterEnabled, false, "Enable GOP based temporal filter. Disabled per default")
     ("TemporalFilterPastRefs", m_gopBasedTemporalFilterPastRefs, TF_DEFAULT_REFS, "Number of past references for temporal prefilter")
@@ -1408,6 +1613,8 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     ("LastValidFrame", m_lastValidFrame, MAX_INT, "Last valid frame")
     ("TemporalFilterStrengthFrame*", m_gopBasedTemporalFilterStrengths, std::map<Int, Double>(), "Strength for every * frame in GOP based temporal filter, where * is an integer."
                                                                                                    " E.g. --TemporalFilterStrengthFrame8 0.95 will enable GOP based temporal filter at every 8th frame with strength 0.95");
+   
+
 
 #if NNPFC_SEI_MESSAGE
   opts.addOptions()("SEINNPFCEnabled",      m_nnPostFilterSEICharacteristicsEnabled,      false, "Control generation of the Neural Network Post Filter Characteristics SEI messages");
@@ -2409,6 +2616,14 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
       }
     }
   }
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  if (m_aurSEIEnabled)
+  {
+    m_aurSEIRestrictions = cfg_aurSEIRestrictions.values;
+    m_aurSEIContextPresentFlag = cfg_aurSEIContextPresentFlag.values;
+    m_aurSEIContext = cfg_aurSEIContext.values;
+  }
+#endif
 #if SHUTTER_INTERVAL_SEI_PROCESSING
   m_ShutterFilterEnable = false;
 #endif
@@ -2536,6 +2751,395 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
     }
   }
 #endif
+#if JVET_AJ0207_GFV
+  if (m_generativeFaceVideoEnabled)
+  {
+    assert(cfg_generativeFaceVideoSEIId.values.size() == m_generativeFaceVideoSEINumber);
+    assert(cfg_generativeFaceVideoSEICnt.values.size() == m_generativeFaceVideoSEINumber);
+    assert(cfg_generativeFaceVideoSEIDrivePicFusionFlag.values.size() == m_generativeFaceVideoSEINumber);
+    assert(cfg_generativeFaceVideoSEILowConfidenceFaceParameterFlag.values.size() == m_generativeFaceVideoSEINumber);
+    assert(cfg_generativeFaceVideoSEICoordinatePresentFlag.values.size() == m_generativeFaceVideoSEINumber);
+    assert(cfg_generativeFaceVideoSEICoordinatePredFlag.values.size() == m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEIId.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEICnt.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEIDrivePicFusionFlag.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEILowConfidenceFaceParameterFlag.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEICoordinatePresentFlag.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEICoordinateQuantizationFactor.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEICoordinatePredFlag.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEI3DCoordinateFlag.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEICoordinatePointNum.resize(m_generativeFaceVideoSEINumber);
+    assert(cfg_generativeFaceVideoSEIMatrixPresentFlag.values.size() == m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEIMatrixPresentFlag.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEIMatrixPredFlag.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEIMatrixElementPrecisionFactor.resize(m_generativeFaceVideoSEINumber);
+    m_generativeFaceVideoSEINumMatrixType.resize(m_generativeFaceVideoSEINumber);
+    int cooridinateBeforeSum = 0;
+    int cooridinateZBeforeSum = 0;
+    int matrixNumBeforeSum = 0;
+    int matrixDimensionBeforeSum = 0;
+    m_generativeFaceVideoSEIChromaKeyValuePresentFlag.resize(3);
+    m_generativeFaceVideoSEIChromaKeyValue.resize(3);
+    m_generativeFaceVideoSEIChromaKeyThrPresentFlag.resize(2);
+    m_generativeFaceVideoSEIChromaKeyThrValue.resize(2);
+    if (m_generativeFaceVideoSEIChromaKeyInfoPresentFlag)
+    {
+      for (uint32_t chromac = 0; chromac < 3; chromac++)
+      {
+        m_generativeFaceVideoSEIChromaKeyValuePresentFlag[chromac] = cfg_generativeFaceVideoSEIChromaKeyValuePresentFlag.values[chromac];
+        m_generativeFaceVideoSEIChromaKeyValue[chromac] = cfg_generativeFaceVideoSEIChromaKeyValue.values[chromac];
+      }
+      for (uint32_t chromai = 0; chromai < 2; chromai++)
+      {
+        m_generativeFaceVideoSEIChromaKeyThrPresentFlag[chromai] = cfg_generativeFaceVideoSEIChromaKeyThrPresentFlag.values[chromai];
+        m_generativeFaceVideoSEIChromaKeyThrValue[chromai] = cfg_generativeFaceVideoSEIChromaKeyThrValue.values[chromai];
+      }
+    }
+    for (uint32_t frameIdx = 0; frameIdx < m_generativeFaceVideoSEINumber; frameIdx++)
+    {
+      m_generativeFaceVideoSEIId[frameIdx] = cfg_generativeFaceVideoSEIId.values[frameIdx];
+      m_generativeFaceVideoSEICnt[frameIdx] = cfg_generativeFaceVideoSEICnt.values[frameIdx];
+      m_generativeFaceVideoSEIDrivePicFusionFlag[frameIdx] = cfg_generativeFaceVideoSEIDrivePicFusionFlag.values[frameIdx];
+      m_generativeFaceVideoSEILowConfidenceFaceParameterFlag[frameIdx] = cfg_generativeFaceVideoSEILowConfidenceFaceParameterFlag.values[frameIdx];
+      m_generativeFaceVideoSEICoordinatePresentFlag[frameIdx] = cfg_generativeFaceVideoSEICoordinatePresentFlag.values[frameIdx];
+      assert(!m_generativeFaceVideoSEICnt[frameIdx] || !m_generativeFaceVideoSEIBasePicFlag || !m_generativeFaceVideoSEIDrivePicFusionFlag[frameIdx]);
+      m_generativeFaceVideoSEICoordinatePredFlag[frameIdx] = cfg_generativeFaceVideoSEICoordinatePredFlag.values[frameIdx];
+      m_generativeFaceVideoSEIZCoordinateMaxValue.push_back(std::vector<uint32_t>());
+      int basePicFlag = (frameIdx == 0) ? 1 : 0;
+      if (basePicFlag || !m_generativeFaceVideoSEICoordinatePredFlag[frameIdx])
+      {
+        m_generativeFaceVideoSEICoordinateQuantizationFactor[frameIdx] = cfg_generativeFaceVideoSEICoordinateQuantizationFactor.values[frameIdx];
+        m_generativeFaceVideoSEI3DCoordinateFlag[frameIdx] = cfg_generativeFaceVideoSEI3DCoordinateFlag.values[frameIdx];
+        m_generativeFaceVideoSEICoordinatePointNum[frameIdx] = cfg_generativeFaceVideoSEICoordinatePointNum.values[frameIdx];
+        if (m_generativeFaceVideoSEI3DCoordinateFlag[frameIdx] == 1)
+        {
+          m_generativeFaceVideoSEIZCoordinateMaxValue[frameIdx].push_back(cfg_generativeFaceVideoSEIZCoordinateMaxValue.values[frameIdx]);
+        }
+      }
+      else
+      {
+        assert(m_generativeFaceVideoSEIId[frameIdx] == m_generativeFaceVideoSEIId[0]);
+        m_generativeFaceVideoSEICoordinateQuantizationFactor[frameIdx] = m_generativeFaceVideoSEICoordinateQuantizationFactor[0];
+        m_generativeFaceVideoSEI3DCoordinateFlag[frameIdx] = m_generativeFaceVideoSEI3DCoordinateFlag[0];
+        m_generativeFaceVideoSEICoordinatePointNum[frameIdx] = m_generativeFaceVideoSEICoordinatePointNum[0];
+        if (m_generativeFaceVideoSEI3DCoordinateFlag[frameIdx] == 1)
+        {
+          m_generativeFaceVideoSEIZCoordinateMaxValue[frameIdx].push_back(m_generativeFaceVideoSEIZCoordinateMaxValue[0][0]);
+        }
+      }
+      m_generativeFaceVideoSEICoordinateXTesonr.push_back(std::vector<double>());
+      m_generativeFaceVideoSEICoordinateYTesonr.push_back(std::vector<double>());
+      m_generativeFaceVideoSEICoordinateZTesonr.push_back(std::vector<double>());
+      m_generativeFaceVideoSEIMatrixElement.push_back(std::vector<std::vector<std::vector<std::vector<double>>>>());
+      if (m_generativeFaceVideoSEICoordinatePresentFlag[frameIdx] == 1)
+      {
+        for (uint32_t coordinateId = 0; coordinateId < m_generativeFaceVideoSEICoordinatePointNum[frameIdx]; coordinateId++)
+        {
+          m_generativeFaceVideoSEICoordinateXTesonr[frameIdx].push_back(cfg_generativeFaceVideoSEICoordinateXTesonr.values[cooridinateBeforeSum + coordinateId]);
+          m_generativeFaceVideoSEICoordinateYTesonr[frameIdx].push_back(cfg_generativeFaceVideoSEICoordinateYTesonr.values[cooridinateBeforeSum + coordinateId]);
+        }
+        cooridinateBeforeSum = cooridinateBeforeSum + m_generativeFaceVideoSEICoordinatePointNum[frameIdx];
+        if (m_generativeFaceVideoSEI3DCoordinateFlag[frameIdx] == 1)
+        {
+          m_generativeFaceVideoSEIZCoordinateMaxValue[frameIdx].push_back(cfg_generativeFaceVideoSEIZCoordinateMaxValue.values[frameIdx]);
+          for (uint32_t coordinateId = 0; coordinateId < m_generativeFaceVideoSEICoordinatePointNum[frameIdx]; coordinateId++)
+          {
+            m_generativeFaceVideoSEICoordinateZTesonr[frameIdx].push_back(cfg_generativeFaceVideoSEICoordinateZTesonr.values[cooridinateZBeforeSum + coordinateId]);
+          }
+          cooridinateZBeforeSum = cooridinateZBeforeSum + m_generativeFaceVideoSEICoordinatePointNum[frameIdx];
+        }
+      }
+      m_generativeFaceVideoSEIMatrixPresentFlag[frameIdx] = cfg_generativeFaceVideoSEIMatrixPresentFlag.values[frameIdx];
+      m_generativeFaceVideoSEIMatrixPredFlag[frameIdx] = cfg_generativeFaceVideoSEIMatrixPredFlag.values[frameIdx];
+      if (basePicFlag)
+      {
+        m_generativeFaceVideoSEIMatrixPredFlag[frameIdx] = 0;
+      }
+      if (basePicFlag || !m_generativeFaceVideoSEIMatrixPredFlag[frameIdx])
+      {
+        m_generativeFaceVideoSEIMatrixElementPrecisionFactor[frameIdx] = cfg_generativeFaceVideoSEIMatrixElementPrecisionFactor.values[frameIdx];
+        m_generativeFaceVideoSEINumMatrixType[frameIdx] = cfg_generativeFaceVideoSEINumMatrixType.values[frameIdx];
+      }
+      else
+      {
+        assert(m_generativeFaceVideoSEIId[frameIdx] == m_generativeFaceVideoSEIId[0]);
+        m_generativeFaceVideoSEIMatrixElementPrecisionFactor[frameIdx] = m_generativeFaceVideoSEIMatrixElementPrecisionFactor[0];
+        m_generativeFaceVideoSEINumMatrixType[frameIdx] = m_generativeFaceVideoSEINumMatrixType[0];
+      }
+      m_generativeFaceVideoSEIMatrixTypeIdx.push_back(std::vector<uint32_t>());
+      m_generativeFaceVideoSEIMatrix3DSpaceFlag.push_back(std::vector<uint32_t>());
+      m_generativeFaceVideoSEINumMatrices.push_back(std::vector<uint32_t>());
+      m_generativeFaceVideoSEIMatrixWidth.push_back(std::vector<uint32_t>());
+      m_generativeFaceVideoSEIMatrixHeight.push_back(std::vector<uint32_t>());
+      m_generativeFaceVideoSEINumMatricestoNumKpsFlag.push_back(std::vector<uint32_t>());
+      m_generativeFaceVideoSEINumMatricesInfo.push_back(std::vector<uint32_t>());
+      if (m_generativeFaceVideoSEIMatrixPresentFlag[frameIdx] == 1)
+      {
+        uint32_t matrixWidth = 0;
+        uint32_t matrixHeight = 0;
+        uint32_t numMatrices = 0;
+        for (uint32_t matrixId = 0; matrixId < m_generativeFaceVideoSEINumMatrixType[frameIdx]; matrixId++)
+        {
+          m_generativeFaceVideoSEIMatrixElement[frameIdx].push_back(std::vector<std::vector<std::vector<double>>>());
+          if (basePicFlag || !m_generativeFaceVideoSEIMatrixPredFlag[frameIdx])
+          {
+            m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx].push_back(cfg_generativeFaceVideoSEIMatrixTypeIdx.values[matrixNumBeforeSum + matrixId]);
+            m_generativeFaceVideoSEIMatrix3DSpaceFlag[frameIdx].push_back(cfg_generativeFaceVideoSEIMatrix3DSpaceFlag.values[matrixNumBeforeSum + matrixId]);
+            m_generativeFaceVideoSEINumMatrices[frameIdx].push_back(cfg_generativeFaceVideoSEINumMatrices.values[matrixNumBeforeSum + matrixId]);
+            m_generativeFaceVideoSEIMatrixWidth[frameIdx].push_back(cfg_generativeFaceVideoSEIMatrixWidth.values[matrixNumBeforeSum + matrixId]);
+            m_generativeFaceVideoSEIMatrixHeight[frameIdx].push_back(cfg_generativeFaceVideoSEIMatrixHeight.values[matrixNumBeforeSum + matrixId]);
+            m_generativeFaceVideoSEINumMatricestoNumKpsFlag[frameIdx].push_back(cfg_generativeFaceVideoSEINumMatricestoNumKpsFlag.values[matrixNumBeforeSum + matrixId]);
+            m_generativeFaceVideoSEINumMatricesInfo[frameIdx].push_back(cfg_generativeFaceVideoSEINumMatricesInfo.values[matrixNumBeforeSum + matrixId]);
+          }
+          else
+          {
+            assert(m_generativeFaceVideoSEIId[frameIdx] == m_generativeFaceVideoSEIId[0]);
+            m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx].push_back(m_generativeFaceVideoSEIMatrixTypeIdx[0][matrixId]);
+            m_generativeFaceVideoSEIMatrix3DSpaceFlag[frameIdx].push_back(m_generativeFaceVideoSEIMatrix3DSpaceFlag[0][matrixId]);
+            m_generativeFaceVideoSEINumMatrices[frameIdx].push_back(m_generativeFaceVideoSEINumMatrices[0][matrixId]);
+            m_generativeFaceVideoSEIMatrixWidth[frameIdx].push_back(m_generativeFaceVideoSEIMatrixWidth[0][matrixId]);
+            m_generativeFaceVideoSEIMatrixHeight[frameIdx].push_back(m_generativeFaceVideoSEIMatrixHeight[0][matrixId]);
+            m_generativeFaceVideoSEINumMatricestoNumKpsFlag[frameIdx].push_back(m_generativeFaceVideoSEINumMatricestoNumKpsFlag[0][matrixId]);
+            m_generativeFaceVideoSEINumMatricesInfo[frameIdx].push_back(m_generativeFaceVideoSEINumMatricesInfo[0][matrixId]);
+          }
+          if (m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] == 0 || m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] == 1)
+          {
+            if (m_generativeFaceVideoSEI3DCoordinateFlag[frameIdx] == 1 || m_generativeFaceVideoSEIMatrix3DSpaceFlag[frameIdx][matrixId] == 1)
+            {
+              matrixWidth = 3;
+              matrixHeight = 3;
+            }
+            else
+            {
+              matrixWidth = 2;
+              matrixHeight = 2;
+            }
+            if (m_generativeFaceVideoSEICoordinatePresentFlag[frameIdx])
+            {
+              numMatrices = m_generativeFaceVideoSEINumMatricestoNumKpsFlag[frameIdx][matrixId] ? m_generativeFaceVideoSEICoordinatePointNum[frameIdx] : (m_generativeFaceVideoSEINumMatricesInfo[frameIdx][matrixId] < (m_generativeFaceVideoSEICoordinatePointNum[frameIdx] - 1) ? (m_generativeFaceVideoSEINumMatricesInfo[frameIdx][matrixId] + 1) : (m_generativeFaceVideoSEINumMatricesInfo[frameIdx][matrixId] + 2));
+            }
+            else
+            {
+              numMatrices = m_generativeFaceVideoSEINumMatricesInfo[frameIdx][matrixId] + 1;
+            }
+          }
+          else if (m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] == 2 || m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] == 3 || m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] >= 7)
+          {
+            if (m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] >= 7)
+            {
+              numMatrices = m_generativeFaceVideoSEINumMatrices[frameIdx][matrixId];
+            }
+            else
+            {
+              numMatrices = 1;
+            }
+            matrixHeight = m_generativeFaceVideoSEIMatrixHeight[frameIdx][matrixId];
+            matrixWidth = m_generativeFaceVideoSEIMatrixWidth[frameIdx][matrixId];
+          }
+          else if (m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] >= 4 && m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] <= 6)
+          {
+            if (m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] == 4)
+            {
+              if (m_generativeFaceVideoSEI3DCoordinateFlag[frameIdx] == 1 || m_generativeFaceVideoSEIMatrix3DSpaceFlag[frameIdx][matrixId] == 1)
+              {
+                matrixWidth = 3;
+              }
+              else
+              {
+                matrixWidth = 2;
+              }
+            }
+            if (m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] == 5 || m_generativeFaceVideoSEIMatrixTypeIdx[frameIdx][matrixId] == 6)
+            {
+              matrixWidth = 1;
+            }
+            if (m_generativeFaceVideoSEI3DCoordinateFlag[frameIdx] == 1 || m_generativeFaceVideoSEIMatrix3DSpaceFlag[frameIdx][matrixId] == 1)
+            {
+              matrixHeight = 3;
+            }
+            else
+            {
+              matrixHeight = 2;
+            }
+            numMatrices = 1;
+          }
+          for (uint32_t j = 0; j < numMatrices; j++)
+          {
+            m_generativeFaceVideoSEIMatrixElement[frameIdx][matrixId].push_back(std::vector< std::vector<double> >());
+            for (uint32_t k = 0; k < matrixHeight; k++)
+            {
+              m_generativeFaceVideoSEIMatrixElement[frameIdx][matrixId][j].push_back(std::vector<double>());
+              for (uint32_t l = 0; l < matrixWidth; l++)
+              {
+                m_generativeFaceVideoSEIMatrixElement[frameIdx][matrixId][j][k].push_back(cfg_generativeFaceVideoSEIMatrixElement.values[matrixDimensionBeforeSum + j * matrixHeight * matrixWidth + k * matrixWidth + l]);
+              }
+            }
+          }
+          matrixDimensionBeforeSum = matrixDimensionBeforeSum + numMatrices * matrixHeight * matrixWidth;
+        }
+      }
+      if (m_generativeFaceVideoSEINumMatrixType[frameIdx] == 0)
+      {
+        matrixNumBeforeSum = matrixNumBeforeSum + 1;
+      }
+      else
+      {
+        matrixNumBeforeSum = matrixNumBeforeSum + m_generativeFaceVideoSEINumMatrixType[frameIdx];
+      }
+    }
+  }
+#endif
+
+#if JVET_AK0239_GEFV
+  if (m_generativeFaceVideoEnhancementEnabled)
+  {
+    assert(cfg_generativeFaceVideoEnhancementSEIId.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIGFVCnt.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIGFVId.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIMatrixElementPrecisionFactor.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIMatrixPresentFlag.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIMatrixPredFlag.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEINumMatrices.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIPupilPresentIdx.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIPupilCoordinatePrecisionFactor.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateX.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateY.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateX.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    assert(cfg_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateY.values.size() == m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIId.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIGFVCnt.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIGFVId.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIMatrixElementPrecisionFactor.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEINumMatrices.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIMatrixPresentFlag.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIMatrixPredFlag.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIPupilPresentIdx.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIPupilCoordinatePrecisionFactor.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateX.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateY.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateX.resize(m_generativeFaceVideoEnhancementSEINumber);
+    m_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateY.resize(m_generativeFaceVideoEnhancementSEINumber);
+    int matrixNumBeforeSum = 0;
+    int matrixDimensionBeforeSum = 0;
+    m_generativeFaceVideoEnhancementSEIMatrixElement.push_back(std::vector< std::vector< std::vector<double>> >());
+    m_generativeFaceVideoEnhancementSEIMatrixElement.resize(m_generativeFaceVideoEnhancementSEINumber);
+    for (uint32_t frameIdx = 0; frameIdx < m_generativeFaceVideoEnhancementSEINumber; frameIdx++)
+    {
+      m_generativeFaceVideoEnhancementSEIId[frameIdx] = cfg_generativeFaceVideoEnhancementSEIId.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIGFVCnt[frameIdx] = cfg_generativeFaceVideoEnhancementSEIGFVCnt.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIGFVId[frameIdx] = cfg_generativeFaceVideoEnhancementSEIGFVId.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIMatrixElementPrecisionFactor[frameIdx] = cfg_generativeFaceVideoEnhancementSEIMatrixElementPrecisionFactor.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEINumMatrices[frameIdx] = cfg_generativeFaceVideoEnhancementSEINumMatrices.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIMatrixPresentFlag[frameIdx] = cfg_generativeFaceVideoEnhancementSEIMatrixPresentFlag.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIMatrixPredFlag[frameIdx] = cfg_generativeFaceVideoEnhancementSEIMatrixPredFlag.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIPupilPresentIdx[frameIdx] = cfg_generativeFaceVideoEnhancementSEIPupilPresentIdx.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIPupilCoordinatePrecisionFactor[frameIdx] = cfg_generativeFaceVideoEnhancementSEIPupilCoordinatePrecisionFactor.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateX[frameIdx] = cfg_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateX.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateY[frameIdx] = cfg_generativeFaceVideoEnhancementSEIPupilLeftEyeCoordinateY.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateX[frameIdx] = cfg_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateX.values[frameIdx];
+      m_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateY[frameIdx] = cfg_generativeFaceVideoEnhancementSEIPupilRightEyeCoordinateY.values[frameIdx];
+      uint32_t numMatrices = m_generativeFaceVideoEnhancementSEINumMatrices[frameIdx];
+      m_generativeFaceVideoEnhancementSEIMatrixWidth.push_back(std::vector<uint32_t>());
+      m_generativeFaceVideoEnhancementSEIMatrixHeight.push_back(std::vector<uint32_t>());
+      m_generativeFaceVideoEnhancementSEIMatrixElement[frameIdx].push_back(std::vector< std::vector<double> >());
+      m_generativeFaceVideoEnhancementSEIMatrixElement[frameIdx].resize(numMatrices);
+      for (uint32_t j = 0; j < numMatrices; j++)
+      {
+        m_generativeFaceVideoEnhancementSEIMatrixWidth[frameIdx].push_back(cfg_generativeFaceVideoEnhancementSEIMatrixWidth.values[matrixNumBeforeSum + j]);
+        m_generativeFaceVideoEnhancementSEIMatrixHeight[frameIdx].push_back(cfg_generativeFaceVideoEnhancementSEIMatrixHeight.values[matrixNumBeforeSum + j]);
+        uint32_t matrixWidth = m_generativeFaceVideoEnhancementSEIMatrixWidth[frameIdx][j];
+        uint32_t matrixHeight = m_generativeFaceVideoEnhancementSEIMatrixHeight[frameIdx][j];
+        for (uint32_t k = 0; k < matrixHeight; k++)
+        {
+          m_generativeFaceVideoEnhancementSEIMatrixElement[frameIdx][j].push_back(std::vector<double>());
+          for (uint32_t l = 0; l < matrixWidth; l++)
+          {
+            m_generativeFaceVideoEnhancementSEIMatrixElement[frameIdx][j][k].push_back(cfg_generativeFaceVideoEnhancementSEIMatrixElement.values[matrixDimensionBeforeSum + k * matrixWidth + l]);
+          }
+        }
+        matrixDimensionBeforeSum = matrixDimensionBeforeSum + matrixHeight * matrixWidth;
+      }
+      matrixNumBeforeSum = matrixNumBeforeSum + numMatrices;
+    }
+  }
+#endif
+#if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
+  if (m_priSEIEnabled)
+  {
+    CHECK(m_priSEICancelFlag, "SEIPRICancelFlag must be 0 in this implementation");
+    CHECK(!m_priSEIPersistenceFlag, "SEIPRIPersistenceFlag must be 1 in this implementation");
+    CHECK(cfg_priSEIResamplingWidthNumMinus1.values.size() != (m_priSEINumResamplingRatiosMinus1 + 1), "Number of elements in SEIRPRIesamplingWidthNumMinus1 must be equal to SEIPRINumResamplingRatiosMinus1 + 1");
+    CHECK(cfg_priSEIResamplingWidthDenomMinus1.values.size() != (m_priSEINumResamplingRatiosMinus1 + 1), "Number of elements in SEIPRIResamplingWidthNumMinus1 must be equal to SEIPRIResamplingWidthDenomMinus1 + 1");
+    CHECK(cfg_priSEIResamplingHeightNumMinus1.values.size() != (m_priSEINumResamplingRatiosMinus1 + 1), "Number of elements in SEIPRIResamplingHeightNumMinus1 must be equal to SEIPRINumResamplingRatiosMinus1 + 1");
+    CHECK(cfg_priSEIResamplingHeightDenomMinus1.values.size() != (m_priSEINumResamplingRatiosMinus1 + 1), "Number of elements in SEIPRIResamplingHeightNumMinus1 must be equal to SEIPRIResamplingWidthDenomMinus1 + 1");
+    if (m_priSEINumResamplingRatiosMinus1 > 0)
+    {
+      m_priSEIResamplingWidthNumMinus1 = cfg_priSEIResamplingWidthNumMinus1.values;
+      m_priSEIResamplingWidthDenomMinus1 = cfg_priSEIResamplingWidthDenomMinus1.values;
+      m_priSEIResamplingHeightNumMinus1 = cfg_priSEIResamplingHeightNumMinus1.values;
+      m_priSEIResamplingHeightDenomMinus1 = cfg_priSEIResamplingHeightDenomMinus1.values;
+      m_priSEIFixedAspectRatioFlag.resize(m_priSEINumResamplingRatiosMinus1 + 1);
+      for (uint32_t i = 1; i <= m_priSEINumResamplingRatiosMinus1; i++)
+      {
+        m_priSEIFixedAspectRatioFlag[i] =
+          m_priSEIResamplingWidthNumMinus1[i] == m_priSEIResamplingHeightNumMinus1[i] &&
+          m_priSEIResamplingWidthDenomMinus1[i] == m_priSEIResamplingHeightDenomMinus1[i];
+      }
+      // First entry has fixed values
+      m_priSEIResamplingWidthNumMinus1[0] = 0;
+      m_priSEIResamplingWidthDenomMinus1[0] = 0;
+      m_priSEIFixedAspectRatioFlag[0] = true;
+      m_priSEIResamplingHeightNumMinus1[0] = 0;
+      m_priSEIResamplingHeightDenomMinus1[0] = 0;
+    }
+    else
+    {
+      m_priSEIResamplingWidthNumMinus1 = {0};
+      m_priSEIResamplingWidthDenomMinus1 = {0};
+      m_priSEIFixedAspectRatioFlag = {true};
+      m_priSEIResamplingHeightNumMinus1 = {0};
+      m_priSEIResamplingHeightDenomMinus1 = {0};
+    }
+
+    if (m_priSEIRegionIdPresentFlag)
+    {
+      CHECK(cfg_priSEIRegionId.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIRegionId must be equal to SEIPRINumRegionsMinus1 + 1");
+      std::vector<uint32_t> tmpVec = cfg_priSEIRegionId.values;
+      std::sort(tmpVec.begin(), tmpVec.end());
+      auto it = std::unique(tmpVec.begin(), tmpVec.end());
+      CHECK(it != tmpVec.end(), "SEIRegionId values must be unique");
+    }
+    CHECK(cfg_priSEIRegionTopLeftInUnitsX.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIRegionTopLeftInUnitsX must be equal to SEIPRINumRegionsMinus1 + 1");
+    CHECK(cfg_priSEIRegionTopLeftInUnitsY.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIRegionTopLeftInUnitsY must be equal to SEIPRINumRegionsMinus1 + 1");
+    CHECK(cfg_priSEIRegionWidthInUnitsMinus1.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIRegionWidthInUnitsMinus1 must be equal to SEIPRINumRegionsMinus1 + 1");
+    CHECK(cfg_priSEIRegionHeightInUnitsMinus1.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIRegionHeightInUnitsMinus1 must be equal to SEIPRINumRegionsMinus1 + 1");
+    if (m_priSEINumResamplingRatiosMinus1 > 0)
+    {
+      CHECK(cfg_priSEIResamplingRatioIdx.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRIResamplingRatioIdx must be equal to SEIPRINumRegionsMinus1 + 1");
+    }
+    if (m_priSEITargetPicParamsPresentFlag)
+    {
+      CHECK(cfg_priSEITargetRegionTopLeftInUnitsX.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRITargetRegionTopLeftInUnitsX must be equal to SEIPRINumRegionsMinus1 + 1");
+      CHECK(cfg_priSEITargetRegionTopLeftInUnitsY.values.size() != (m_priSEINumRegionsMinus1 + 1), "Number of elements in SEIPRITargetRegionTopLeftInUnitsY must be equal to SEIPRINumRegionsMinus1 + 1");
+    }
+    m_priSEIRegionId = cfg_priSEIRegionId.values;
+    m_priSEIRegionTopLeftInUnitsX = cfg_priSEIRegionTopLeftInUnitsX.values;
+    m_priSEIRegionTopLeftInUnitsY = cfg_priSEIRegionTopLeftInUnitsY.values;
+    m_priSEIRegionWidthInUnitsMinus1 = cfg_priSEIRegionWidthInUnitsMinus1.values;
+    m_priSEIRegionHeightInUnitsMinus1 = cfg_priSEIRegionHeightInUnitsMinus1.values;
+    if (m_priSEINumResamplingRatiosMinus1 > 0)
+    {
+      m_priSEIResamplingRatioIdx = cfg_priSEIResamplingRatioIdx.values;
+    }
+    else
+    {
+      m_priSEIResamplingRatioIdx = {0};
+    }
+    m_priSEITargetRegionTopLeftInUnitsX = cfg_priSEITargetRegionTopLeftInUnitsX.values;
+    m_priSEITargetRegionTopLeftInUnitsY = cfg_priSEITargetRegionTopLeftInUnitsY.values;
+  }
+#endif
+
   // check validity of input parameters
   xCheckParameter();
 
@@ -3319,6 +3923,14 @@ Void TAppEncCfg::xCheckParameter()
     xConfirmPara( m_nominalBlackLevelLumaCodeValue >= m_nominalWhiteLevelLumaCodeValue, "SEIToneMapNominalWhiteLevelLumaCodeValue shall be greater than SEIToneMapNominalBlackLevelLumaCodeValue");
     xConfirmPara( m_extendedWhiteLevelLumaCodeValue < m_nominalWhiteLevelLumaCodeValue, "SEIToneMapExtendedWhiteLevelLumaCodeValue shall be greater than or equal to SEIToneMapNominalWhiteLevelLumaCodeValue");
   }
+
+#if JVET_AL0339_SPATIAL_RESOLUTION_FOR_FGC_SEI
+  if (m_fgcSEIEnabled)
+  {
+    xConfirmPara(m_fgcSEIPicWidthInLumaSamples > 0 && m_fgcSEIPicHeightInLumaSamples == 0, "When SEIFGCPicWidthInLumaSamples is set, SEIFGCPicHeightInLumaSamples must also be set");
+    xConfirmPara(m_fgcSEIPicHeightInLumaSamples > 0 && m_fgcSEIPicWidthInLumaSamples == 0, "When SEIFGCPicHeightInLumaSamples is set, SEIFGCPicWidthInLumaSamples must also be set");
+  }
+#endif
 
   if (m_kneeSEIEnabled && !m_kneeFunctionInformationSEI.m_kneeFunctionCancelFlag)
   {
