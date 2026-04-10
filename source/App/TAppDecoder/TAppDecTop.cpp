@@ -145,12 +145,12 @@ Void TAppDecTop::decode()
 #if JVET_X0048_X0103_FILM_GRAIN
   Bool openedSEIFGSFile = false; // reconstruction file (with FGS) not yet opened. (must be performed after SPS is seen)
 #endif
-  Bool loopFiltered = false;
 #if SHUTTER_INTERVAL_SEI_PROCESSING
   Bool openedPostFile = false;
   setShutterFilterFlag(!m_shutterIntervalPostFileName.empty());   // not apply shutter interval SEI processing if filename is not specified.
   m_cTDecTop.setShutterFilterFlag(getShutterFilterFlag());
 #endif
+  bool eosBefore = false;
 
   while (!!bitstreamFile)
   {
@@ -212,11 +212,7 @@ Void TAppDecTop::decode()
     if ( (bNewPicture || !bitstreamFile || nalu.m_nalUnitType == NAL_UNIT_EOS) &&
         !m_cTDecTop.getFirstSliceInSequence () )
     {
-      if (!loopFiltered || bitstreamFile)
-      {
-        m_cTDecTop.executeLoopFilters(poc, pcListPic);
-      }
-      loopFiltered = (nalu.m_nalUnitType == NAL_UNIT_EOS);
+      m_cTDecTop.executeLoopFilters(poc, pcListPic);
       if (nalu.m_nalUnitType == NAL_UNIT_EOS)
       {
         m_cTDecTop.setFirstSliceInSequence(true);
@@ -323,7 +319,7 @@ Void TAppDecTop::decode()
       // write reconstruction to file
       if( bNewPicture )
       {
-        xWriteOutput( pcListPic, nalu.m_temporalId );
+        xWriteOutput( pcListPic, nalu.m_temporalId, poc );
       }
       if ( (bNewPicture || nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_CRA) && m_cTDecTop.getNoOutputPriorPicsFlag() )
       {
@@ -335,19 +331,16 @@ Void TAppDecTop::decode()
             || nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_IDR_N_LP
             || nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_BLA_N_LP
             || nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_BLA_W_RADL
-            || nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_BLA_W_LP ) )
+            || nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_BLA_W_LP
+            || (nalu.m_nalUnitType == NAL_UNIT_CODED_SLICE_CRA && eosBefore) ) )
       {
         xFlushOutput( pcListPic );
+        eosBefore = false;
       }
       if (nalu.m_nalUnitType == NAL_UNIT_EOS)
       {
-        xWriteOutput( pcListPic, nalu.m_temporalId );
         m_cTDecTop.setFirstSliceInPicture (false);
-      }
-      // write reconstruction to file -- for additional bumping as defined in C.5.2.3
-      if(!bNewPicture && nalu.m_nalUnitType >= NAL_UNIT_CODED_SLICE_TRAIL_N && nalu.m_nalUnitType <= NAL_UNIT_RESERVED_VCL31)
-      {
-        xWriteOutput( pcListPic, nalu.m_temporalId );
+        eosBefore = true;
       }
     }
   }
@@ -432,12 +425,16 @@ Void TAppDecTop::xInitDecLib()
 /** \param pcListPic list of pictures to be written to file
     \param tId       temporal sub-layer ID
  */
-Void TAppDecTop::xWriteOutput( TComList<TComPic*>* pcListPic, UInt tId )
+Void TAppDecTop::xWriteOutput( TComList<TComPic*>* pcListPic, UInt tId, Int poc )
 {
   if (pcListPic->empty())
   {
     return;
   }
+
+  auto const currPic = std::find_if(pcListPic->begin(), pcListPic->end(),
+      [poc](const TComPic* p) { return p->getPOC() == poc; });
+  assert(currPic != pcListPic->end());
 
   TComList<TComPic*>::iterator iterPic   = pcListPic->begin();
   Int numPicsNotYetDisplayed = 0;
@@ -445,18 +442,35 @@ Void TAppDecTop::xWriteOutput( TComList<TComPic*>* pcListPic, UInt tId )
   const TComSPS* activeSPS = &(pcListPic->front()->getPicSym()->getSPS());
   UInt numReorderPicsHighestTid;
   UInt maxDecPicBufferingHighestTid;
+  UInt maxLatencyIncreasePlus1HighestTId;
   UInt maxNrSublayers = activeSPS->getMaxTLayers();
 
   if(m_iMaxTemporalLayer == -1 || m_iMaxTemporalLayer >= maxNrSublayers)
   {
     numReorderPicsHighestTid = activeSPS->getNumReorderPics(maxNrSublayers-1);
     maxDecPicBufferingHighestTid =  activeSPS->getMaxDecPicBuffering(maxNrSublayers-1); 
+    maxLatencyIncreasePlus1HighestTId = activeSPS->getMaxLatencyIncreasePlus1(maxNrSublayers-1);
   }
   else
   {
     numReorderPicsHighestTid = activeSPS->getNumReorderPics(m_iMaxTemporalLayer);
     maxDecPicBufferingHighestTid = activeSPS->getMaxDecPicBuffering(m_iMaxTemporalLayer); 
+    maxLatencyIncreasePlus1HighestTId = activeSPS->getMaxLatencyIncreasePlus1(m_iMaxTemporalLayer);
   }
+
+  // Add condition on picLatencyCount to output picture
+  auto const maxLatencyPictures = maxLatencyIncreasePlus1HighestTId -
+    (maxLatencyIncreasePlus1HighestTId ? 1 : 0) + numReorderPicsHighestTid;
+
+  auto isTherePicAboveMaxLatencyCount = [&]() -> bool
+  {
+    auto isLatencyAboveMax = [maxLatencyPictures](const TComPic* p) -> bool
+    {
+      return p->getOutputMark() && p->getPicLatencyCount() >= maxLatencyPictures;
+    };
+
+    return std::find_if(pcListPic->begin(), pcListPic->end(), isLatencyAboveMax) != pcListPic->end();
+  };
 
   while (iterPic != pcListPic->end())
   {
@@ -465,6 +479,11 @@ Void TAppDecTop::xWriteOutput( TComList<TComPic*>* pcListPic, UInt tId )
     {
        numPicsNotYetDisplayed++;
       dpbFullness++;
+      if((*currPic)->getOutputMark())
+      {
+        pcPic->setPicLatencyCount(pcPic->getPOC() > poc ?
+            pcPic->getPicLatencyCount() + 1 : 0);
+      }
     }
     else if(pcPic->getSlice( 0 )->isReferenced())
     {
@@ -493,7 +512,10 @@ Void TAppDecTop::xWriteOutput( TComList<TComPic*>* pcListPic, UInt tId )
       TComPic* pcPicBottom = *(iterPic);
 
       if ( pcPicTop->getOutputMark() && pcPicBottom->getOutputMark() &&
-          (numPicsNotYetDisplayed >  numReorderPicsHighestTid || dpbFullness > maxDecPicBufferingHighestTid) &&
+          (numPicsNotYetDisplayed >  numReorderPicsHighestTid ||
+           dpbFullness > maxDecPicBufferingHighestTid ||
+           (maxLatencyIncreasePlus1HighestTId > 0 &&
+            isTherePicAboveMaxLatencyCount())) &&
           (!(pcPicTop->getPOC()%2) && pcPicBottom->getPOC() == pcPicTop->getPOC()+1) &&
           (pcPicTop->getPOC() == m_iPOCLastDisplay+1 || m_iPOCLastDisplay < 0))
       {
@@ -560,7 +582,10 @@ Void TAppDecTop::xWriteOutput( TComList<TComPic*>* pcListPic, UInt tId )
       pcPic = *(iterPic);
 
       if(pcPic->getOutputMark() && pcPic->getPOC() > m_iPOCLastDisplay &&
-        (numPicsNotYetDisplayed >  numReorderPicsHighestTid || dpbFullness > maxDecPicBufferingHighestTid))
+        (numPicsNotYetDisplayed >  numReorderPicsHighestTid ||
+         dpbFullness > maxDecPicBufferingHighestTid ||
+         (maxLatencyIncreasePlus1HighestTId > 0 &&
+          isTherePicAboveMaxLatencyCount())))
       {
         // write to file
          numPicsNotYetDisplayed--;
