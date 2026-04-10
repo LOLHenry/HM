@@ -634,7 +634,7 @@ Bool SEIReader::xReadSEImessage(SEIMessages& seis, const NalUnitType nalUnitType
 
   if(payloadSize == 0)
   {
-    return;
+    return false;
   }
 
   /* extract the payload for this single SEI message.

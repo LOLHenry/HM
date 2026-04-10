@@ -1027,9 +1027,9 @@ Bool TDecTop::decode(InputNALUnit& nalu, Int& iSkipFrame, Int& iPOCLastDisplay)
       {
         if (m_pcPic)
         {
+#if JVET_AK0194_DSC_SEI
           SEIMessages::iterator newSEI = m_seiReader.parseSEImessage( &(nalu.getBitstream()), m_pcPic->getSEIs(), nalu.m_nalUnitType,
                                                                     m_parameterSetManager.getActiveSPS(), m_pDecodedSEIOutputStream );
-#if JVET_AK0194_DSC_SEI
           if ((*newSEI)->payloadType() == SEI::PayloadType::DIGITALLY_SIGNED_CONTENT_SELECTION && (next(newSEI) != m_pcPic->getSEIs().end()))
           {
             auto dscsSei = reinterpret_cast<SEIDigitallySignedContentSelection*>(*newSEI);
@@ -1064,6 +1064,9 @@ Bool TDecTop::decode(InputNALUnit& nalu, Int& iSkipFrame, Int& iPOCLastDisplay)
               }
             }
           }
+#else
+          m_seiReader.parseSEImessage( &(nalu.getBitstream()), m_pcPic->getSEIs(), nalu.m_nalUnitType,
+                                        m_parameterSetManager.getActiveSPS(), m_pDecodedSEIOutputStream );
 #endif
         }
         else
