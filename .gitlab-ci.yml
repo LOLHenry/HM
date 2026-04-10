@@ -15,7 +15,6 @@ variables:
          - web
       variables:
          - $CI_PROJECT_URL == 'https://vcgit.hhi.fraunhofer.de/jvet/HM'
-         - $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == 'master'
 
 .build_template_linux:
    extends: .build_template
