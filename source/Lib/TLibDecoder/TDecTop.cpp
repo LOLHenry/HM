@@ -327,10 +327,7 @@ Void TDecTop::checkNoOutputPriorPics (TComList<TComPic*>* pcListPic)
   while (iterPic != pcListPic->end())
   {
     TComPic* pcPicTmp = *(iterPic++);
-    if (m_lastPOCNoOutputPriorPics != pcPicTmp->getPOC())
-    {
-      pcPicTmp->setOutputMark(false);
-    }
+    pcPicTmp->setOutputMark(false);
   }
 }
 
