@@ -154,9 +154,14 @@ protected:
   }
 #endif 
 
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  void xWriteSEIAIUsageRestrictions(const SEIAIUsageRestrictions &sei);
+#endif 
+
 #if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
   void xWriteSEIEncoderOptimizationInfo           (const SEIEncoderOptimizationInfo &sei);
 #endif
+
 #if JVET_AK0194_DSC_SEI
   void xWriteSEIDigitallySignedContentInitialization(const SEIDigitallySignedContentInitialization &sei);
   void xWriteSEIDigitallySignedContentSelection(const SEIDigitallySignedContentSelection &sei);
@@ -205,7 +210,7 @@ protected:
 
 
 #if SHUTTER_INTERVAL_SEI_MESSAGE
-  Void xWriteSEIShutterInterval                   (const SEIShutterIntervalInfo& sei);
+  void xWriteSEIShutterInterval                   (const SEIShutterIntervalInfo& sei);
 #endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   void xWriteSEIPhaseIndication                   (const SEIPhaseIndication&sei);

@@ -592,6 +592,14 @@ Void TEncGOP::xCreateIRAPLeadingSEIMessages (SEIMessages& seiMessages, const TCo
     seiMessages.push_back(seiShutterInterval);
   }
 #endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  if (m_pcCfg->getAURSEIEnabled())
+  {
+    SEIAIUsageRestrictions *aurSEI = new SEIAIUsageRestrictions;
+    m_seiEncoder.initSEIAIUsageRestrictions(aurSEI);
+    seiMessages.push_back(aurSEI);
+  }
+#endif
 #if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
   if (m_pcCfg->getEOISEIEnabled())
   {
@@ -618,7 +626,7 @@ Void TEncGOP::xCreateIRAPLeadingSEIMessages (SEIMessages& seiMessages, const TCo
       }
     }
     seiMessages.push_back(seiFGC);
-}
+  }
 #else
   // film grain
   if (m_pcCfg->getFilmGrainCharactersticsSEIEnabled())

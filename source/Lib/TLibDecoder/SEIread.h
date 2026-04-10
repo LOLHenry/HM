@@ -117,6 +117,9 @@ protected:
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   Void xParseSEIShutterInterval               (SEIShutterIntervalInfo& sei,           UInt payloadSize,                     std::ostream *pDecodedMessageOutputStream);
 #endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  void xParseSEIAIUsageRestrictions(SEIAIUsageRestrictions& sei, uint32_t payloadSize, std::ostream* pDecodedMessageOutputStream);
+#endif
 #if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
   void xParseSEIEncoderOptimizationInfo(SEIEncoderOptimizationInfo& sei, uint32_t payloadSize, std::ostream* pDecodedMessageOutputStream);
 #endif

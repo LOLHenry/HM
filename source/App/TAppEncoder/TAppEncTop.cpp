@@ -491,6 +491,17 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setSiiSEITimeScale                                   (m_siiSEITimeScale);
   m_cTEncTop.setSiiSEISubLayerNumUnitsInSI                        (m_siiSEISubLayerNumUnitsInSI);
 #endif
+
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  m_cTEncTop.setAURSEIEnabled(m_aurSEIEnabled);
+  m_cTEncTop.setAURSEICancelFlag(m_aurSEICancelFlag);
+  m_cTEncTop.setAURSEIPersistenceFlag(m_aurSEIPersistenceFlag);
+  m_cTEncTop.setAURSEINumRestrictionsMinus1(m_aurSEINumRestrictionsMinus1);
+  m_cTEncTop.setAURSEIRestrictions(m_aurSEIRestrictions);
+  m_cTEncTop.setAURSEIContextPresentFlag(m_aurSEIContextPresentFlag);
+  m_cTEncTop.setAURSEIContext(m_aurSEIContext);
+#endif 
+
 #if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
   m_cTEncTop.setEOISEIEnabled(m_eoiSEIEnabled);
   m_cTEncTop.setEOISEICancelFlag(m_eoiSEICancelFlag);
@@ -511,6 +522,7 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setEOISEIPrivacyProtectionTypeIdc(m_eoiSEIPrivacyProtectionTypeIdc);
   m_cTEncTop.setEOISEIPrivacyProtectedInfoType(m_eoiSEIPrivacyProtectedInfoType);
 #endif
+
 #if SEI_ENCODER_CONTROL
 // film grain charcteristics
   m_cTEncTop.setFilmGrainCharactersticsSEIEnabled                 (m_fgcSEIEnabled);

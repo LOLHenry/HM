@@ -98,10 +98,12 @@ const std::vector<SEI::PayloadType> SEI::prefix_sei_messages({
   SEI::DIGITALLY_SIGNED_CONTENT_INITIALIZATION,
   SEI::DIGITALLY_SIGNED_CONTENT_SELECTION,
 #endif
-#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
-  SEI::ENCODER_OPTIMIZATION_INFO
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  SEI::AI_USAGE_RESTRICTIONS,
 #endif
-
+#if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
+  SEI::ENCODER_OPTIMIZATION_INFO,
+#endif
 });
 
 const std::vector<SEI::PayloadType> SEI::suffix_sei_messages({
@@ -490,6 +492,9 @@ const TChar *SEI::getSEIMessageString(SEI::PayloadType payloadType)
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     case SEI::PHASE_INDICATION:                     return "Phase Indication";
 #endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+    case SEI::AI_USAGE_RESTRICTIONS:                return "AI usage restrictions";
+#endif   
 #if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
     case SEI::ENCODER_OPTIMIZATION_INFO:            return "Encoder optimization information";
 #endif

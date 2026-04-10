@@ -766,6 +766,13 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   SMultiValueInput<UInt>   cfg_siiSEIInputNumUnitsInSI                (0, MAX_UINT, 0, 7);
 #endif
+
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  SMultiValueInput<uint32_t>  cfg_aurSEIRestrictions(0, 2, 0, std::numeric_limits<uint32_t>::max());
+  SMultiValueInput<bool>      cfg_aurSEIContextPresentFlag(0, 1, 0, 4096);
+  SMultiValueInput<uint32_t>  cfg_aurSEIContext(0, 15, 0, std::numeric_limits<uint32_t>::max());
+#endif
+
 #if JVET_AJ0207_GFV
   SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEIId(0, 2550, 0, 102400);
   SMultiValueInput<uint32_t>   cfg_generativeFaceVideoSEICnt(0, 2550, 0, 102400);
@@ -829,7 +836,6 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   SMultiValueInput<uint32_t> cfg_priSEITargetRegionTopLeftInUnitsX    (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
   SMultiValueInput<uint32_t> cfg_priSEITargetRegionTopLeftInUnitsY    (0, std::numeric_limits<uint32_t>::max(), 0, std::numeric_limits<uint32_t>::max());
 #endif
-
 
   Int warnUnknowParameter = 0;
   po::Options opts;
@@ -1562,7 +1568,16 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   ("SEIPRITargetRegionTopLeftInUnitsY",               cfg_priSEITargetRegionTopLeftInUnitsY, cfg_priSEITargetRegionTopLeftInUnitsY, "Specifies a list of vertical top left postions in units of priUnitSize luma samples for the regions in reconstructed target picture")
 #endif
   ;
-
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  opts.addOptions()
+    ("SEIAUREnabled", m_aurSEIEnabled, false, "Control use of the AI usage restrictions SEI")
+    ("SEIAURCancelFlag", m_aurSEICancelFlag, false, " Specifies the persistence of any previous AI usage restrictions SEI message in output order")
+    ("SEIAURPersistenceFlag", m_aurSEIPersistenceFlag, false, "Specifies the persistence of the AI usage restrictions SEI message for the current layer.")
+    ("SEIAURNumRestrictionsMinus1", m_aurSEINumRestrictionsMinus1, 0u, "plus one specifies the number of restriction")
+    ("SEIAURRestrictions", cfg_aurSEIRestrictions, cfg_aurSEIRestrictions, "List of restrictions")
+    ("SEIAURContextPresentFlag", cfg_aurSEIContextPresentFlag, cfg_aurSEIContextPresentFlag, "List of flags indicating whether aur_context syntax elements are present")
+    ("SEIAURContext", cfg_aurSEIContext, cfg_aurSEIContext, "List of context");
+#endif
   opts.addOptions()
     ("TemporalFilter", m_gopBasedTemporalFilterEnabled, false, "Enable GOP based temporal filter. Disabled per default")
     ("TemporalFilterPastRefs", m_gopBasedTemporalFilterPastRefs, TF_DEFAULT_REFS, "Number of past references for temporal prefilter")
@@ -2303,6 +2318,14 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
       }
     }
   }
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  if (m_aurSEIEnabled)
+  {
+    m_aurSEIRestrictions = cfg_aurSEIRestrictions.values;
+    m_aurSEIContextPresentFlag = cfg_aurSEIContextPresentFlag.values;
+    m_aurSEIContext = cfg_aurSEIContext.values;
+  }
+#endif
 #if SHUTTER_INTERVAL_SEI_PROCESSING
   m_ShutterFilterEnable = false;
 #endif

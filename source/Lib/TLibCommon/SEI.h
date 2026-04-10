@@ -118,12 +118,14 @@ public:
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     PHASE_INDICATION                     = 212,
 #endif
+
 #if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
     ENCODER_OPTIMIZATION_INFO            = 215,
 #endif
 #if JVET_AK2006_SPTI_SEI_MESSAGE
     SOURCE_PICTURE_TIMING_INFO           = 216,
 #endif
+
 #if JVET_AK0107_MODALITY_INFORMATION
     MODALITY_INFORMATION                 = 218,
 #endif
@@ -131,12 +133,16 @@ public:
     DIGITALLY_SIGNED_CONTENT_INITIALIZATION = 220,
     DIGITALLY_SIGNED_CONTENT_SELECTION      = 221,
     DIGITALLY_SIGNED_CONTENT_VERIFICATION   = 222,
+
 #endif
 #if JVET_AJ0207_GFV
-    GENERATIVE_FACE_VIDEO                = 223,
+    GENERATIVE_FACE_VIDEO                   = 223,
 #endif
 #if JVET_AK0239_GEFV
-    GENERATIVE_ENHANCEMENT_FACE_VIDEO    = 224,
+    GENERATIVE_ENHANCEMENT_FACE_VIDEO       = 224,
+#endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+    AI_USAGE_RESTRICTIONS                   = 225,
 #endif
 #if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI
     PACKED_REGIONS_INFO                     = 226,
@@ -1413,6 +1419,7 @@ public:
   uint8_t getNumsOfSeiPrefixIndications(const SEI* sei);
 };
 #endif 
+
 #if JVET_AJ0207_GFV
 class SEIGenerativeFaceVideo : public SEI
 {
@@ -1555,4 +1562,26 @@ public:
 };
 #endif
 
+#if  JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+class SEIAIUsageRestrictions : public SEI
+{
+public:
+  PayloadType payloadType() const { return AI_USAGE_RESTRICTIONS; }
+  SEIAIUsageRestrictions()
+    : m_cancelFlag(false)
+    , m_persistenceFlag(false)
+    , m_numRestrictionsMinus1(0)
+  {}
+  SEIAIUsageRestrictions(const SEIAIUsageRestrictions& sei);
+
+  virtual ~SEIAIUsageRestrictions() {}
+
+  bool                  m_cancelFlag;
+  bool                  m_persistenceFlag;
+  uint32_t              m_numRestrictionsMinus1;
+  std::vector<uint32_t> m_restrictions;
+  std::vector<bool>     m_contextPresentFlag;
+  std::vector<uint32_t> m_context;
+};
+#endif
 //! \}

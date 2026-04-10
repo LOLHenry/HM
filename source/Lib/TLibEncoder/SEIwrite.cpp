@@ -248,14 +248,16 @@ Void SEIWriter::xWriteSEIpayloadData(TComBitIf& bs, const SEI& sei, const TComSP
     xWriteSEIPhaseIndication(*static_cast<const SEIPhaseIndication *>(&sei));
     break;
 #endif
-
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  case SEI::PayloadType::AI_USAGE_RESTRICTIONS:
+    xWriteSEIAIUsageRestrictions(*static_cast<const SEIAIUsageRestrictions *>(&sei));
+    break;
+#endif  
 #if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
   case SEI::ENCODER_OPTIMIZATION_INFO:
     xWriteSEIEncoderOptimizationInfo(*static_cast<const SEIEncoderOptimizationInfo *>(&sei));
     break;
 #endif
-
-
 #if JVET_AK0107_MODALITY_INFORMATION
   case SEI::PayloadType::MODALITY_INFORMATION:
     xWriteSEIModalityInfo(*static_cast<const SEIModalityInfo *>(&sei));
@@ -1859,6 +1861,26 @@ Void SEIWriter::xWriteByteAlign()
   }
 }
 
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+void SEIWriter::xWriteSEIAIUsageRestrictions(const SEIAIUsageRestrictions &sei)
+{
+  WRITE_FLAG(sei.m_cancelFlag, "aur_cancel_flag");
+  
+  if (!sei.m_cancelFlag)
+  {
+    WRITE_FLAG(sei.m_persistenceFlag, "aur_persistence_flag");
+    WRITE_UVLC(sei.m_numRestrictionsMinus1, "aur_num_restrictions_minus1");
+    for (uint32_t i = 0; i <= sei.m_numRestrictionsMinus1; i++)
+    {
+      WRITE_UVLC(sei.m_restrictions[i], "aur_restriction");
+      WRITE_FLAG(sei.m_contextPresentFlag[i], "aur_context_present_flag");
+      if (sei.m_contextPresentFlag[i])
+        WRITE_UVLC(sei.m_context[i], "aur_context");
+    }
+  }
+}
+#endif
+
 #if JVET_AK0194_DSC_SEI
 void SEIWriter::xWriteSEIDigitallySignedContentInitialization(const SEIDigitallySignedContentInitialization &sei)
 {
@@ -1901,6 +1923,7 @@ void SEIWriter::xWriteSEIDigitallySignedContentVerification(const SEIDigitallySi
     WRITE_CODE(sei.dscvSignature[i], 8, "dscv_signature");
   }
 }
+
 #endif
 
 #if JVET_AK0140_PACKED_REGIONS_INFORMATION_SEI

@@ -488,6 +488,16 @@ protected:
   std::vector<UInt>       m_siiSEISubLayerNumUnitsInSI;
 #endif
 
+#if  JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  bool  m_aurSEIEnabled;
+  bool  m_aurSEICancelFlag;
+  bool  m_aurSEIPersistenceFlag;
+  uint32_t  m_aurSEINumRestrictionsMinus1;
+  std::vector<uint32_t>  m_aurSEIRestrictions;
+  std::vector<bool>  m_aurSEIContextPresentFlag;
+  std::vector<uint32_t>  m_aurSEIContext;
+#endif
+
 #if JVET_AL0061_ENCODER_OPTIMIZATION_INFORMATION_SEI
   // Encoder Optimization Information SEI
   Bool  m_eoiSEIEnabled;
@@ -1305,6 +1315,22 @@ public:
   Bool     getSiiSEIFixedSIwithinCLVS()                              { return m_siiSEISubLayerNumUnitsInSI.empty(); }
   Void     setSiiSEISubLayerNumUnitsInSI(const std::vector<UInt>& b) { m_siiSEISubLayerNumUnitsInSI = b; }
   UInt     getSiiSEISubLayerNumUnitsInSI(UInt idx) const             { return m_siiSEISubLayerNumUnitsInSI[idx]; }
+#endif
+#if  JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  void setAURSEIEnabled(bool b) { m_aurSEIEnabled = b; }
+  bool getAURSEIEnabled() const { return m_aurSEIEnabled; }
+  void setAURSEICancelFlag(bool b) { m_aurSEICancelFlag = b; }
+  bool getAURSEICancelFlag() const { return m_aurSEICancelFlag; }
+  void setAURSEIPersistenceFlag(bool b) { m_aurSEIPersistenceFlag = b; }
+  bool getAURSEIPersistenceFlag() const { return m_aurSEIPersistenceFlag; }
+  void setAURSEINumRestrictionsMinus1(uint32_t b) { m_aurSEINumRestrictionsMinus1 = b; }
+  uint32_t  getAURSEINumRestrictionsMinus1() { return m_aurSEINumRestrictionsMinus1; }
+  void setAURSEIRestrictions(std::vector<uint32_t> b) { m_aurSEIRestrictions = b; }
+  uint32_t getAURSEIRestrictions(uint32_t idx) const { return m_aurSEIRestrictions[idx]; }
+  void setAURSEIContextPresentFlag(std::vector<bool> b) { m_aurSEIContextPresentFlag = b; }
+  bool getAURSEIContextPresentFlag(uint32_t idx) const { return m_aurSEIContextPresentFlag[idx]; }
+  void setAURSEIContext(std::vector<uint32_t> b) { m_aurSEIContext = b; }
+  uint32_t getAURSEIContext(uint32_t idx) const { return m_aurSEIContext[idx]; }
 #endif
 #if SEI_ENCODER_CONTROL
   // film grain SEI

@@ -504,6 +504,15 @@ protected:
   UInt      m_siiSEITimeScale;
   std::vector<UInt>     m_siiSEISubLayerNumUnitsInSI;
 #endif
+#if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
+  bool  m_aurSEIEnabled;
+  bool  m_aurSEICancelFlag;
+  bool  m_aurSEIPersistenceFlag;
+  uint32_t  m_aurSEINumRestrictionsMinus1;
+  std::vector<uint32_t>  m_aurSEIRestrictions;
+  std::vector<bool>  m_aurSEIContextPresentFlag;
+  std::vector<uint32_t>  m_aurSEIContext;
+#endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   bool      m_phaseIndicationSEIEnabledFullResolution;
   int       m_piHorPhaseNumFullResolution;
