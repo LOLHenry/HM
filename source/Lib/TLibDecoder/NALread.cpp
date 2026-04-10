@@ -180,7 +180,7 @@ Void read(InputNALUnit& nalu)
   const bool isVCLNalUnit = ((nalUnitBuf[0] & 64) == 0);
 #if JVET_AK0194_DSC_SEI
   const NalUnitType nut = (NalUnitType)((nalUnitBuf[0] & 127) >> 1);
-  if (nut == NAL_UNIT_VPS || nut == NAL_UNIT_SPS || nut == NAL_UNIT_PPS || isVCLNalUnit )
+  if (nut == NAL_UNIT_VPS || nut == NAL_UNIT_SPS || nut == NAL_UNIT_PPS || nut == NAL_UNIT_PREFIX_SEI || nut == NAL_UNIT_SUFFIX_SEI || isVCLNalUnit )
   {
     bitstream.copyToOrigFifo();
   }

@@ -128,6 +128,7 @@ public:
 
 protected:
   Void xReadRbspTrailingBits();
+  bool isByteAligned() { return (m_pcBitstream->getNumBitsUntilByteAligned() == 0 ); }
 };
 
 class AUDReader: public SyntaxElementParser

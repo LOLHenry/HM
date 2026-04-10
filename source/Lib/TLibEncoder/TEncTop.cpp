@@ -51,8 +51,8 @@
 // ====================================================================================================================
 
 TEncTop::TEncTop() :
-    m_spsMap(MAX_NUM_SPS)
-  , m_ppsMap(MAX_NUM_PPS)
+    m_spsMap(MAX_NUM_SPS),
+    m_ppsMap(MAX_NUM_PPS)
 {
   m_iPOCLast          = -1;
   m_iNumPicRcvd       =  0;

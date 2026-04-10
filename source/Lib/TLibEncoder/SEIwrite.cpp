@@ -2165,10 +2165,8 @@ void SEIWriter::xWriteSEIAIUsageRestrictions(const SEIAIUsageRestrictions &sei)
 #if JVET_AK0194_DSC_SEI
 void SEIWriter::xWriteSEIDigitallySignedContentInitialization(const SEIDigitallySignedContentInitialization &sei)
 {
+  WRITE_CODE(sei.dsciId, 8, "dsci_id");
   WRITE_CODE(sei.dsciHashMethodType, 8, "dsci_hash_method_type");
-  WRITE_STRING(sei.dsciKeySourceUri, "dsci_key_source_uri");
-  CHECK (sei.dsciNumVerificationSubstreams < 1, "Number of DSC verification substreams has to be greater than zero");
-  WRITE_UVLC(sei.dsciNumVerificationSubstreams - 1, "dsci_num_verification_substreams_minus1");
   WRITE_UVLC(sei.dsciKeyRetrievalModeIdc, "dsci_key_retrieval_mode_idc");
   if (sei.dsciKeyRetrievalModeIdc == 1)
   {
@@ -2186,23 +2184,42 @@ void SEIWriter::xWriteSEIDigitallySignedContentInitialization(const SEIDigitally
       WRITE_CODE(sei.dsciContentUuid[i], 8, "dsci_content_uuid");
     }
   }
-}
+  CHECK (sei.dsciNumVerificationSubstreams < 1, "Number of DSC verification substreams has to be greater than zero");
+  WRITE_UVLC(sei.dsciNumVerificationSubstreams - 1, "dsci_num_verification_substreams_minus1");
+  for (int i = 1; i < sei.dsciNumVerificationSubstreams; i++)
+  {
+    for (int j = 0; j < i; j++)
+    {
+      WRITE_FLAG(sei.dsciRefSubstreamFlag[i][j], "dsci_ref_substream_flag");
+    }
+  }
+  WRITE_FLAG(sei.dsciVSSImplicitAssociationModeFlag, "dsci_vss_implicit_association_mode_flag");
+  WRITE_FLAG(sei.dsciSignedContentStartFlag, "dsci_signed_content_start_flag");
+  WRITE_FLAG(sei.dsciSEISigningFlag, "dsci_sei_signing_flag");
+  while (!isByteAligned())
+  {
+    WRITE_FLAG(0, "dsci_alignment_zero_bit");
+  }
+  WRITE_STRING(sei.dsciKeySourceUri, "dsci_key_source_uri");}
 
 void SEIWriter::xWriteSEIDigitallySignedContentSelection(const SEIDigitallySignedContentSelection &sei)
 {
-  WRITE_UVLC(sei.dscsVerificationSubstreamId, "dscs_verification_substream_id");
+  WRITE_CODE(sei.dscsId, 8, "dscs_id");
+  WRITE_CODE(sei.dscsVerificationSubstreamId, 8, "dscs_verification_substream_id");
 }
 
 void SEIWriter::xWriteSEIDigitallySignedContentVerification(const SEIDigitallySignedContentVerification &sei)
 {
-  WRITE_UVLC(sei.dscvVerificationSubstreamId, "dscv_verification_substream_id");
+  WRITE_CODE(sei.dscvId, 8, "dscv_id");
+  WRITE_CODE(sei.dscvVerificationSubstreamId, 8, "dscv_verification_substream_id");
   CHECK (sei.dscvSignatureLengthInOctets < 1, "Length of signature has to be greater than zero");
-  WRITE_UVLC(sei.dscvSignatureLengthInOctets - 1, "dscv_signature_length_in_octets_minus1");
+  WRITE_CODE(sei.dscvSignatureLengthInOctets - 1, 24, "dscv_signature_length_in_octets_minus1");
   CHECK (sei.dscvSignatureLengthInOctets != sei.dscvSignature.size(), "Signature length incosistent");
   for (int i=0; i< sei.dscvSignature.size(); i++)
   {
     WRITE_CODE(sei.dscvSignature[i], 8, "dscv_signature");
   }
+  WRITE_FLAG(sei.dscvSignedContentEndFlag, "dsci_signed_content_end_flag");
 }
 
 #endif

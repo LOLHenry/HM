@@ -159,9 +159,10 @@ private:
 #if JVET_AK0194_DSC_SEI
   void xAddToSubstream(int substreamId, OutputNALUnit &nalu);
 
-  DscSubstreamManager m_dscSubstreamManager;
-  int                 m_totalPicsCoded = 0;
-  int                 m_prevPicTemporalId = 0;
+  DscSubstreamManager  m_dscSubstreamManager;
+  int                  m_totalPicsCoded = 0;
+  int                  m_prevPicTemporalId = 0;
+  int                  m_dscSubstreamId = 0;
 #endif
 
 public:
@@ -239,7 +240,11 @@ protected:
 
   Void xCreateScalableNestingSEI (SEIMessages& seiMessages, SEIMessages& nestedSeiMessages);
   Void xWriteSEI (NalUnitType naluType, SEIMessages& seiMessages, AccessUnit &accessUnit, AccessUnit::iterator &auPos, Int temporalId, const TComSPS *sps);
+#if JVET_AK0194_DSC_SEI
+  Void xWriteSEISeparately (NalUnitType naluType, SEIMessages& seiMessages, AccessUnit &accessUnit, AccessUnit::iterator &auPos, Int temporalId, const TComSPS *sps, bool signSEI = false);
+#else
   Void xWriteSEISeparately (NalUnitType naluType, SEIMessages& seiMessages, AccessUnit &accessUnit, AccessUnit::iterator &auPos, Int temporalId, const TComSPS *sps);
+#endif
   Void xClearSEIs(SEIMessages& seiMessages, Bool deleteMessages);
   Void xWriteLeadingSEIOrdered (SEIMessages& seiMessages, SEIMessages& duInfoSeiMessages, AccessUnit &accessUnit, Int temporalId, const TComSPS *sps, Bool testWrite);
   Void xWriteLeadingSEIMessages  (SEIMessages& seiMessages, SEIMessages& duInfoSeiMessages, AccessUnit &accessUnit, Int temporalId, const TComSPS *sps, std::deque<DUData> &duData);
