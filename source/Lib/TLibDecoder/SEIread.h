@@ -48,6 +48,9 @@
 
 #include "SyntaxElementParser.h"
 #include "TLibCommon/SEI.h"
+#if NNPFC_SEI_MESSAGE
+#include <fstream>
+#endif
 class TComInputBitstream;
 
 #if JVET_AK0194_DSC_SEI_DECODER_SYNTAX
@@ -61,7 +64,16 @@ public:
   virtual ~SEIReader() {};
   Void parseSEImessage(TComInputBitstream* bs, SEIMessages& seis, const NalUnitType nalUnitType, const TComSPS *sps, std::ostream *pDecodedMessageOutputStream);
 
+#if NNPFC_SEI_MESSAGE
+  Bool nnpfcProcessed;
+  std::vector<Int> nnpfcValues;
+#endif
+
 protected:
+#if NNPFC_SEI_MESSAGE
+  Bool xCheckNnpfcSeiMsg                      (UInt seiId,                            Bool baseFlag,                        const std::vector<Int> nnpfcValueList);
+  Bool xCheckNnpfcUpdatePresentSeiMsg         (UInt seiId,                            const std::vector<Int> nnpfcValueList);
+#endif
   Void xReadSEImessage                        (SEIMessages& seis, const NalUnitType nalUnitType, const TComSPS *sps, std::ostream *pDecodedMessageOutputStream, const vector<SEI::PayloadType>& allowedSeiTypes, std::string const &typeName);
   Void xReadSEIPayloadData                    (Int const payloadType, Int const payloadSize, SEI *&sei, const NalUnitType nalUnitType, const TComSPS *sps, std::ostream *pDecodedMessageOutputStream, std::string const &typeName);
   Void xParseSEIBufferingPeriod               (SEIBufferingPeriod& sei,               UInt payloadSize, const TComSPS *sps, std::ostream *pDecodedMessageOutputStream);
@@ -116,6 +128,12 @@ protected:
   Void xParseSEIRegionalNesting               ( SEIRegionalNesting& sei,              UInt payloadSize, const TComSPS* sps, std::ostream *pDecodedMessageOutputStream );
 #if SHUTTER_INTERVAL_SEI_MESSAGE
   Void xParseSEIShutterInterval               (SEIShutterIntervalInfo& sei,           UInt payloadSize,                     std::ostream *pDecodedMessageOutputStream);
+#endif
+#if NNPFC_SEI_MESSAGE
+  Void xParseSEINNPostFilterCharacteristics   (SEINeuralNetworkPostFilterCharacteristics& sei, UInt payloadSize, const TComSPS* sps, std::ostream *pDecodedMessageOutputStream);
+#endif
+#if NNPFA_SEI_MESSAGE
+  Void xParseSEINNPostFilterActivation        (SEINeuralNetworkPostFilterActivation& sei, UInt payloadSize, std::ostream *pDecodedMessageOutputStream);
 #endif
 #if JVET_AL0062_AI_USAGE_RESTRICTIONS_SEI
   void xParseSEIAIUsageRestrictions(SEIAIUsageRestrictions& sei, uint32_t payloadSize, std::ostream* pDecodedMessageOutputStream);

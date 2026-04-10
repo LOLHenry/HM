@@ -918,6 +918,12 @@ Void TEncGOP::xCreatePerPictureSEIMessages (Int picInGOP, SEIMessages& seiMessag
     seiMessages.push_back(sei);
   }
 #endif
+#if NNPFA_SEI_MESSAGE
+  if (m_pcCfg->getNnPostFilterSEIActivationEnabled() && !m_pcCfg->getNnPostFilterSEIActivationUseSuffixSEI())
+  {
+    xCreateNNPostFilterActivationSEIMessage(seiMessages, slice);
+  }
+#endif
 }
 
 Void TEncGOP::xCreateScalableNestingSEI (SEIMessages& seiMessages, SEIMessages& nestedSeiMessages)
@@ -1072,6 +1078,30 @@ Void TEncGOP::xCreatePictureTimingSEI  (Int IRAPGOPid, SEIMessages& seiMessages,
     }
   }
 }
+
+#if NNPFC_SEI_MESSAGE
+Void TEncGOP::xCreateNNPostFilterCharacteristicsSEIMessages(SEIMessages& seiMessages, const TComSlice *slice)
+{
+  for (Int i = 0; i < m_pcCfg->getNNPostFilterSEICharacteristicsNumFilters(); i++)
+  {
+    SEINeuralNetworkPostFilterCharacteristics *seiNNPostFilterCharacteristics = new SEINeuralNetworkPostFilterCharacteristics;
+    m_seiEncoder.initSEINeuralNetworkPostFilterCharacteristics(seiNNPostFilterCharacteristics, i, slice);
+    seiMessages.push_back(seiNNPostFilterCharacteristics);
+  }
+}
+#endif
+
+#if NNPFA_SEI_MESSAGE
+Void TEncGOP::xCreateNNPostFilterActivationSEIMessage(SEIMessages& seiMessages, TComSlice* slice)
+{
+  SEINeuralNetworkPostFilterActivation *nnpfActivationSEI = new SEINeuralNetworkPostFilterActivation;
+  m_seiEncoder.initSEINeuralNetworkPostFilterActivation(nnpfActivationSEI);
+#if 0
+  CHECK(!slice->getPicHeader()->getPicOutputFlag(), "NNPFA SEI Message cannot be associated with picture with ph_pic_output_flag equal to 0")
+#endif
+    seiMessages.push_back(nnpfActivationSEI);
+}
+#endif
 
 Void TEncGOP::xUpdateDuData(AccessUnit &testAU, std::deque<DUData> &duData)
 {
@@ -2046,7 +2076,20 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
 #endif
 
       m_bSeqFirst = false;
+#if NNPFC_SEI_MESSAGE
+      if (m_pcCfg->getNNPostFilterSEICharacteristicsEnabled() && !m_pcCfg->getNNPostFilterSEICharacteristicsUseSuffixSEI())
+      {
+        xCreateNNPostFilterCharacteristicsSEIMessages(leadingSeiMessages, pcSlice);
+      }
+#endif
     }
+#if NNPFC_SEI_MESSAGE
+    if (writePS && m_pcCfg->getNNPostFilterSEICharacteristicsEnabled() && m_pcCfg->getNNPostFilterSEICharacteristicsUseSuffixSEI())
+    {
+      // create NNPostFilterSEICharacteristics SEI as suffix SEI
+      xCreateNNPostFilterCharacteristicsSEIMessages(trailingSeiMessages, pcSlice);
+    }
+#endif
 #if JVET_AJ0207_GFV
     if (writePS && m_pcCfg->getGenerativeFaceVideoSEIEnabled())
     {
@@ -2069,6 +2112,13 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
     // create prefix SEI associated with a picture
     xCreatePerPictureSEIMessages(iGOPid, leadingSeiMessages, nestedSeiMessages, pcSlice);
 
+#if NNPFA_SEI_MESSAGE
+    if (m_pcCfg->getNnPostFilterSEIActivationEnabled() && m_pcCfg->getNnPostFilterSEIActivationUseSuffixSEI())
+    {
+      // create NeuralNetworkPostFilterActivation SEI as suffix SEI
+      xCreateNNPostFilterActivationSEIMessage(trailingSeiMessages, pcSlice);
+    }
+#endif
     /* use the main bitstream buffer for storing the marshalled picture */
     m_pcEntropyCoder->setBitstream(NULL);
 

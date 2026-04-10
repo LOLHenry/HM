@@ -227,6 +227,12 @@ protected:
 #endif
   Void xCreatePerPictureSEIMessages (Int picInGOP, SEIMessages& seiMessages, SEIMessages& nestedSeiMessages, TComSlice *slice);
   Void xCreatePictureTimingSEI  (Int IRAPGOPid, SEIMessages& seiMessages, SEIMessages& nestedSeiMessages, SEIMessages& duInfoSeiMessages, TComSlice *slice, Bool isField, std::deque<DUData> &duData);
+#if NNPFC_SEI_MESSAGE
+  Void xCreateNNPostFilterCharacteristicsSEIMessages(SEIMessages& seiMessages, const TComSlice *slice);
+#endif
+#if NNPFA_SEI_MESSAGE
+  Void xCreateNNPostFilterActivationSEIMessage(SEIMessages& seiMessages, TComSlice* slice);
+#endif
   Void xUpdateDuData(AccessUnit &testAU, std::deque<DUData> &duData);
   Void xUpdateTimingSEI(SEIPictureTiming *pictureTimingSEI, std::deque<DUData> &duData, const TComSPS *sps);
   Void xUpdateDuInfoSEI(SEIMessages &duInfoSeiMessages, SEIPictureTiming *pictureTimingSEI);

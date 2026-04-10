@@ -255,6 +255,300 @@ Void SEIEncoder::initSEIBufferingPeriod(SEIBufferingPeriod *bufferingPeriodSEI, 
   bufferingPeriodSEI->m_dpbDelayOffset = 0;
 }
 
+#if NNPFC_SEI_MESSAGE
+Void SEIEncoder::initSEINeuralNetworkPostFilterCharacteristics(SEINeuralNetworkPostFilterCharacteristics *sei, Int filterIdx, const TComSlice *slice)
+{
+  CHECK(!(m_isInitialized), "Unspecified error");
+  CHECK(!(sei != nullptr), "Unspecified error");
+  sei->m_purpose = m_pcCfg->getNNPostFilterSEICharacteristicsPurpose(filterIdx);
+  sei->m_id = m_pcCfg->getNNPostFilterSEICharacteristicsId(filterIdx);
+  sei->m_baseFlag = m_pcCfg->getNNPostFilterSEICharacteristicsBaseFlag(filterIdx);
+  sei->m_modeIdc = m_pcCfg->getNNPostFilterSEICharacteristicsModeIdc(filterIdx);
+  if (sei->m_modeIdc == POST_FILTER_MODE::URI)
+  {
+    sei->m_uriTag = m_pcCfg->getNNPostFilterSEICharacteristicsUriTag(filterIdx);
+    sei->m_uri    = m_pcCfg->getNNPostFilterSEICharacteristicsUri(filterIdx);
+  }
+  sei->m_propertyPresentFlag = m_pcCfg->getNNPostFilterSEICharacteristicsPropertyPresentFlag(filterIdx);
+  if (sei->m_propertyPresentFlag)
+  {
+    sei->m_numberInputDecodedPicturesMinus1 = m_pcCfg->getNNPostFilterSEICharacteristicsNumberInputDecodedPicturesMinus1(filterIdx);
+    CHECK(sei->m_numberInputDecodedPicturesMinus1 > 63, "m_numberInputDecodedPicturesMinus1 shall be in the range of 0 to 63");
+
+    sei->m_inputPicOutputFlag = m_pcCfg->getNNPostFilterSEICharacteristicsInputPicOutputFlag(filterIdx);
+
+    sei->m_absentInputPicZeroFlag = m_pcCfg->getNNPostFilterSEICharacteristicsAbsentInputPicZeroFlag(filterIdx);
+
+    sei->m_numInpPicsInOutputTensor = 0;
+    if (sei->m_numberInputDecodedPicturesMinus1 > 0)
+    {
+      for (UInt i = 0; i <= sei->m_numberInputDecodedPicturesMinus1; i++)
+      {
+        if (sei->m_inputPicOutputFlag[i])
+        {
+          sei->m_numInpPicsInOutputTensor++;
+        }
+      }
+    }
+    else
+    {
+      sei->m_numInpPicsInOutputTensor = 1;
+    }
+
+    if((sei->m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0)
+    {
+      sei->m_outSubCFlag = m_pcCfg->getNNPostFilterSEICharacteristicsOutSubCFlag(filterIdx);
+    }
+    if((sei->m_purpose & NNPC_PurposeType::COLOURIZATION) != 0)
+    {
+      sei->m_outColourFormatIdc = m_pcCfg->getNNPostFilterSEICharacteristicsOutColourFormatIdc(filterIdx);
+    }
+
+#if 0
+    const ChromaFormat chromaFormatIdc = m_pcEncLib->getSPS(0)->getChromaFormatIdc();
+#else
+    const ChromaFormat chromaFormatIdc = slice->getSPS()->getChromaFormatIdc();
+#endif
+    UChar subWidthC     = TComSPS::getWinUnitX(chromaFormatIdc);
+    UChar subHeightC    = TComSPS::getWinUnitY(chromaFormatIdc);
+
+    UChar outSubWidthC  = subWidthC;
+    UChar outSubHeightC = subHeightC;
+    if ((sei->m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0)
+    {
+      if (sei->m_outSubCFlag)
+      {
+        outSubWidthC  = 1;
+        outSubHeightC = 1;
+      }
+      else
+      {
+        outSubWidthC  = 2;
+        outSubHeightC = 1;
+      }
+    }
+    else if ((sei->m_purpose & NNPC_PurposeType::COLOURIZATION) != 0)
+    {
+      CHECK(sei->m_outColourFormatIdc == ChromaFormat::CHROMA_400, "The value of nnpfc_out_colour_format_idc shall not be equal to 0");
+      outSubWidthC  = TComSPS::getWinUnitX(sei->m_outColourFormatIdc);
+      outSubHeightC = TComSPS::getWinUnitY(sei->m_outColourFormatIdc);
+    }
+
+    if((sei->m_purpose & NNPC_PurposeType::RESOLUTION_UPSAMPLING) != 0)
+    {
+      sei->m_picWidthNumeratorMinus1 = m_pcCfg->getNNPostFilterSEICharacteristicsPicWidthNumeratorMinus1(filterIdx);
+      sei->m_picWidthDenominatorMinus1 = m_pcCfg->getNNPostFilterSEICharacteristicsPicWidthDenominatorMinus1(filterIdx);
+      sei->m_picHeightNumeratorMinus1 = m_pcCfg->getNNPostFilterSEICharacteristicsPicHeightNumeratorMinus1(filterIdx);
+      sei->m_picHeightDenominatorMinus1 = m_pcCfg->getNNPostFilterSEICharacteristicsPicHeightDenominatorMinus1(filterIdx);
+      CHECK(sei->m_picWidthNumeratorMinus1 > 65535, "nnpfc_pic_width_num_minus1 shall be in the range of 0 to 65535");
+      CHECK(sei->m_picWidthDenominatorMinus1 > 65535, "nnpfc_pic_width_denom_minus1 shall be in the range of 0 to 65535");
+      CHECK(sei->m_picHeightNumeratorMinus1 > 65535, "nnpfc_pic_height_num_minus1 shall be in the range of 0 to 65535");
+      CHECK(sei->m_picHeightDenominatorMinus1 > 65535, "nnpfc_pic_height_denom_minus1 shall be in the range of 0 to 65535");
+#if 0
+      int confWinLeftOffset = m_pcEncLib->getPPS(0)->getConformanceWindow().getWindowLeftOffset();
+      int confWinTopOffset = m_pcEncLib->getPPS(0)->getConformanceWindow().getWindowTopOffset();
+      int confWinRightOffset = m_pcEncLib->getPPS(0)->getConformanceWindow().getWindowRightOffset();
+      int confWinBottomOffset = m_pcEncLib->getPPS(0)->getConformanceWindow().getWindowBottomOffset();
+      int ppsPicWidthInLumaSample  = m_pcEncLib->getPPS(0)->getPicWidthInLumaSamples();
+      int ppsPicHeightInLumaSample = m_pcEncLib->getPPS(0)->getPicHeightInLumaSamples();
+#else
+      Int confWinLeftOffset = slice->getSPS()->getConformanceWindow().getWindowLeftOffset();
+      Int confWinTopOffset = slice->getSPS()->getConformanceWindow().getWindowTopOffset();
+      Int confWinRightOffset = slice->getSPS()->getConformanceWindow().getWindowRightOffset();
+      Int confWinBottomOffset = slice->getSPS()->getConformanceWindow().getWindowBottomOffset();
+      Int ppsPicWidthInLumaSample  = slice->getSPS()->getPicWidthInLumaSamples();
+      Int ppsPicHeightInLumaSample = slice->getSPS()->getPicHeightInLumaSamples();
+#endif
+
+      
+      Int croppedWidth = ppsPicWidthInLumaSample - subWidthC * (confWinRightOffset + confWinLeftOffset);
+      Int croppedHeight = ppsPicHeightInLumaSample - subHeightC * (confWinBottomOffset + confWinTopOffset);
+      Int outputPicWidth = (Int)ceil(((Double)croppedWidth * (sei->m_picWidthNumeratorMinus1 + 1)) / (sei->m_picWidthDenominatorMinus1 + 1));
+      Int outputPicHeight = (Int)ceil(((Double)croppedHeight * (sei->m_picHeightNumeratorMinus1 + 1)) / (sei->m_picHeightDenominatorMinus1 + 1));
+
+      CHECK(!(outputPicWidth >= croppedWidth && outputPicWidth <= croppedWidth * 16), "output picture width in luma samples shall be in the range of croppedWidth to croppedWidth * 16");
+      CHECK(!(outputPicHeight >= croppedHeight && outputPicHeight <= croppedHeight * 16), "output picture height in luma samples shall be in the range of croppedHeight to croppedHeight * 16");
+
+      CHECK((outputPicWidth  % outSubWidthC)  != 0, "The value of nnpfcOutputPicWidth % outSubWidthC shall be equal to 0");
+      CHECK((outputPicHeight % outSubHeightC) != 0, "The value of nnpfcOutputPicHeight % outSubHeightC shall be equal to 0");
+    }
+    if((sei->m_purpose & NNPC_PurposeType::FRAME_RATE_UPSAMPLING) != 0)
+    {
+      sei->m_numberInterpolatedPictures = m_pcCfg->getNNPostFilterSEICharacteristicsNumberInterpolatedPictures(filterIdx);
+      CHECK(sei->m_numberInputDecodedPicturesMinus1 <= 0, "If nnpfc_purpose is FRAME_RATE_UPSAMPLING, m_numberInputDecodedPicturesMinus1 shall be greater than 0");
+    }
+    if((sei->m_purpose & NNPC_PurposeType::TEMPORAL_EXTRAPOLATION) != 0)
+    {
+      sei->m_numberExtrapolatedPicturesMinus1 = m_pcCfg->getNNPostFilterSEICharacteristicsNumberExtrapolatedPicturesMinus1(filterIdx);
+    }
+    if((sei->m_purpose & NNPC_PurposeType::SPATIAL_EXTRAPOLATION) != 0)
+    {
+      sei->m_spatialExtrapolationLeftOffset = m_pcCfg->getNNPostFilterSEICharacteristicsSpatialExtrapolationLeftOffset(filterIdx);
+      sei->m_spatialExtrapolationRightOffset = m_pcCfg->getNNPostFilterSEICharacteristicsSpatialExtrapolationRightOffset(filterIdx);
+      sei->m_spatialExtrapolationTopOffset = m_pcCfg->getNNPostFilterSEICharacteristicsSpatialExtrapolationTopOffset(filterIdx);
+      sei->m_spatialExtrapolationBottomOffset = m_pcCfg->getNNPostFilterSEICharacteristicsSpatialExtrapolationBottomOffset(filterIdx);
+    }
+
+    sei->m_componentLastFlag = m_pcCfg->getNNPostFilterSEICharacteristicsComponentLastFlag(filterIdx);
+    sei->m_inpFormatIdc = m_pcCfg->getNNPostFilterSEICharacteristicsInpFormatIdc(filterIdx);
+    CHECK(sei->m_inpFormatIdc > 255, "The value of nnpfc_inp_format_idc shall be in the range of 0 to 255");
+    if (sei->m_inpFormatIdc == 1)
+    {
+      sei->m_inpTensorBitDepthLumaMinus8 = m_pcCfg->getNNPostFilterSEICharacteristicsInpTensorBitDepthLumaMinus8(filterIdx);
+      sei->m_inpTensorBitDepthChromaMinus8 = m_pcCfg->getNNPostFilterSEICharacteristicsInpTensorBitDepthChromaMinus8(filterIdx);
+    }
+
+    sei->m_inpOrderIdc = m_pcCfg->getNNPostFilterSEICharacteristicsInpOrderIdc(filterIdx);
+    CHECK((sei->m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0 && sei->m_inpOrderIdc == 0, "When nnpfc_purpose & 0x02 is not equal to 0, nnpfc_inp_order_idc shall not be equal to 0");
+    sei->m_auxInpIdc             = m_pcCfg->getNNPostFilterSEICharacteristicsAuxInpIdc(filterIdx);
+
+    if ((sei->m_auxInpIdc & 2) > 0)
+    {
+      sei->m_inbandPromptFlag = m_pcCfg->getNNPostFilterSEICharacteristicsInbandPromptFlag(filterIdx);
+      if (sei->m_inbandPromptFlag)
+      {
+        sei->m_prompt = m_pcCfg->getNNPostFilterSEICharacteristicsPrompt(filterIdx);
+      }
+    }
+
+    if ((sei->m_auxInpIdc & 4) > 0)
+    {
+      sei->m_inbandSeedFlag = m_pcCfg->getNNPostFilterSEICharacteristicsInbandSeedFlag(filterIdx);
+      if (sei->m_inbandSeedFlag)
+      {
+        sei->m_seed = m_pcCfg->getNNPostFilterSEICharacteristicsSeed(filterIdx);
+      }
+    }
+
+    sei->m_outFormatIdc = m_pcCfg->getNNPostFilterSEICharacteristicsOutFormatIdc(filterIdx);
+    CHECK(sei->m_outFormatIdc > 255, "The value of nnpfc_out_format_idc shall be in the range of 0 to 255");
+    if (sei->m_outFormatIdc == 1)
+    {
+      sei->m_outTensorBitDepthLumaMinus8 = m_pcCfg->getNNPostFilterSEICharacteristicsOutTensorBitDepthLumaMinus8(filterIdx);
+      sei->m_outTensorBitDepthChromaMinus8 = m_pcCfg->getNNPostFilterSEICharacteristicsOutTensorBitDepthChromaMinus8(filterIdx);
+    }
+    sei->m_sepColDescriptionFlag = m_pcCfg->getNNPostFilterSEICharacteristicsSepColDescriptionFlag(filterIdx);
+    if (sei->m_sepColDescriptionFlag)
+    {
+      sei->m_colPrimaries         = m_pcCfg->getNNPostFilterSEICharacteristicsColPrimaries(filterIdx);
+      sei->m_transCharacteristics = m_pcCfg->getNNPostFilterSEICharacteristicsTransCharacteristics(filterIdx);
+      if (sei->m_outFormatIdc == 1)
+      {
+        sei->m_matrixCoeffs         = m_pcCfg->getNNPostFilterSEICharacteristicsMatrixCoeffs(filterIdx);
+        CHECK(sei->m_matrixCoeffs == 0 && !(sei->m_outTensorBitDepthChromaMinus8 == sei->m_outTensorBitDepthLumaMinus8 && sei->m_outOrderIdc == 2 && outSubHeightC == 1 && outSubWidthC == 1),
+          "nnpfc_matrix_coeffs shall not be equal to 0 unless the following conditions are true: nnpfc_out_tensor_chroma_bitdepth_minus8 is equal to nnpfc_out_tensor_luma_bitdepth_minus8, nnpfc_out_order_idc is equal to 2, outSubHeightC is equal to 1, and outSubWidthC is equal to 1");
+        CHECK(sei->m_matrixCoeffs == 8 && !((sei->m_outTensorBitDepthChromaMinus8 == sei->m_outTensorBitDepthLumaMinus8) || (sei->m_outTensorBitDepthChromaMinus8 == (sei->m_outTensorBitDepthLumaMinus8 + 1) && sei->m_outOrderIdc == 2 && outSubHeightC == 1 && outSubWidthC == 1)),
+          "nnpfc_matrix_coeffs shall not be equal to 8 unless one of the following conditions is true: nnpfc_out_tensor_chroma_bitdepth_minus8 is equal to nnpfc_out_tensor_luma_bitdepth_minus8 or "
+          "nnpfc_out_tensor_chroma_bitdepth_minus8 is equal to nnpfc_out_tensor_luma_bitdepth_minus8 + 1, nnpfc_out_order_idc is equal to 2, outSubHeightC is equal to 1, and outSubWidthC is equal to 1");
+      }
+    }
+    if (sei->m_sepColDescriptionFlag && (sei->m_outFormatIdc == 1))
+    {
+      sei->m_fullRangeFlag = m_pcCfg->getNNPostFilterSEICharacteristicsFullRangeFlag(filterIdx);
+    }
+    sei->m_outOrderIdc = m_pcCfg->getNNPostFilterSEICharacteristicsOutOrderIdc(filterIdx);
+    CHECK((sei->m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0 && (sei->m_outOrderIdc == 0 || sei->m_outOrderIdc == 3), "When nnpfc_purpose & 0x02 is not equal to 0, nnpfc_out_order_idc shall not be equal to 0 or 3");
+    CHECK((sei->m_purpose & NNPC_PurposeType::COLOURIZATION) != 0 && sei->m_outOrderIdc == 0, "When nnpfc_purpose & 0x20 is not equal to 0, nnpfc_out_order_idc shall not be equal to 0");
+    if(sei->m_outOrderIdc != 0)
+    {
+      sei->m_chromaLocInfoPresentFlag = m_pcCfg->getNNPostFilterSEICharacteristicsChromaLocInfoPresentFlag(filterIdx);
+    }
+    else
+    {
+      sei->m_chromaLocInfoPresentFlag = 0;
+    }
+      if(sei->m_chromaLocInfoPresentFlag)
+      {
+        sei->m_chromaSampleLocTypeFrame = m_pcCfg->getNNPostFilterSEICharacteristicsChromaSampleLocTypeFrame(filterIdx);;
+      }
+    sei->m_constantPatchSizeFlag = m_pcCfg->getNNPostFilterSEICharacteristicsConstantPatchSizeFlag(filterIdx);
+    sei->m_patchWidthMinus1 = m_pcCfg->getNNPostFilterSEICharacteristicsPatchWidthMinus1(filterIdx);
+    sei->m_patchHeightMinus1 = m_pcCfg->getNNPostFilterSEICharacteristicsPatchHeightMinus1(filterIdx);
+    if (sei->m_constantPatchSizeFlag == 0)
+    {
+      sei->m_extendedPatchWidthCdDeltaMinus1 = m_pcCfg->getNNPostFilterSEICharacteristicsExtendedPatchWidthCdDeltaMinus1(filterIdx);
+      sei->m_extendedPatchHeightCdDeltaMinus1 = m_pcCfg->getNNPostFilterSEICharacteristicsExtendedPatchHeightCdDeltaMinus1(filterIdx);
+    }
+    sei->m_overlap = m_pcCfg->getNNPostFilterSEICharacteristicsOverlap(filterIdx);
+    sei->m_paddingType = m_pcCfg->getNNPostFilterSEICharacteristicsPaddingType(filterIdx);
+    CHECK((sei->m_paddingType >= 5) && (sei->m_paddingType <= 15), "Reserved nnpfc_padding_type value, shall not be present in bitstreams conforming to this version of VTM");
+    CHECK(sei->m_paddingType > 15, "Invalid nnpfc_padding_type value");
+    sei->m_lumaPadding = m_pcCfg->getNNPostFilterSEICharacteristicsLumaPadding(filterIdx);
+    sei->m_cbPadding = m_pcCfg->getNNPostFilterSEICharacteristicsCbPadding(filterIdx);
+    sei->m_crPadding = m_pcCfg->getNNPostFilterSEICharacteristicsCrPadding(filterIdx);
+
+    sei->m_complexityInfoPresentFlag = m_pcCfg->getNNPostFilterSEICharacteristicsComplexityInfoPresentFlag(filterIdx);
+    if (sei->m_complexityInfoPresentFlag)
+    {
+        sei->m_parameterTypeIdc = m_pcCfg->getNNPostFilterSEICharacteristicsParameterTypeIdc(filterIdx);
+        sei->m_log2ParameterBitLengthMinus3 = m_pcCfg->getNNPostFilterSEICharacteristicsLog2ParameterBitLengthMinus3(filterIdx);
+        sei->m_numParametersIdc = m_pcCfg->getNNPostFilterSEICharacteristicsNumParametersIdc(filterIdx);
+        sei->m_numKmacOperationsIdc = m_pcCfg->getNNPostFilterSEICharacteristicsNumKmacOperationsIdc(filterIdx);
+        sei->m_totalKilobyteSize = m_pcCfg->getNNPostFilterSEICharacteristicsTotalKilobyteSize(filterIdx);
+    }
+    if (sei->m_purpose == 0)
+    {
+      sei->m_applicationPurposeTagUriPresentFlag = m_pcCfg->getNNPostFilterSEICharacteristicsApplicationPurposeTagUriPresentFlag(filterIdx);
+      if (sei->m_applicationPurposeTagUriPresentFlag)
+      {
+        sei->m_applicationPurposeTagUri = m_pcCfg->getNNPostFilterSEICharacteristicsApplicationPurposeTagUri(filterIdx);
+      }
+    }
+    if ((sei->m_purpose & NNPC_PurposeType::SPATIAL_EXTRAPOLATION) != 0 || (sei->m_purpose & NNPC_PurposeType::RESOLUTION_UPSAMPLING) != 0)
+    {
+      sei->m_scanTypeIdc = m_pcCfg->getNNPostFilterSEICharacteristicsScanTypeIdc(filterIdx);
+    }
+    sei->m_forHumanViewingIdc = m_pcCfg->getNNPostFilterSEICharacteristicsForHumanViewingIdc(filterIdx);
+    sei->m_forMachineAnalysisIdc = m_pcCfg->getNNPostFilterSEICharacteristicsForMachineAnalysisIdc(filterIdx);
+  }
+  if (sei->m_modeIdc == POST_FILTER_MODE::ISO_IEC_15938_17)
+  {
+    const std::string payloadFilename = m_pcCfg->getNNPostFilterSEICharacteristicsPayloadFilename(filterIdx);
+    std::ifstream     bitstreamFile(payloadFilename.c_str(), std::ifstream::in | std::ifstream::binary);
+    if (!bitstreamFile)
+    {
+      EXIT( "Failed to open bitstream file " << payloadFilename.c_str() << " for reading" ) ;
+    }
+
+    bitstreamFile.seekg(0, std::ifstream::end);
+    sei->m_payloadLength = bitstreamFile.tellg();
+    bitstreamFile.seekg(0, std::ifstream::beg);
+
+    sei->m_payloadByte = new TChar[sei->m_payloadLength];
+    bitstreamFile.read(sei->m_payloadByte, sei->m_payloadLength);
+    bitstreamFile.close();
+  }
+}
+#endif
+
+#if NNPFA_SEI_MESSAGE
+Void SEIEncoder::initSEINeuralNetworkPostFilterActivation(SEINeuralNetworkPostFilterActivation *sei)
+{
+  CHECK(!(m_isInitialized), "Unspecified error");
+  CHECK(!(sei != nullptr), "Unspecified error");
+  sei->m_targetId = m_pcCfg->getNnPostFilterSEIActivationTargetId();
+  sei->m_cancelFlag  = m_pcCfg->getNnPostFilterSEIActivationCancelFlag();
+  if(!sei->m_cancelFlag)
+  {
+    sei->m_persistenceFlag = m_pcCfg->getNnPostFilterSEIActivationPersistenceFlag();
+    sei->m_targetBaseFlag = m_pcCfg->getNnPostFilterSEIActivationTargetBaseFlag();
+    sei->m_noPrevCLVSFlag = m_pcCfg->getNnPostFilterSEIActivationNoPrevCLVSFlag();
+    sei->m_noFollCLVSFlag = m_pcCfg->getNnPostFilterSEIActivationNoFollCLVSFlag();
+    sei->m_outputFlag = m_pcCfg->getNnPostFilterSEIActivationOutputFlag();
+    sei->m_promptUpdateFlag = m_pcCfg->getNnPostFilterSEIActivationPromptUpdateFlag();
+    if (sei->m_promptUpdateFlag)
+    {
+      sei->m_prompt = m_pcCfg->getNnPostFilterSEIActivationPrompt();
+    }
+    sei->m_seedUpdateFlag = m_pcCfg->getNnPostFilterSEIActivationSeedUpdateFlag();
+    if (sei->m_seedUpdateFlag)
+    {
+      sei->m_seed = m_pcCfg->getNnPostFilterSEIActivationSeed();
+    }
+  }
+}
+#endif
+
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
 void SEIEncoder::initSEIPhaseIndication(SEIPhaseIndication* seiPhaseIndication)
 {

@@ -243,6 +243,16 @@ Void SEIWriter::xWriteSEIpayloadData(TComBitIf& bs, const SEI& sei, const TComSP
     xWriteSEISEIPrefixIndication(bs, *static_cast<const SEIPrefixIndication*>(&sei), sps);
     break;
 #endif
+#if NNPFC_SEI_MESSAGE
+  case SEI::NEURAL_NETWORK_POST_FILTER_CHARACTERISTICS:
+    xWriteSEINeuralNetworkPostFilterCharacteristics(*static_cast<const SEINeuralNetworkPostFilterCharacteristics *>(&sei));
+    break;
+#endif
+#if NNPFA_SEI_MESSAGE
+  case SEI::NEURAL_NETWORK_POST_FILTER_ACTIVATION:
+    xWriteSEINeuralNetworkPostFilterActivation(*static_cast<const SEINeuralNetworkPostFilterActivation *>(&sei));
+    break;
+#endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   case SEI::PayloadType::PHASE_INDICATION:
     xWriteSEIPhaseIndication(*static_cast<const SEIPhaseIndication *>(&sei));
@@ -1277,6 +1287,277 @@ Void SEIWriter::xWriteSEIShutterInterval(const SEIShutterIntervalInfo &sei)
     for (UInt i = 0; i <= sei.m_siiMaxSubLayersMinus1; i++)
     {
       WRITE_CODE(sei.m_siiSubLayerNumUnitsInSI[i], 32, "sub_layer_num_units_in_shutter_interval[ i ]");
+    }
+  }
+}
+#endif
+
+#if NNPFC_SEI_MESSAGE
+Void SEIWriter::xWriteSEINeuralNetworkPostFilterCharacteristics(const SEINeuralNetworkPostFilterCharacteristics &sei)
+{
+  WRITE_CODE(sei.m_purpose, 16, "nnpfc_purpose");
+  WRITE_UVLC(sei.m_id, "nnpfc_id");
+  WRITE_FLAG(sei.m_baseFlag, "nnpfc_base_flag");
+  WRITE_UVLC(sei.m_modeIdc, "nnpfc_mode_idc");
+  if (sei.m_modeIdc == POST_FILTER_MODE::URI)
+  {
+    while (m_pcBitIf->getNumBitsUntilByteAligned() != 0)
+    {
+      WRITE_FLAG(0, "nnpfc_alignment_zero_bit");
+    }
+    WRITE_STRING(sei.m_uriTag, "nnpfc_uri_tag");
+    WRITE_STRING(sei.m_uri, "nnpfc_uri");
+  }
+  WRITE_FLAG(sei.m_propertyPresentFlag, "nnpfc_property_present_flag");
+  if (sei.m_propertyPresentFlag)
+  {
+    WRITE_UVLC(sei.m_numberInputDecodedPicturesMinus1, "nnpfc_number_of_input_pictures_minus1");
+
+    if (sei.m_numberInputDecodedPicturesMinus1 > 0)
+    {
+      for (Int i = 0; i <= sei.m_numberInputDecodedPicturesMinus1; ++i)
+      {
+        WRITE_FLAG(sei.m_inputPicOutputFlag[i], "nnpfc_input_pic_filtering_flag");
+      }
+      WRITE_FLAG(sei.m_absentInputPicZeroFlag, "nnpfc_absent_input_pic_zero_flag");
+    }
+
+    if((sei.m_purpose & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0)
+    {
+      WRITE_FLAG(sei.m_outSubCFlag, "nnpfc_out_sub_c_flag");
+    }
+    if((sei.m_purpose & NNPC_PurposeType::COLOURIZATION) != 0)
+    {
+      WRITE_CODE(uint32_t(sei.m_outColourFormatIdc), 2, "nnpfc_out_colour_format_idc");
+    }
+    if((sei.m_purpose & NNPC_PurposeType::RESOLUTION_UPSAMPLING) != 0)
+    {
+      WRITE_UVLC(sei.m_picWidthNumeratorMinus1, "nnpfc_pic_width_num_minus1");
+      WRITE_UVLC(sei.m_picWidthDenominatorMinus1, "nnpfc_pic_width_denom_minus1");
+      WRITE_UVLC(sei.m_picHeightNumeratorMinus1, "nnpfc_pic_height_num_minus1");
+      WRITE_UVLC(sei.m_picHeightDenominatorMinus1, "nnpfc_pic_height_denom_minus1");
+    }
+
+    if((sei.m_purpose & NNPC_PurposeType::FRAME_RATE_UPSAMPLING) != 0)
+    {
+      for (Int i = 0; i < sei.m_numberInputDecodedPicturesMinus1; ++i)
+      {
+        WRITE_UVLC(sei.m_numberInterpolatedPictures[i], "nnpfc_interpolated_pictures");
+      }
+    }
+
+    if((sei.m_purpose & NNPC_PurposeType::TEMPORAL_EXTRAPOLATION) != 0)
+    {
+      WRITE_UVLC(sei.m_numberExtrapolatedPicturesMinus1, "nnpfc_extrapolated_pics_minus1");
+    }
+
+    if((sei.m_purpose & NNPC_PurposeType::SPATIAL_EXTRAPOLATION) != 0)
+    {
+      WRITE_SVLC(sei.m_spatialExtrapolationLeftOffset, "nnpfc_spatial_extrapolation_left_offset");
+      WRITE_SVLC(sei.m_spatialExtrapolationRightOffset, "nnpfc_spatial_extrapolation_right_offset");
+      WRITE_SVLC(sei.m_spatialExtrapolationTopOffset, "nnpfc_spatial_extrapolation_top_offset");
+      WRITE_SVLC(sei.m_spatialExtrapolationBottomOffset, "nnpfc_spatial_extrapolation_right_offset");
+    }
+
+    WRITE_FLAG(sei.m_componentLastFlag, "nnpfc_component_last_flag");
+    WRITE_UVLC(sei.m_inpFormatIdc, "nnpfc_inp_format_idc");
+    WRITE_UVLC(sei.m_auxInpIdc, "nnpfc_auxiliary_inp_idc");
+    if ((sei.m_auxInpIdc & 2) > 0)
+    {
+      WRITE_FLAG(sei.m_inbandPromptFlag, "nnpfc_inband_prompt_flag");
+      if (sei.m_inbandPromptFlag)
+      {
+        while (m_pcBitIf->getNumBitsUntilByteAligned() != 0)
+        {
+          WRITE_FLAG(0, "nnpfc_alignment_zero_bit_c");
+        }
+        WRITE_STRING(sei.m_prompt, "nnpfc_prompt");
+      }
+    }
+    if ((sei.m_auxInpIdc & 4) > 0)
+    {
+      WRITE_FLAG(sei.m_inbandSeedFlag, "nnpfc_inband_seed_flag");
+      if (sei.m_inbandSeedFlag)
+      {
+        WRITE_CODE(sei.m_seed, 16, "nnpfc_seed");
+      }
+    }
+    WRITE_UVLC(sei.m_inpOrderIdc, "nnpfc_inp_order_idc");
+    if (sei.m_inpFormatIdc == 1)
+    {
+      if (sei.m_inpOrderIdc != 1)
+      {
+        WRITE_UVLC(sei.m_inpTensorBitDepthLumaMinus8, "nnpfc_inp_tensor_luma_bitdepth_minus8");
+      }
+      if (sei.m_inpOrderIdc != 0)
+      {
+        WRITE_UVLC(sei.m_inpTensorBitDepthChromaMinus8, "nnpfc_inp_tensor_chroma_bitdepth_minus8");
+      }
+    }
+    WRITE_UVLC(sei.m_outFormatIdc, "nnpfc_out_format_idc");
+    WRITE_UVLC(sei.m_outOrderIdc, "nnpfc_out_order_idc");
+    if (sei.m_outFormatIdc == 1)
+    {
+      if (sei.m_outOrderIdc != 1)
+      {
+        WRITE_UVLC(sei.m_outTensorBitDepthLumaMinus8, "nnpfc_out_tensor_luma_bitdepth_minus8");
+      }
+      if (sei.m_outOrderIdc != 0)
+      {
+        WRITE_UVLC(sei.m_outTensorBitDepthChromaMinus8, "nnpfc_out_tensor_chroma_bitdepth_minus8");
+      }
+    }
+
+    WRITE_FLAG(sei.m_sepColDescriptionFlag, "nnpfc_sep_col_desc_flag");
+
+    if (sei.m_sepColDescriptionFlag)
+    {
+      WRITE_CODE(sei.m_colPrimaries, 8, "nnpfc_col_primaries");
+      WRITE_CODE(sei.m_transCharacteristics, 8, "nnpfc_trans_characteristics");
+      if (sei.m_outFormatIdc == 1)
+      {
+        WRITE_CODE(sei.m_matrixCoeffs, 8, "nnpfc_matrix_coeffs");
+      }
+    }
+    if (sei.m_sepColDescriptionFlag && (sei.m_outFormatIdc == 1))
+    {
+      WRITE_FLAG(sei.m_fullRangeFlag, "nnpfc_full_range_flag");
+    }
+    
+    if (sei.m_outOrderIdc != 0)
+    {   
+      WRITE_FLAG(sei.m_chromaLocInfoPresentFlag, "nnpfc_chroma_loc_info_present_flag");
+    }
+
+    if(sei.m_chromaLocInfoPresentFlag)
+    {
+      WRITE_UVLC(static_cast<UInt>(sei.m_chromaSampleLocTypeFrame), "nnpfc_chroma_sample_loc_type_frame");
+    }
+    
+    if((sei.m_purpose & NNPC_PurposeType::SPATIAL_EXTRAPOLATION) == 0)
+    {
+      WRITE_UVLC(sei.m_overlap, "nnpfc_overlap");
+      WRITE_FLAG(sei.m_constantPatchSizeFlag, "nnpfc_constant_patch_size_flag");
+    }
+    if (sei.m_constantPatchSizeFlag)
+    {
+      WRITE_UVLC(sei.m_patchWidthMinus1, "nnpfc_patch_width_minus1");
+      WRITE_UVLC(sei.m_patchHeightMinus1, "nnpfc_patch_height_minus1");
+    }
+    else
+    {
+      WRITE_UVLC(sei.m_extendedPatchWidthCdDeltaMinus1, "extended_nnpfc_patch_width_cd_delta_minus1");
+      WRITE_UVLC(sei.m_extendedPatchHeightCdDeltaMinus1, "extended_nnpfc_patch_height_cd_delta_minus1");
+    }
+    WRITE_UVLC(sei.m_paddingType, "nnpfc_padding_type");
+    if (sei.m_paddingType == NNPC_PaddingType::FIXED_PADDING)
+    {
+      if (sei.m_inpOrderIdc != 1)
+      {
+        WRITE_UVLC(sei.m_lumaPadding, "nnpfc_luma_padding_val");
+      }
+      if (sei.m_inpOrderIdc != 0)
+      {
+        WRITE_UVLC(sei.m_cbPadding, "nnpfc_cb_padding_val");
+        WRITE_UVLC(sei.m_crPadding, "nnpfc_cr_padding_val");
+      }
+    }
+
+    WRITE_FLAG(sei.m_complexityInfoPresentFlag, "nnpfc_complexity_info_present_flag");
+    if (sei.m_complexityInfoPresentFlag)
+    {
+      WRITE_CODE(sei.m_parameterTypeIdc, 2, "nnpfc_parameter_type_idc");
+      if (sei.m_parameterTypeIdc != 2)
+      {
+        WRITE_CODE(sei.m_log2ParameterBitLengthMinus3, 2, "nnpfc_log2_parameter_bit_length_minus3");
+      }
+      WRITE_CODE(sei.m_numParametersIdc, 6, "nnpfc_num_parameters_idc");
+      WRITE_UVLC(sei.m_numKmacOperationsIdc, "nnpfc_num_kmac_operations_idc");
+      WRITE_UVLC(sei.m_totalKilobyteSize, "nnpfc_total_kilobyte_size");
+    }
+    UInt metadataExtensionNumBits = 0;
+    if (sei.m_purpose == 0 || sei.m_forHumanViewingIdc != 0 || sei.m_forMachineAnalysisIdc != 0)
+    {
+      if (sei.m_purpose == 0)
+      {
+        metadataExtensionNumBits++;
+        if (sei.m_applicationPurposeTagUriPresentFlag)
+        {
+          metadataExtensionNumBits +=  (static_cast<UInt>(sei.m_applicationPurposeTagUri.length() + 1) * 8);
+        }
+      }
+      metadataExtensionNumBits += 4;  // nnpfc_for_human_viewing_idc and nnpfc_for_machine_analysis_idc bits
+      WRITE_UVLC(metadataExtensionNumBits, "nnpfc_metadata_extension_num_bits");
+      if (sei.m_purpose == 0)
+      {
+        WRITE_FLAG(sei.m_applicationPurposeTagUriPresentFlag, "nnpfc_application_purpose_tag_uri_present_flag");
+        if ( sei.m_applicationPurposeTagUriPresentFlag )
+        {
+          while (m_pcBitIf->getNumBitsUntilByteAligned() != 0)
+          {
+            WRITE_FLAG(0, "nnpfc_metadata_alignment_zero_bit");
+          }
+          WRITE_STRING(sei.m_applicationPurposeTagUri, "nnpfc_application_purpose_tag_uri"); 
+        }
+      }
+      if ((sei.m_purpose & NNPC_PurposeType::SPATIAL_EXTRAPOLATION) != 0 || (sei.m_purpose & NNPC_PurposeType::RESOLUTION_UPSAMPLING) != 0)
+      {
+        WRITE_CODE(sei.m_scanTypeIdc, 2, "nnpfc_scan_type_idc");
+      }
+      WRITE_CODE(sei.m_forHumanViewingIdc, 2, "nnpfc_for_human_viewing_idc");
+      WRITE_CODE(sei.m_forMachineAnalysisIdc, 2, "nnpfc_for_machine_analysis_idc");
+    }
+    else
+    {
+      WRITE_UVLC(metadataExtensionNumBits, "nnpfc_metadata_extension_num_bits");  
+    }
+  }
+  if (sei.m_modeIdc == POST_FILTER_MODE::ISO_IEC_15938_17)
+  {
+    while (m_pcBitIf->getNumBitsUntilByteAligned() != 0)
+    {
+      WRITE_FLAG(0, "nnpfc_alignment_zero_bit");
+    }
+    for (UInt i = 0; i < sei.m_payloadLength; i++)
+    {
+      WRITE_SCODE(sei.m_payloadByte[i], 8, "nnpfc_payload_byte[i]");
+    }
+  }
+}
+#endif
+
+#if NNPFA_SEI_MESSAGE
+Void SEIWriter::xWriteSEINeuralNetworkPostFilterActivation(const SEINeuralNetworkPostFilterActivation &sei)
+{
+  WRITE_UVLC(sei.m_targetId, "nnpfa_target_id");
+  WRITE_FLAG(sei.m_cancelFlag, "nnpfa_cancel_flag");
+  if(!sei.m_cancelFlag)
+  {
+    WRITE_FLAG(sei.m_persistenceFlag, "nnpfa_persistence_flag");
+    WRITE_FLAG(sei.m_targetBaseFlag, "nnpfa_target_base_flag");
+    WRITE_FLAG(sei.m_noPrevCLVSFlag, "nnpfa_no_prev_clvs_flag");
+    if (sei.m_persistenceFlag)
+    {
+      WRITE_FLAG(sei.m_noFollCLVSFlag, "nnpfa_no_foll_clvs_flag");
+    }
+    WRITE_UVLC((UInt)sei.m_outputFlag.size(), "nnpfa_num_output_entries");
+    for (UInt i = 0; i < (UInt)sei.m_outputFlag.size(); i++)
+    {
+      WRITE_FLAG(sei.m_outputFlag[i], "nnpfa_output_flag");
+    }
+    WRITE_FLAG(sei.m_promptUpdateFlag, "nnpfa_prompt_update_flag");
+    if (sei.m_promptUpdateFlag)
+    {
+      while (m_pcBitIf->getNumBitsUntilByteAligned() != 0)
+      {
+        WRITE_FLAG(0, "nnpfa_alignment_zero_bit");
+      }
+      WRITE_STRING(sei.m_prompt, "nnpfa_prompt");
+    }
+    WRITE_FLAG(sei.m_seedUpdateFlag, "nnpfa_seed_update_flag");
+    if (sei.m_seedUpdateFlag)
+    {
+      WRITE_CODE(sei.m_seed, 16, "nnpfa_seed");
     }
   }
 }

@@ -73,6 +73,12 @@ public:
   Void initSEIToneMappingInfo(SEIToneMappingInfo *sei);
   Void initSEISOPDescription(SEISOPDescription *sei, TComSlice *slice, Int picInGOP, Int lastIdr, Int currGOPSize);
   Void initSEIBufferingPeriod(SEIBufferingPeriod *sei, TComSlice *slice);
+#if NNPFC_SEI_MESSAGE
+  Void initSEINeuralNetworkPostFilterCharacteristics(SEINeuralNetworkPostFilterCharacteristics *sei, Int filterIdx, const TComSlice *slice);
+#endif
+#if NNPFA_SEI_MESSAGE
+  Void initSEINeuralNetworkPostFilterActivation(SEINeuralNetworkPostFilterActivation *sei);
+#endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   void initSEIPhaseIndication(SEIPhaseIndication* sei);
 #endif

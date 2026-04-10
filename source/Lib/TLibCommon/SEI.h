@@ -115,6 +115,12 @@ public:
 #if SHUTTER_INTERVAL_SEI_MESSAGE
     SHUTTER_INTERVAL_INFO                = 203,
 #endif
+#if NNPFC_SEI_MESSAGE
+    NEURAL_NETWORK_POST_FILTER_CHARACTERISTICS = 210,
+#endif
+#if NNPFA_SEI_MESSAGE
+    NEURAL_NETWORK_POST_FILTER_ACTIVATION = 211,
+#endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
     PHASE_INDICATION                     = 212,
 #endif
@@ -1063,8 +1069,205 @@ public:
 };
 #endif
 
+#if NNPFC_SEI_MESSAGE
+class SEINeuralNetworkPostFilterCharacteristics : public SEI
+{
+public:
+  PayloadType payloadType() const override { return NEURAL_NETWORK_POST_FILTER_CHARACTERISTICS; }
+  SEINeuralNetworkPostFilterCharacteristics()
+    : m_id(0)
+    , m_modeIdc(0)
+    , m_propertyPresentFlag(false)
+    , m_purpose(0)
+    , m_baseFlag(false)
+    , m_outSubCFlag(0)
+    , m_outSubWidthC(1)
+    , m_outSubHeightC(1)
+    , m_outColourFormatIdc(ChromaFormat::CHROMA_420)
+    , m_chromaLocInfoPresentFlag(false)
+    , m_chromaSampleLocTypeFrame(Chroma420LocType::UNSPECIFIED)
+    , m_picWidthNumeratorMinus1(0)
+    , m_picWidthDenominatorMinus1(0)
+    , m_picHeightNumeratorMinus1(0)
+    , m_picHeightDenominatorMinus1(0)
+    , m_picWidthInLumaSamples(0)
+    , m_picHeightInLumaSamples(0)
+    , m_inpTensorBitDepthLumaMinus8(0)
+    , m_inpTensorBitDepthChromaMinus8(0)
+    , m_outTensorBitDepthLumaMinus8(0)
+    , m_outTensorBitDepthChromaMinus8(0)
+    , m_componentLastFlag(false)
+    , m_inpFormatIdc(0)
+    , m_auxInpIdc(0)
+    , m_sepColDescriptionFlag(false)
+    , m_fullRangeFlag(false)
+    , m_colPrimaries(0)
+    , m_transCharacteristics(0)
+    , m_matrixCoeffs(0)
+    , m_inpOrderIdc(0)
+    , m_outFormatIdc(0)
+    , m_outOrderIdc(0)
+    , m_constantPatchSizeFlag(false)
+    , m_patchWidthMinus1(0)
+    , m_patchHeightMinus1(0)
+    , m_extendedPatchWidthCdDeltaMinus1(0)
+    , m_extendedPatchHeightCdDeltaMinus1(0)
+    , m_overlap(0)
+    , m_paddingType(0)
+    , m_lumaPadding(0)
+    , m_cbPadding(0)
+    , m_crPadding(0)
+    , m_payloadByte(nullptr)
+    , m_complexityInfoPresentFlag(false)
+    , m_applicationPurposeTagUriPresentFlag(false)
+    , m_applicationPurposeTagUri("")
+    , m_scanTypeIdc(0)
+    , m_forHumanViewingIdc(0)
+    , m_forMachineAnalysisIdc(0)
+    , m_uriTag("")
+    , m_uri("")
+    , m_parameterTypeIdc(0)
+    , m_log2ParameterBitLengthMinus3(0)
+    , m_numParametersIdc(0)
+    , m_numKmacOperationsIdc(0)
+    , m_totalKilobyteSize(0)
+    , m_numberInputDecodedPicturesMinus1(0)
+    , m_numberExtrapolatedPicturesMinus1(0)
+    , m_spatialExtrapolationLeftOffset(0)
+    , m_spatialExtrapolationRightOffset(0)
+    , m_spatialExtrapolationTopOffset(0)
+    , m_spatialExtrapolationBottomOffset(0)
+    , m_inbandPromptFlag(false)
+    , m_prompt("")
+    , m_absentInputPicZeroFlag(false)
+    , m_numInpPicsInOutputTensor(0)
+    , m_inbandSeedFlag(false)
+    , m_seed(0)
+  {}
+  SEINeuralNetworkPostFilterCharacteristics(const SEINeuralNetworkPostFilterCharacteristics& sei);
+
+  Bool operator == (const SEINeuralNetworkPostFilterCharacteristics& sei);
+
+  ~SEINeuralNetworkPostFilterCharacteristics() override
+  {
+    if (m_payloadByte)
+    {
+      delete m_payloadByte;
+      m_payloadByte = nullptr;
+    }
+  }
+
+  UInt                  m_id;
+  UInt                  m_modeIdc;
+  Bool                  m_propertyPresentFlag;
+  UInt                  m_purpose;
+  Bool                  m_baseFlag;
+  Bool                  m_outSubCFlag;
+  UChar                 m_outSubWidthC;
+  UChar                 m_outSubHeightC;
+  ChromaFormat          m_outColourFormatIdc;
+  Bool                  m_chromaLocInfoPresentFlag;
+  Chroma420LocType      m_chromaSampleLocTypeFrame;
+  UInt                  m_picWidthNumeratorMinus1;
+  UInt                  m_picWidthDenominatorMinus1;
+  UInt                  m_picHeightNumeratorMinus1;
+  UInt                  m_picHeightDenominatorMinus1;
+  UInt                  m_picWidthInLumaSamples;
+  UInt                  m_picHeightInLumaSamples;
+  UInt                  m_inpTensorBitDepthLumaMinus8;
+  UInt                  m_inpTensorBitDepthChromaMinus8;
+  UInt                  m_outTensorBitDepthLumaMinus8;
+  UInt                  m_outTensorBitDepthChromaMinus8;
+  Bool                  m_componentLastFlag;
+  UInt                  m_inpFormatIdc;
+  UInt                  m_auxInpIdc;
+  Bool                  m_sepColDescriptionFlag;
+  Bool                  m_fullRangeFlag;
+  UChar                 m_colPrimaries;
+  UChar                 m_transCharacteristics;
+  UChar                 m_matrixCoeffs;
+  UInt                  m_inpOrderIdc;
+  UInt                  m_outFormatIdc;
+  UInt                  m_outOrderIdc;
+  Bool                  m_constantPatchSizeFlag;
+  UInt                  m_patchWidthMinus1;
+  UInt                  m_patchHeightMinus1;
+  UInt                  m_extendedPatchWidthCdDeltaMinus1;
+  UInt                  m_extendedPatchHeightCdDeltaMinus1;
+  UInt                  m_overlap;
+  UInt                  m_paddingType;
+  UInt                  m_lumaPadding;
+  UInt                  m_cbPadding;
+  UInt                  m_crPadding;
+  UInt64                m_payloadLength;
+  TChar*                m_payloadByte;
+  Bool                  m_complexityInfoPresentFlag;
+  Bool                  m_applicationPurposeTagUriPresentFlag;
+  std::string           m_applicationPurposeTagUri;
+  UInt                  m_scanTypeIdc;
+  UInt                  m_forHumanViewingIdc;
+  UInt                  m_forMachineAnalysisIdc;
+  std::string           m_uriTag;
+  std::string           m_uri;
+  UInt                  m_parameterTypeIdc;
+  UInt                  m_log2ParameterBitLengthMinus3;
+  UInt                  m_numParametersIdc;
+  UInt                  m_numKmacOperationsIdc;
+  UInt                  m_totalKilobyteSize;
+  UInt                  m_numberInputDecodedPicturesMinus1;
+  std::vector<UInt>     m_numberInterpolatedPictures;
+  UInt                  m_numberExtrapolatedPicturesMinus1;
+  Int                   m_spatialExtrapolationLeftOffset;
+  Int                   m_spatialExtrapolationRightOffset;
+  Int                   m_spatialExtrapolationTopOffset;
+  Int                   m_spatialExtrapolationBottomOffset;
+  Bool                  m_inbandPromptFlag;
+  std::string           m_prompt;
+  std::vector<Bool>     m_inputPicOutputFlag;
+  Bool                  m_absentInputPicZeroFlag;
+  UInt                  m_numInpPicsInOutputTensor;
+  Bool                  m_inbandSeedFlag;
+  UInt                  m_seed;
+};
+#endif
+
+#if NNPFA_SEI_MESSAGE
+class SEINeuralNetworkPostFilterActivation : public SEI
+{
+public:
+  PayloadType payloadType() const { return NEURAL_NETWORK_POST_FILTER_ACTIVATION; }
+  SEINeuralNetworkPostFilterActivation()
+    : m_targetId(0)
+    , m_cancelFlag(false)
+    , m_targetBaseFlag(false)
+    , m_noPrevCLVSFlag(false)
+    , m_noFollCLVSFlag(false)
+    , m_persistenceFlag(false)
+    , m_promptUpdateFlag(false)
+    , m_prompt("")
+    , m_seedUpdateFlag(false)
+    , m_seed(0)
+  {}
+  SEINeuralNetworkPostFilterActivation(const SEINeuralNetworkPostFilterActivation& sei);
+
+  virtual ~SEINeuralNetworkPostFilterActivation() {}
+
+  UInt              m_targetId;
+  Bool              m_cancelFlag;
+  Bool              m_targetBaseFlag;
+  Bool              m_noPrevCLVSFlag;
+  Bool              m_noFollCLVSFlag;
+  Bool              m_persistenceFlag;
+  std::vector<Bool> m_outputFlag;
+  Bool              m_promptUpdateFlag;
+  std::string       m_prompt;
+  Bool              m_seedUpdateFlag;
+  UInt              m_seed;
+};
+#endif
+
 #if JVET_AK2006_SPTI_SEI_MESSAGE
-class SEISourcePictureTimingInfo : public SEI 
+class SEISourcePictureTimingInfo : public SEI
 {
 public:
   PayloadType payloadType() const { return PayloadType::SOURCE_PICTURE_TIMING_INFO; }

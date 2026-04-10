@@ -378,6 +378,180 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setDecodingUnitInfoSEIEnabled                        ( m_decodingUnitInfoSEIEnabled );
   m_cTEncTop.setSOPDescriptionSEIEnabled                          ( m_SOPDescriptionSEIEnabled );
   m_cTEncTop.setScalableNestingSEIEnabled                         ( m_scalableNestingSEIEnabled );
+#if NNPFC_SEI_MESSAGE
+  m_cTEncTop.setNNPostFilterSEICharacteristicsEnabled             (m_nnPostFilterSEICharacteristicsEnabled);
+  m_cTEncTop.setNNPostFilterSEICharacteristicsUseSuffixSEI        (m_nnPostFilterSEICharacteristicsUseSuffixSEI);
+  m_cTEncTop.setNNPostFilterSEICharacteristicsNumFilters          (m_nnPostFilterSEICharacteristicsNumFilters);
+  for (Int i = 0; i < m_nnPostFilterSEICharacteristicsNumFilters; i++)
+  {
+    m_cTEncTop.setNNPostFilterSEICharacteristicsId                 (m_nnPostFilterSEICharacteristicsId[i], i);
+    m_cTEncTop.setNNPostFilterSEICharacteristicsBaseFlag           (m_nnPostFilterSEICharacteristicsBaseFlag[i], i);
+    m_cTEncTop.setNNPostFilterSEICharacteristicsModeIdc            (m_nnPostFilterSEICharacteristicsModeIdc[i], i);
+    m_cTEncTop.setNNPostFilterSEICharacteristicsPropertyPresentFlag(m_nnPostFilterSEICharacteristicsPropertyPresentFlag[i], i);
+    if (m_cTEncTop.getNNPostFilterSEICharacteristicsPropertyPresentFlag(i))
+    {
+      if (!m_nnPostFilterSEICharacteristicsBaseFlag[i])
+      {
+        Bool baseFilterExist = false;
+        for (Int j = i - 1; j >= 0; j--)
+        {
+          if (m_cTEncTop.getNNPostFilterSEICharacteristicsId(i) == m_cTEncTop.getNNPostFilterSEICharacteristicsId(j))
+          {
+            baseFilterExist = true;
+            break;
+          }
+        }
+        CHECK(!baseFilterExist, "No base filter found! Cannot have an update filter without base filter.");
+      }
+      m_cTEncTop.setNNPostFilterSEICharacteristicsPurpose                 (m_nnPostFilterSEICharacteristicsPurpose[i], i);
+      if ((m_cTEncTop.getNNPostFilterSEICharacteristicsPurpose(i) & NNPC_PurposeType::CHROMA_UPSAMPLING) != 0)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsOutSubCFlag(m_nnPostFilterSEICharacteristicsOutSubCFlag[i], i);
+      }
+      if ((m_cTEncTop.getNNPostFilterSEICharacteristicsPurpose(i) & NNPC_PurposeType::COLOURIZATION) != 0)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsOutColourFormatIdc(ChromaFormat(m_nnPostFilterSEICharacteristicsOutColourFormatIdc[i]), i);
+      }
+      if ((m_cTEncTop.getNNPostFilterSEICharacteristicsPurpose(i) & NNPC_PurposeType::RESOLUTION_UPSAMPLING) != 0)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsPicWidthNumeratorMinus1      (m_nnPostFilterSEICharacteristicsPicWidthNumerator[i] - 1, i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsPicWidthDenominatorMinus1    (m_nnPostFilterSEICharacteristicsPicWidthDenominator[i] - 1, i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsPicHeightNumeratorMinus1     (m_nnPostFilterSEICharacteristicsPicHeightNumerator[i] - 1, i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsPicHeightDenominatorMinus1   (m_nnPostFilterSEICharacteristicsPicHeightDenominator[i] - 1, i);
+      }
+      m_cTEncTop.setNNPostFilterSEICharacteristicsNumberInputDecodedPicturesMinus1(m_nnPostFilterSEICharacteristicsNumberInputDecodedPicturesMinus1[i], i);
+      if (m_nnPostFilterSEICharacteristicsNumberInputDecodedPicturesMinus1[i] > 0)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsInputPicOutputFlag( m_nnPostFilterSEICharacteristicsInputPicOutputFlag[i], i);
+      }
+      if ((m_cTEncTop.getNNPostFilterSEICharacteristicsPurpose(i) & NNPC_PurposeType::FRAME_RATE_UPSAMPLING) != 0)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsNumberInterpolatedPictures( m_nnPostFilterSEICharacteristicsNumberInterpolatedPictures[i], i);
+      }
+      if ((m_cTEncTop.getNNPostFilterSEICharacteristicsPurpose(i) & NNPC_PurposeType::TEMPORAL_EXTRAPOLATION) != 0)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsNumberExtrapolatedPicturesMinus1( m_nnPostFilterSEICharacteristicsNumberExtrapolatedPicturesMinus1[i], i);
+      }
+      if ((m_cTEncTop.getNNPostFilterSEICharacteristicsPurpose(i) & NNPC_PurposeType::SPATIAL_EXTRAPOLATION) != 0)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsSpatialExtrapolationLeftOffset  (m_nnPostFilterSEICharacteristicsSpatialExtrapolationLeftOffset[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsSpatialExtrapolationRightOffset (m_nnPostFilterSEICharacteristicsSpatialExtrapolationRightOffset[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsSpatialExtrapolationTopOffset   (m_nnPostFilterSEICharacteristicsSpatialExtrapolationTopOffset[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsSpatialExtrapolationBottomOffset(m_nnPostFilterSEICharacteristicsSpatialExtrapolationBottomOffset[i], i);
+      }
+      m_cTEncTop.setNNPostFilterSEICharacteristicsAbsentInputPicZeroFlag  (m_nnPostFilterSEICharacteristicsAbsentInputPicZeroFlag[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsComponentLastFlag       (m_nnPostFilterSEICharacteristicsComponentLastFlag[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsInpFormatIdc            (m_nnPostFilterSEICharacteristicsInpFormatIdc[i], i);
+      if (m_cTEncTop.getNNPostFilterSEICharacteristicsInpFormatIdc(i) == 1)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsInpTensorBitDepthLumaMinus8(m_nnPostFilterSEICharacteristicsInpTensorBitDepthLumaMinus8[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsInpTensorBitDepthChromaMinus8(m_nnPostFilterSEICharacteristicsInpTensorBitDepthChromaMinus8[i], i);
+      }
+      m_cTEncTop.setNNPostFilterSEICharacteristicsInpOrderIdc             (m_nnPostFilterSEICharacteristicsInpOrderIdc[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsOutFormatIdc            (m_nnPostFilterSEICharacteristicsOutFormatIdc[i], i);
+      if (m_cTEncTop.getNNPostFilterSEICharacteristicsOutFormatIdc(i) == 1)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsOutTensorBitDepthLumaMinus8(m_nnPostFilterSEICharacteristicsOutTensorBitDepthLumaMinus8[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsOutTensorBitDepthChromaMinus8(m_nnPostFilterSEICharacteristicsOutTensorBitDepthChromaMinus8[i], i);
+      }
+      m_cTEncTop.setNNPostFilterSEICharacteristicsOutOrderIdc             (m_nnPostFilterSEICharacteristicsOutOrderIdc[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsChromaLocInfoPresentFlag(m_nnPostFilterSEICharacteristicsChromaLocInfoPresentFlag[i], i);
+      if(m_cTEncTop.getNNPostFilterSEICharacteristicsChromaLocInfoPresentFlag(i))
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsChromaSampleLocTypeFrame(static_cast<Chroma420LocType>(m_nnPostFilterSEICharacteristicsChromaSampleLocTypeFrame[i]), i);
+      }
+      m_cTEncTop.setNNPostFilterSEICharacteristicsConstantPatchSizeFlag   ( m_nnPostFilterSEICharacteristicsConstantPatchSizeFlag[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsPatchWidthMinus1        ( m_nnPostFilterSEICharacteristicsPatchWidthMinus1[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsPatchHeightMinus1       ( m_nnPostFilterSEICharacteristicsPatchHeightMinus1[i], i);
+      if (m_nnPostFilterSEICharacteristicsConstantPatchSizeFlag[i] == 0)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsExtendedPatchWidthCdDeltaMinus1(m_nnPostFilterSEICharacteristicsExtendedPatchWidthCdDeltaMinus1[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsExtendedPatchHeightCdDeltaMinus1(m_nnPostFilterSEICharacteristicsExtendedPatchHeightCdDeltaMinus1[i], i);
+      }
+      m_cTEncTop.setNNPostFilterSEICharacteristicsOverlap                 ( m_nnPostFilterSEICharacteristicsOverlap[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsPaddingType             ( m_nnPostFilterSEICharacteristicsPaddingType[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsLumaPadding             (m_nnPostFilterSEICharacteristicsLumaPadding[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsCrPadding               (m_nnPostFilterSEICharacteristicsCrPadding[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsCbPadding               (m_nnPostFilterSEICharacteristicsCbPadding[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsComplexityInfoPresentFlag (m_nnPostFilterSEICharacteristicsComplexityInfoPresentFlag[i], i);
+      if (m_cTEncTop.getNNPostFilterSEICharacteristicsComplexityInfoPresentFlag(i))
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsLumaPadding             (m_nnPostFilterSEICharacteristicsLumaPadding[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsCrPadding               (m_nnPostFilterSEICharacteristicsCrPadding[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsCbPadding               (m_nnPostFilterSEICharacteristicsCbPadding[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsParameterTypeIdc        (m_nnPostFilterSEICharacteristicsParameterTypeIdc[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsLog2ParameterBitLengthMinus3     ( m_nnPostFilterSEICharacteristicsLog2ParameterBitLengthMinus3[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsNumParametersIdc        ( m_nnPostFilterSEICharacteristicsNumParametersIdc[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsNumKmacOperationsIdc    ( m_nnPostFilterSEICharacteristicsNumKmacOperationsIdc[i], i);
+        m_cTEncTop.setNNPostFilterSEICharacteristicsTotalKilobyteSize       ( m_nnPostFilterSEICharacteristicsTotalKilobyteSize[i], i);
+
+      }
+      if (m_cTEncTop.getNNPostFilterSEICharacteristicsPurpose(i) == 0)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsApplicationPurposeTagUriPresentFlag (m_nnPostFilterSEICharacteristicsApplicationPurposeTagUriPresentFlag[i], i);
+        if (m_cTEncTop.getNNPostFilterSEICharacteristicsApplicationPurposeTagUriPresentFlag(i))
+        {
+          m_cTEncTop.setNNPostFilterSEICharacteristicsApplicationPurposeTagUri(m_nnPostFilterSEICharacteristicsApplicationPurposeTagUri[i],i);
+        }
+      }
+      if ((m_cTEncTop.getNNPostFilterSEICharacteristicsPurpose(i) & NNPC_PurposeType::SPATIAL_EXTRAPOLATION) != 0 || (m_cTEncTop.getNNPostFilterSEICharacteristicsPurpose(i) & NNPC_PurposeType::RESOLUTION_UPSAMPLING) != 0)
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsScanTypeIdc           ( m_nnPostFilterSEICharacteristicsScanTypeIdc[i], i);
+      }
+      m_cTEncTop.setNNPostFilterSEICharacteristicsForHumanViewingIdc      ( m_nnPostFilterSEICharacteristicsForHumanViewingIdc[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsForMachineAnalysisIdc   ( m_nnPostFilterSEICharacteristicsForMachineAnalysisIdc[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsUriTag                  ( m_nnPostFilterSEICharacteristicsUriTag[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsUri                     ( m_nnPostFilterSEICharacteristicsUri[i], i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsInbandSeedFlag          ( m_nnPostFilterSEICharacteristicsInbandSeedFlag[i], i);
+      if (m_cTEncTop.getNNPostFilterSEICharacteristicsInbandSeedFlag(i))
+      {
+        m_cTEncTop.setNNPostFilterSEICharacteristicsSeed                  ( m_nnPostFilterSEICharacteristicsSeed[i], i );
+      }
+    }
+    if (m_cTEncTop.getNNPostFilterSEICharacteristicsModeIdc(i) == POST_FILTER_MODE::ISO_IEC_15938_17)
+    {
+      m_cTEncTop.setNNPostFilterSEICharacteristicsPayloadFilename(m_nnPostFilterSEICharacteristicsPayloadFilename[i], i);
+    }
+    m_cTEncTop.setNNPostFilterSEICharacteristicsAuxInpIdc               (m_nnPostFilterSEICharacteristicsAuxInpIdc[i], i);
+    m_cTEncTop.setNNPostFilterSEICharacteristicsInbandPromptFlag( m_nnPostFilterSEICharacteristicsInbandPromptFlag[i], i);
+    if (m_cTEncTop.getNNPostFilterSEICharacteristicsInbandPromptFlag(i))
+    {
+      m_cTEncTop.setNNPostFilterSEICharacteristicsPrompt( m_nnPostFilterSEICharacteristicsPrompt[i], i);
+    }
+    m_cTEncTop.setNNPostFilterSEICharacteristicsSepColDescriptionFlag   (m_nnPostFilterSEICharacteristicsSepColDescriptionFlag[i], i);
+    if (m_cTEncTop.getNNPostFilterSEICharacteristicsSepColDescriptionFlag(i))
+    {
+      m_cTEncTop.setNNPostFilterSEICharacteristicsColPrimaries          (m_nnPostFilterSEICharacteristicsColPrimaries[i],i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsTransCharacteristics  (m_nnPostFilterSEICharacteristicsTransCharacteristics[i],i);
+      m_cTEncTop.setNNPostFilterSEICharacteristicsMatrixCoeffs          (m_nnPostFilterSEICharacteristicsMatrixCoeffs[i],i);
+    }
+    if (m_cTEncTop.getNNPostFilterSEICharacteristicsSepColDescriptionFlag(i) && (m_cTEncTop.getNNPostFilterSEICharacteristicsOutFormatIdc(i)==1))
+    {
+      m_cTEncTop.setNNPostFilterSEICharacteristicsFullRangeFlag         (m_nnPostFilterSEICharacteristicsFullRangeFlag[i],i);
+    }
+  }
+#endif
+#if NNPFA_SEI_MESSAGE
+  m_cTEncTop.setNnPostFilterSEIActivationEnabled                  ( m_nnPostFilterSEIActivationEnabled );
+  m_cTEncTop.setNnPostFilterSEIActivationUseSuffixSEI             ( m_nnPostFilterSEIActivationUseSuffixSEI );
+  m_cTEncTop.setNnPostFilterSEIActivationTargetId                 ( m_nnPostFilterSEIActivationTargetId );
+  m_cTEncTop.setNnPostFilterSEIActivationCancelFlag               ( m_nnPostFilterSEIActivationCancelFlag );
+  m_cTEncTop.setNnPostFilterSEIActivationTargetBaseFlag           ( m_nnPostFilterSEIActivationTargetBaseFlag );
+  m_cTEncTop.setNnPostFilterSEIActivationNoPrevCLVSFlag           ( m_nnPostFilterSEIActivationNoPrevCLVSFlag );
+  m_cTEncTop.setNnPostFilterSEIActivationNoFollCLVSFlag           ( m_nnPostFilterSEIActivationNoFollCLVSFlag );
+  m_cTEncTop.setNnPostFilterSEIActivationPersistenceFlag          ( m_nnPostFilterSEIActivationPersistenceFlag );
+  m_cTEncTop.setNnPostFilterSEIActivationOutputFlag               ( m_nnPostFilterSEIActivationOutputFlag );
+  m_cTEncTop.setNnPostFilterSEIActivationPromptUpdateFlag         ( m_nnPostFilterSEIActivationPromptUpdateFlag );
+  if (m_cTEncTop.getNnPostFilterSEIActivationPromptUpdateFlag())
+  {
+    m_cTEncTop.setNnPostFilterSEIActivationPrompt                 ( m_nnPostFilterSEIActivationPrompt );
+  }
+  m_cTEncTop.setNnPostFilterSEIActivationSeedUpdateFlag           ( m_nnPostFilterSEIActivationSeedUpdateFlag );
+  if (m_cTEncTop.getNnPostFilterSEIActivationSeedUpdateFlag())
+  {
+    m_cTEncTop.setNnPostFilterSEIActivationSeed                   ( m_nnPostFilterSEIActivationSeed );
+  }
+#endif
 #if JVET_AE0101_PHASE_INDICATION_SEI_MESSAGE
   m_cTEncTop.setPhaseIndicationSEIEnabledFullResolution            ( m_phaseIndicationSEIEnabledFullResolution );
   m_cTEncTop.setHorPhaseNumFullResolution                          ( m_piHorPhaseNumFullResolution );
