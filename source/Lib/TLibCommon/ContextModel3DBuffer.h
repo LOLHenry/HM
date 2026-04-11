@@ -40,6 +40,7 @@
 
 #include <stdio.h>
 #include <memory.h>
+#include <algorithm>
 
 #include "CommonDef.h"
 #include "ContextModel.h"
@@ -88,7 +89,7 @@ public:
   Void copyFrom( const ContextModel3DBuffer* src )
   {
     assert( m_sizeXYZ == src->m_sizeXYZ );
-    ::memcpy( m_contextModel, src->m_contextModel, sizeof(ContextModel) * m_sizeXYZ );
+    std::copy( src->m_contextModel, src->m_contextModel + m_sizeXYZ, m_contextModel );
   }
 };
 

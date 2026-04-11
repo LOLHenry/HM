@@ -1064,6 +1064,23 @@ Void TAppEncTop::xCreateLib()
     m_acTVideoIOYuvInputFileList[layer]->open( m_pchInputFileList[layer],     false, &m_inputBitDepths[repFormatIdx][0], &m_MSBExtendedBitDepths[repFormatIdx][0], &m_internalBitDepths[repFormatIdx][0] );  // read  mode
     m_acTVideoIOYuvInputFileList[layer]->skipFrames( m_FrameSkip, m_iSourceWidths[repFormatIdx] - m_aiPads[repFormatIdx][0], m_iSourceHeights[repFormatIdx] - m_aiPads[repFormatIdx][1], m_InputChromaFormatIDC[repFormatIdx]);
 
+    // Clamp FramesToBeEncoded to the number of frames available in the input file
+    {
+      Int availableFrames = m_acTVideoIOYuvInputFileList[layer]->countFrames(
+        m_iSourceWidths[repFormatIdx] - m_aiPads[repFormatIdx][0],
+        m_iSourceHeights[repFormatIdx] - m_aiPads[repFormatIdx][1],
+        m_InputChromaFormatIDC[repFormatIdx] );
+      if (availableFrames >= 0 && (m_framesToBeEncoded == 0 || m_framesToBeEncoded > availableFrames))
+      {
+        if (m_framesToBeEncoded > 0)
+        {
+          fprintf(stderr, "\nWarning: Layer %d input file has only %d frames, clamping FramesToBeEncoded from %d to %d.\n",
+                  layer, availableFrames, m_framesToBeEncoded, availableFrames);
+        }
+        m_framesToBeEncoded = availableFrames;
+      }
+    }
+
     if (m_pchReconFileList[layer])
     {
       m_acTVideoIOYuvReconFileList[layer]->open( m_pchReconFileList[layer], true, &m_outputBitDepths[repFormatIdx][0], &m_outputBitDepths[repFormatIdx][0], &m_internalBitDepths[repFormatIdx][0]);  // write mode
@@ -1077,10 +1094,31 @@ Void TAppEncTop::xCreateLib()
 #endif
     m_acTEncTopList[layer]->create();
   }
+
+  // Update all layer encoders with the clamped FramesToBeEncoded value
+  for( Int layer=0; layer < m_numberOfLayers; layer++)
+  {
+    m_acTEncTopList[layer]->setFramesToBeEncoded(m_framesToBeEncoded);
+  }
 #else
   // Video I/O
   m_cTVideoIOYuvInputFile.open( m_inputFileName,     false, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth );  // read  mode
   m_cTVideoIOYuvInputFile.skipFrames(m_FrameSkip, m_inputFileWidth, m_inputFileHeight, m_InputChromaFormatIDC);
+
+  // Clamp FramesToBeEncoded to the number of frames available in the input file
+  {
+    Int availableFrames = m_cTVideoIOYuvInputFile.countFrames(m_inputFileWidth, m_inputFileHeight, m_InputChromaFormatIDC);
+    if (availableFrames >= 0 && (m_framesToBeEncoded == 0 || m_framesToBeEncoded > availableFrames))
+    {
+      if (m_framesToBeEncoded > 0)
+      {
+        fprintf(stderr, "\nWarning: Input file has only %d frames, clamping FramesToBeEncoded from %d to %d.\n",
+                availableFrames, m_framesToBeEncoded, availableFrames);
+      }
+      m_framesToBeEncoded = availableFrames;
+      m_cTEncTop.setFramesToBeEncoded(m_framesToBeEncoded);
+    }
+  }
 
   if (!m_reconFileName.empty())
   {
@@ -1337,11 +1375,10 @@ Void TAppEncTop::encode()
 
         // increase number of received frames
         m_frameRcvd[layer]++;
-        
+
         frmCnt++;
 
         eos[layer] = (m_frameRcvd[layer] == m_framesToBeEncoded);
-        allEos = allEos||eos[layer];
 
         // if end of file (which is only detected on a read failure) flush the encoder of any queued pictures
         if (m_acTVideoIOYuvInputFileList[layer]->isEof())
@@ -1351,6 +1388,15 @@ Void TAppEncTop::encode()
           m_frameRcvd    [layer]--;
           m_acTEncTopList[layer]->setFramesToBeEncoded(m_frameRcvd[layer]);
         }
+      }
+    }
+    // Check if all layers have reached end-of-stream
+    allEos = true;
+    for(Int layer=0; layer < m_numberOfLayers; layer++ )
+    {
+      if (xLayerIdInTargetEncLayerIdList( m_vps->getLayerIdInNuh( layer ) ))
+      {
+        allEos = allEos && eos[layer];
       }
     }
     for ( Int gopId=0; gopId < gopSize; gopId++ )
