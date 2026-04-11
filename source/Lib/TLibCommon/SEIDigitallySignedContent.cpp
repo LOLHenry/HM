@@ -589,11 +589,13 @@ DSCStatus DscVerificator::verifyPacket (std::vector<uint8_t> &packet, std::vecto
     }
     std::cout << "\033[1;32mSignature is valid.\033[0m\n";
     return DSCStatus::DSC_Verified;
-  } else if (verify_result == 0)
+  }
+  else if (verify_result == 0)
   {
     std::cout << "\033[1;31mSignature is invalid.\033[0m\n";
     return DSCStatus::DSC_Invalid;
-  } else
+  }
+  else
   {
     std::cout << "Error occurred during verification.\n";
   }
