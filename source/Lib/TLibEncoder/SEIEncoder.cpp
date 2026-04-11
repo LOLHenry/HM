@@ -2010,23 +2010,35 @@ void SEIEncoder::initSEIAIUsageRestrictions(SEIAIUsageRestrictions *sei)
 
 
 #if JVET_AK0194_DSC_SEI
-void SEIEncoder::initSEIDigitallySignedContentInitialization(SEIDigitallySignedContentInitialization *sei)
+void SEIEncoder::initSEIDigitallySignedContentInitialization(SEIDigitallySignedContentInitialization *sei, bool startFlag)
 {
-  sei->dsciNumVerificationSubstreams = 1; //m_pcCfg->getMaxTempLayer();
+  sei->dsciId = m_pcCfg->getDigitallySignedContentSEICfg().dscId;
+  sei->dsciNumVerificationSubstreams = m_pcCfg->getDigitallySignedContentSEICfg().numVerificationSubstreams;
+  sei->dsciRefSubstreamFlag = m_pcCfg->getDigitallySignedContentSEICfg().refSubstreamFlag;
   sei->dsciHashMethodType = m_pcCfg->getDigitallySignedContentSEICfg().hashMethod;
   sei->dsciKeySourceUri = m_pcCfg->getDigitallySignedContentSEICfg().publicKeyUri;
+  sei->dsciVSSImplicitAssociationModeFlag = m_pcCfg->getDigitallySignedContentSEICfg().implicitAssociationModeFlag;
   sei->dsciUseKeyRegisterIdxFlag = m_pcCfg->getDigitallySignedContentSEICfg().keyIdEnabled;
   sei->dsciKeyRegisterIdx = m_pcCfg->getDigitallySignedContentSEICfg().keyId;
+  sei->dsciSignedContentStartFlag = startFlag;
+  sei->dsciSEISigningFlag = m_pcCfg->getDigitallySignedContentSEICfg().signAURSEI ||
+                            m_pcCfg->getDigitallySignedContentSEICfg().signGFVSEI ||
+                            m_pcCfg->getDigitallySignedContentSEICfg().signGFVESEI ||
+                            m_pcCfg->getDigitallySignedContentSEICfg().signNNPFCSEI ||
+                            m_pcCfg->getDigitallySignedContentSEICfg().signNNPFASEI;
 }
 void SEIEncoder::initSEIDigitallySignedContentSelection(SEIDigitallySignedContentSelection *sei, int substream)
 {
+  sei->dscsId = m_pcCfg->getDigitallySignedContentSEICfg().dscId;
   sei->dscsVerificationSubstreamId = substream;
 }
-void SEIEncoder::initSEIDigitallySignedContentVerification(SEIDigitallySignedContentVerification *sei, int32_t substream, const std::vector<uint8_t> &signature)
+void SEIEncoder::initSEIDigitallySignedContentVerification(SEIDigitallySignedContentVerification *sei, int32_t substream, const std::vector<uint8_t> &signature, bool endFlag)
 {
+  sei->dscvId = m_pcCfg->getDigitallySignedContentSEICfg().dscId;
   sei->dscvVerificationSubstreamId = substream;
   sei->dscvSignatureLengthInOctets = (int32_t) signature.size();
   sei->dscvSignature = signature;
+  sei->dscvSignedContentEndFlag = endFlag;
 }
 #endif
 #if JVET_AJ0207_GFV

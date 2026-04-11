@@ -157,25 +157,38 @@ static inline Void output_sei_message_header(SEI &sei, std::ostream *pDecodedMes
 /**
  * unmarshal a single SEI message from bitstream bs
  */
-Void SEIReader::parseSEImessage(TComInputBitstream* bs, SEIMessages& seis, const NalUnitType nalUnitType, const TComSPS *sps, std::ostream *pDecodedMessageOutputStream)
+SEIMessages::iterator  SEIReader::parseSEImessage(TComInputBitstream* bs, SEIMessages& seis, const NalUnitType nalUnitType, const TComSPS *sps, std::ostream *pDecodedMessageOutputStream)
 {
   setBitstream(bs);
+
+  SEIMessages   seiListInCurNalu;
+  SEIMessages::iterator newSEI = seis.end();
+  bool seiMessageRead = false;
 
   assert(!m_pcBitstream->getNumBitsUntilByteAligned());
   do
   {
     if(nalUnitType == NAL_UNIT_PREFIX_SEI)
     {
-      xReadSEImessage(seis, nalUnitType, sps, pDecodedMessageOutputStream, SEI::prefix_sei_messages, std::string("prefix SEI"));
+      seiMessageRead = xReadSEImessage(seis, nalUnitType, sps, pDecodedMessageOutputStream, SEI::prefix_sei_messages, std::string("prefix SEI"));
     }
     else if (nalUnitType == NAL_UNIT_SUFFIX_SEI)
     {
-      xReadSEImessage(seis, nalUnitType, sps, pDecodedMessageOutputStream, SEI::suffix_sei_messages, std::string("suffix SEI"));
+      seiMessageRead = xReadSEImessage(seis, nalUnitType, sps, pDecodedMessageOutputStream, SEI::suffix_sei_messages, std::string("suffix SEI"));
     }
     else
     {
       std::cerr << "Unsupported SEI NAL unit type '" << nalUnitType << "'" << std::endl;
       exit(EXIT_FAILURE);
+    }
+
+    if (seiMessageRead)
+    {
+      seiListInCurNalu.push_back(seis.back());
+      if (newSEI == seis.end())
+      {
+        newSEI = --seis.end();
+      }
     }
 
     /* SEI messages are an integer number of bytes, something has failed
@@ -185,6 +198,8 @@ Void SEIReader::parseSEImessage(TComInputBitstream* bs, SEIMessages& seis, const
   while (m_pcBitstream->getNumBitsLeft() > 8);
 
   xReadRbspTrailingBits();
+  
+  return newSEI;
 }
 Void SEIReader::xReadSEIPayloadData(Int const payloadType, Int const payloadSize, SEI *&sei, const NalUnitType nalUnitType, const TComSPS *sps, 
   std::ostream *pDecodedMessageOutputStream, std::string const &typeName)
@@ -592,7 +607,7 @@ Bool SEIReader::xCheckNnpfcUpdatePresentSeiMsg(UInt seiId, const std::vector<Int
 }
 #endif
 
-Void SEIReader::xReadSEImessage(SEIMessages& seis, const NalUnitType nalUnitType, const TComSPS *sps, std::ostream *pDecodedMessageOutputStream, const vector<SEI::PayloadType>& allowedSeiTypes, std::string const &typeName)
+Bool SEIReader::xReadSEImessage(SEIMessages& seis, const NalUnitType nalUnitType, const TComSPS *sps, std::ostream *pDecodedMessageOutputStream, const vector<SEI::PayloadType>& allowedSeiTypes, std::string const &typeName)
 {
 #if ENC_DEC_TRACE
   xTraceSEIHeader();
@@ -619,7 +634,7 @@ Void SEIReader::xReadSEImessage(SEIMessages& seis, const NalUnitType nalUnitType
 
   if(payloadSize == 0)
   {
-    return;
+    return false;
   }
 
   /* extract the payload for this single SEI message.
@@ -698,6 +713,8 @@ Void SEIReader::xReadSEImessage(SEIMessages& seis, const NalUnitType nalUnitType
   /* restore primary bitstream for sei_message */
   delete getBitstream();
   setBitstream(bs);
+  
+  return sei != nullptr;
 }
 
 
@@ -3042,11 +3059,10 @@ void SEIReader::xParseSEIAIUsageRestrictions(SEIAIUsageRestrictions& sei, uint32
 void SEIReader::xParseSEIDigitallySignedContentInitialization(SEIDigitallySignedContentInitialization &sei, uint32_t payloadSize, std::ostream *pDecodedMessageOutputStream)
 {
   unsigned int val;
+  sei_read_code(pDecodedMessageOutputStream, 8, val, "dsci_id");
+  sei.dsciId = val;
   sei_read_code(pDecodedMessageOutputStream, 8, val, "dsci_hash_method_type");
   sei.dsciHashMethodType = val;
-  sei_read_string(pDecodedMessageOutputStream, sei.dsciKeySourceUri, "twci_key_source_uri");
-  sei_read_uvlc(pDecodedMessageOutputStream, val, "dsci_num_verification_substreams_minus1");
-  sei.dsciNumVerificationSubstreams = val + 1;
   sei_read_uvlc(pDecodedMessageOutputStream, val, "dsci_key_retrieval_mode_idc");
   sei.dsciKeyRetrievalModeIdc = val;
   if (sei.dsciKeyRetrievalModeIdc == 1)
@@ -3069,21 +3085,49 @@ void SEIReader::xParseSEIDigitallySignedContentInitialization(SEIDigitallySigned
       sei.dsciContentUuid[i] = val;
     }
   }
+  sei_read_uvlc(pDecodedMessageOutputStream, val, "dsci_num_verification_substreams_minus1");
+  sei.dsciNumVerificationSubstreams = val + 1;
+  sei.dsciRefSubstreamFlag.resize(sei.dsciNumVerificationSubstreams);
+  for (int i = 1; i < sei.dsciNumVerificationSubstreams; i++)
+  {
+    sei.dsciRefSubstreamFlag[i].resize(i);
+    for (int j = 0; j < i; j++)
+    {
+      sei_read_flag(pDecodedMessageOutputStream, val, "dsci_ref_substream_flag");
+      sei.dsciRefSubstreamFlag[i][j] = (val!=0);
+    }
+  }
+  sei_read_flag(pDecodedMessageOutputStream, val, "dsci_vss_implicit_association_mode_flag");
+  sei.dsciVSSImplicitAssociationModeFlag = (val!=0);
+  sei_read_flag(pDecodedMessageOutputStream, val, "dsci_signed_content_start_flag");
+  sei.dsciSignedContentStartFlag = (val!=0);
+  sei_read_flag(pDecodedMessageOutputStream, val, "dsci_sei_signing_flag");
+  sei.dsciSEISigningFlag = (val!=0);
+  while (!isByteAligned())
+  {
+    sei_read_flag(pDecodedMessageOutputStream, val, "dsci_alignment_zero_bit");
+    CHECK(val!=0, "dsci_alignment_zero_bit not equal to zero")
+  }
+  sei_read_string(pDecodedMessageOutputStream, sei.dsciKeySourceUri, "twci_key_source_uri");
 }
 
 void SEIReader::xParseSEIDigitallySignedContentSelection(SEIDigitallySignedContentSelection &sei, uint32_t payloadSize, std::ostream *pDecodedMessageOutputStream)
 {
   unsigned int val;
-  sei_read_uvlc(pDecodedMessageOutputStream, val, "dscs_verification_substream_id");
+  sei_read_code(pDecodedMessageOutputStream, 8, val, "dscs_id");
+  sei.dscsId = val;
+  sei_read_code(pDecodedMessageOutputStream, 8, val, "dscs_verification_substream_id");
   sei.dscsVerificationSubstreamId = val;
 }
 
 void SEIReader::xParseSEIDigitallySignedContentVerification(SEIDigitallySignedContentVerification &sei, uint32_t payloadSize, std::ostream *pDecodedMessageOutputStream)
 {
   unsigned int val;
-  sei_read_uvlc(pDecodedMessageOutputStream, val, "dscv_verification_substream_id");
+  sei_read_code(pDecodedMessageOutputStream, 8, val, "dscv_id");
+  sei.dscvId = val;
+  sei_read_code(pDecodedMessageOutputStream, 8, val, "dscv_verification_substream_id");
   sei.dscvVerificationSubstreamId = val;
-  sei_read_uvlc(pDecodedMessageOutputStream, val, "dscv_signature_length_in_octets_minus1");
+  sei_read_code(pDecodedMessageOutputStream, 24, val, "dscv_signature_length_in_octets_minus1");
   sei.dscvSignatureLengthInOctets = val + 1;
   sei.dscvSignature.resize(sei.dscvSignatureLengthInOctets);
   for (int i=0; i< sei.dscvSignature.size(); i++)
@@ -3091,6 +3135,8 @@ void SEIReader::xParseSEIDigitallySignedContentVerification(SEIDigitallySignedCo
     sei_read_code(pDecodedMessageOutputStream, 8, val, "dscv_signature");
     sei.dscvSignature[i] = val;
   }
+  sei_read_flag(pDecodedMessageOutputStream, val, "dsci_signed_content_end_flag");
+  sei.dscvSignedContentEndFlag = (val!=0);
 }
 #endif
 

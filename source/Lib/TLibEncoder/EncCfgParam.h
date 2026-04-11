@@ -50,11 +50,20 @@ public:
   virtual ~CfgSEIDigitallySignedContent(){};
 
   bool                      enabled = false;
+  int dscId = 0;
   std::string               privateKeyFile;
   std::string               publicKeyUri;
   bool                      keyIdEnabled = false;
   int                       keyId = 0;
   int                       hashMethod = 0;
+  int                            numVerificationSubstreams = 1;
+  std::vector<std::vector<bool>> refSubstreamFlag;
+  bool                      implicitAssociationModeFlag = false;
+  bool                      signAURSEI = false;
+  bool                      signGFVSEI = false;
+  bool                      signGFVESEI = false;
+  bool                      signNNPFCSEI = false;
+  bool                      signNNPFASEI = false;
 };
 #endif
 }

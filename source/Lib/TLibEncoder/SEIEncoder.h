@@ -134,9 +134,9 @@ public:
   Void initSEIModalityInfo(SEIModalityInfo *sei);
 #endif
 #if JVET_AK0194_DSC_SEI
-  void initSEIDigitallySignedContentInitialization(SEIDigitallySignedContentInitialization *sei);
+  void initSEIDigitallySignedContentInitialization(SEIDigitallySignedContentInitialization *sei, bool startFlag);
   void initSEIDigitallySignedContentSelection(SEIDigitallySignedContentSelection *sei, int substream);
-  void initSEIDigitallySignedContentVerification(SEIDigitallySignedContentVerification *sei, int32_t substream, const std::vector<uint8_t> &signature);
+  void initSEIDigitallySignedContentVerification(SEIDigitallySignedContentVerification *sei, int32_t substream, const std::vector<uint8_t> &signature, bool endFlag);
 #endif
 #if JVET_AJ0207_GFV
   Void initSEIGenerativeFaceVideo(SEIGenerativeFaceVideo* sei, int currframeindex);
