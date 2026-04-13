@@ -132,15 +132,18 @@ bool SEIReader::xPayloadExtensionPresent()
 #if NH_MV
 Void SEIReader::sei_read_string(std::ostream *pOS, UInt uiBufSize, UChar* pucCode, UInt& ruiLength, const TChar *pSymbolName)
 {
-  READ_STRING(uiBufSize, pucCode, ruiLength, pSymbolName);
+#if RExt__DECODER_DEBUG_BIT_STATISTICS || ENC_DEC_TRACE
+  xReadString(uiBufSize, pucCode, ruiLength, pSymbolName);
+#else
+  xReadString(uiBufSize, pucCode, ruiLength);
+#endif
   if (pOS)
   {
     (*pOS) << "  " << pSymbolName << ": " << (const char*) pucCode << "\n";
   }
 }
+#endif
 
-inline Void SEIReader::output_sei_message_header(SEI &sei, std::ostream *pDecodedMessageOutputStream, UInt payloadSize)
-#else
 void SEIReader::sei_read_string(std::ostream* os, std::string& code, const TChar* symbolName)
 {
   READ_STRING(code, symbolName);
@@ -150,6 +153,9 @@ void SEIReader::sei_read_string(std::ostream* os, std::string& code, const TChar
   }
 }
 
+#if NH_MV
+inline Void SEIReader::output_sei_message_header(SEI &sei, std::ostream *pDecodedMessageOutputStream, UInt payloadSize)
+#else
 static inline Void output_sei_message_header(SEI &sei, std::ostream *pDecodedMessageOutputStream, UInt payloadSize)
 #endif
 {
@@ -2518,15 +2524,7 @@ void SEIReader::xParseSEIDigitallySignedContentInitialization(SEIDigitallySigned
   unsigned int val;
   sei_read_code(pDecodedMessageOutputStream, 8, val, "dsci_hash_method_type");
   sei.dsciHashMethodType = val;
-#if NH_MV
-  UChar* sval = new UChar[256];
-  UInt slen;
-
-  sei_read_string(pDecodedMessageOutputStream, 256, sval, slen, "twci_key_source_uri");
-  sei.dsciKeySourceUri.replace(sei.dsciKeySourceUri.begin(), sei.dsciKeySourceUri.end(), (char *)sval);
-#else
   sei_read_string(pDecodedMessageOutputStream, sei.dsciKeySourceUri, "twci_key_source_uri");
-#endif
   sei_read_uvlc(pDecodedMessageOutputStream, val, "dsci_num_verification_substreams_minus1");
   sei.dsciNumVerificationSubstreams = val + 1;
   sei_read_uvlc(pDecodedMessageOutputStream, val, "dsci_key_retrieval_mode_idc");
@@ -2551,9 +2549,6 @@ void SEIReader::xParseSEIDigitallySignedContentInitialization(SEIDigitallySigned
       sei.dsciContentUuid[i] = val;
     }
   }
-#if NH_MV
-    delete [] sval;
-#endif
 }
 
 void SEIReader::xParseSEIDigitallySignedContentSelection(SEIDigitallySignedContentSelection &sei, uint32_t payloadSize, std::ostream *pDecodedMessageOutputStream)
@@ -2724,21 +2719,8 @@ void SEIReader::xParseSEIGenerativeFaceVideo(SEIGenerativeFaceVideo & sei, uint3
           sei_read_flag(pDecodedMessageOutputStream, val, "gfv_nn_alignment_zero_bit_a");
           assert(val == 0);
         }
-#if NH_MV
-        UChar sval[256];
-        UInt slen;
-        sei_read_string(pDecodedMessageOutputStream, 256, sval, slen, "gfv_uri_tag");
-        sei.m_nnTagURI = std::string((char*)sval);
-        sei_read_string(pDecodedMessageOutputStream, 256, sval, slen, "gfv_uri");
-        sei.m_nnURI = std::string((char*)sval);
-#else
-        std::string val2;
-        sei_read_string(pDecodedMessageOutputStream, val2, "gfv_uri_tag");
-        sei.m_nnTagURI = val2;
-        val2 = "";
-        sei_read_string(pDecodedMessageOutputStream, val2, "gfv_uri");
-        sei.m_nnURI = val2;
-#endif
+        sei_read_string(pDecodedMessageOutputStream, sei.m_nnTagURI, "gfv_uri_tag");
+        sei_read_string(pDecodedMessageOutputStream, sei.m_nnURI, "gfv_uri");
       }
     }
     sei_read_flag(pDecodedMessageOutputStream, val, "gfv_chroma_key_info_present_flag");
@@ -3305,21 +3287,8 @@ void SEIReader::xParseSEIGenerativeFaceVideoEnhancement(SEIGenerativeFaceVideoEn
           sei_read_flag(pDecodedMessageOutputStream, val, "gefv_nn_alignment_zero_bit_a");
           assert(val == 0);
         }
-#if NH_MV
-        UChar sval[256];
-        UInt slen;
-        sei_read_string(pDecodedMessageOutputStream, 256, sval, slen, "gefv_nn_uri_tag");
-        sei.m_nnTagURI = std::string((char*)sval);
-        sei_read_string(pDecodedMessageOutputStream, 256, sval, slen, "gefv_nn_uri");
-        sei.m_nnURI = std::string((char*)sval);
-#else
-        std::string val2;
-        sei_read_string(pDecodedMessageOutputStream, val2, "gefv_nn_uri_tag");
-        sei.m_nnTagURI = val2;
-        val2 = "";
-        sei_read_string(pDecodedMessageOutputStream, val2, "gefv_nn_uri");
-        sei.m_nnURI = val2;
-#endif
+        sei_read_string(pDecodedMessageOutputStream, sei.m_nnTagURI, "gefv_nn_uri_tag");
+        sei_read_string(pDecodedMessageOutputStream, sei.m_nnURI, "gefv_nn_uri");
       }
     }
   }
@@ -3966,8 +3935,6 @@ Void SEIReader::xParseSEIOverlayInfo(SEIOverlayInfo& sei, UInt payloadSize, std:
       assert( code==0 );
     }
 
-    UChar* sval = new UChar[sei.m_numStringBytesMax];
-    UInt slen;
     sei.m_overlayLanguage   .resize( sei.m_numOverlaysMinus1 + 1 );
     sei.m_overlayName       .resize( sei.m_numOverlaysMinus1 + 1 );
     sei.m_overlayElementName.resize( sei.m_numOverlaysMinus1 + 1 );
@@ -3975,22 +3942,18 @@ Void SEIReader::xParseSEIOverlayInfo(SEIOverlayInfo& sei, UInt payloadSize, std:
     {
       if( sei.m_languageOverlayPresentFlag[i] )
       {
-        sei_read_string(pDecodedMessageOutputStream, sei.m_numStringBytesMax, sval, slen, "overlay_language");
-        sei.m_overlayLanguage[i] = std::string((const char*) sval);
+        sei_read_string(pDecodedMessageOutputStream, sei.m_overlayLanguage[i], "overlay_language");
       }
-      sei_read_string(pDecodedMessageOutputStream, sei.m_numStringBytesMax, sval, slen, "overlay_name");
-      sei.m_overlayName[i] = std::string((const char*) sval);
+      sei_read_string(pDecodedMessageOutputStream, sei.m_overlayName[i], "overlay_name");
       if( sei.m_overlayLabelPresentFlag[i] )
       {
         sei.m_overlayElementName[i].resize( sei.m_numOverlayElementsMinus1[i]+1 );
         for( Int j = 0; j  <=  sei.m_numOverlayElementsMinus1[i]; j++ )
         {
-          sei_read_string(pDecodedMessageOutputStream, sei.m_numStringBytesMax, sval, slen, "overlay_element_name");
-          sei.m_overlayElementName[i][j] = std::string((const char*) sval);
+          sei_read_string(pDecodedMessageOutputStream, sei.m_overlayElementName[i][j], "overlay_element_name");
         }
       }
     }
-    delete [] sval;
     sei_read_flag( pDecodedMessageOutputStream, code, "overlay_info_persistence_flag" ); sei.m_overlayInfoPersistenceFlag = (code == 1);
   }
 };

@@ -365,7 +365,8 @@ Void  SyntaxElementParser::xReadString  (UInt bufSize, UChar *pVal, UInt& rLengt
   rLength = i;
   assert( pVal[rLength] == 0 );
 }
-#else
+#endif
+
 #if RExt__DECODER_DEBUG_BIT_STATISTICS || ENC_DEC_TRACE
 Void SyntaxElementParser::xReadString( std::string& valueOut, const TChar *symbolName )
 #else
@@ -390,7 +391,6 @@ Void SyntaxElementParser::xReadString( std::string& valueOut )
 #endif
   valueOut = value;
 }
-#endif
 
 #if RExt__DECODER_DEBUG_BIT_STATISTICS || ENC_DEC_TRACE
 Void SyntaxElementParser::xReadSvlc( Int& rValue, const TChar *pSymbolName)

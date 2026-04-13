@@ -219,7 +219,8 @@ Void  SyntaxElementWriter::xWriteString( UChar* sCode, UInt uiLength)
   }
   m_pcBitIf->write( 0, 8 ); //zero-termination byte
 }
-#else
+#endif
+
 void  SyntaxElementWriter::xWriteString( const std::string &value )
 {
   for (int i = 0; i < value.length(); ++i)
@@ -228,7 +229,6 @@ void  SyntaxElementWriter::xWriteString( const std::string &value )
   }
   m_pcBitIf->write('\0', 8);
 }
-#endif
 
 Void SyntaxElementWriter::xWriteRbspTrailingBits()
 {
