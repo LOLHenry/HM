@@ -51,6 +51,14 @@
 //! \ingroup TAppDecoder
 //! \{
 
+#if Y4M_SUPPORT
+static int calcGcd(int a, int b)
+{
+  // assume that a >= b
+  return b == 0 ? a : calcGcd(b, a % b);
+}
+#endif
+
 // ====================================================================================================================
 // Constructor / destructor / initialization / destroy
 // ====================================================================================================================
@@ -237,6 +245,41 @@ Void TAppDecTop::decode()
           }
         }
 
+#if Y4M_SUPPORT
+        if (isY4mFileExt(m_reconFileName))
+        {
+          const auto sps = pcListPic->front()->getPicSym()->getSPS();
+          int        frameRate = 50;
+          int        frameScale = 1;
+          //if (sps->getGeneralHrdParametersPresentFlag())
+          //{
+          //  const auto hrd = sps->getGeneralHrdParameters();
+          //  const auto olsHrdParam = sps->getOlsHrdParameters()[sps->getMaxTLayers() - 1];
+          //  int        elementDurationInTc = 1;
+          //  if (olsHrdParam.getFixedPicRateWithinCvsFlag())
+          //  {
+          //    elementDurationInTc = olsHrdParam.getElementDurationInTcMinus1() + 1;
+          //  }
+          //  else
+          //  {
+          //    printf("\nWarning: No fixed picture rate info is found in the bitstream, best guess is used.\n");
+          //  }
+          //  frameRate = hrd->getTimeScale() * elementDurationInTc;
+          //  frameScale = hrd->getNumUnitsInTick();
+          //  int gcd = calcGcd(max(frameRate, frameScale), min(frameRate, frameScale));
+          //  frameRate /= gcd;
+          //  frameScale /= gcd;
+          //}
+          //else
+          {
+            printf("\nWarning: No frame rate info found in the bitstream, default 50 fps is used.\n");
+          }
+          auto confWindow = sps.getConformanceWindow();
+          int picWidth = sps.getPicWidthInLumaSamples() - confWindow.getWindowLeftOffset() - confWindow.getWindowRightOffset();
+          int picHeight = sps.getPicHeightInLumaSamples() - confWindow.getWindowTopOffset() - confWindow.getWindowBottomOffset();
+          m_cTVideoIOYuvReconFile.setOutputY4mInfo(picWidth, picHeight, frameRate, frameScale, m_outputBitDepth[0], sps.getChromaFormatIdc());
+        }
+#endif
         m_cTVideoIOYuvReconFile.open( m_reconFileName, true, m_outputBitDepth, m_outputBitDepth, bitDepths.recon ); // write mode
         openedReconFile = true;
       }

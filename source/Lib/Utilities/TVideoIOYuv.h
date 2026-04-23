@@ -58,11 +58,27 @@ private:
   Int       m_fileBitdepth[MAX_NUM_CHANNEL_TYPE]; ///< bitdepth of input/output video file
   Int       m_MSBExtendedBitDepth[MAX_NUM_CHANNEL_TYPE];  ///< bitdepth after addition of MSBs (with value 0)
   Int       m_bitdepthShift[MAX_NUM_CHANNEL_TYPE];  ///< number of bits to increase or decrease image by before/after write/read
+#if Y4M_SUPPORT
+  int          m_inY4mFileHeaderLength = 0;
+  int          m_outPicWidth = 0;
+  int          m_outPicHeight = 0;
+  int          m_outBitDepth = 0;
+  int          m_outFrameRate = 0;
+  int          m_outFrameScale = 1;
+  ChromaFormat m_outChromaFormat = CHROMA_420;
+  bool         m_outY4m = false;
+#endif
 
 public:
   TVideoIOYuv()           {}
   virtual ~TVideoIOYuv()  {}
 
+#if Y4M_SUPPORT
+  void  parseY4mFileHeader(const std::string &fileName, int &width, int &height, int &frameRate, int &bitDepth,
+    ChromaFormat &chromaFormat);
+  void  setOutputY4mInfo(int width, int height, int frameRate, int frameScale, int bitDepth, ChromaFormat chromaFormat);
+  void  writeY4mFileHeader();
+#endif
   Void  open  ( const std::string &fileName, Bool bWriteMode, const Int fileBitDepth[MAX_NUM_CHANNEL_TYPE], const Int MSBExtendedBitDepth[MAX_NUM_CHANNEL_TYPE], const Int internalBitDepth[MAX_NUM_CHANNEL_TYPE] ); ///< open or create file
   Void  close ();                                           ///< close file
 
@@ -93,6 +109,10 @@ public:
     }
   }
 };
+
+#if Y4M_SUPPORT
+bool isY4mFileExt(const std::string &fileName);
+#endif
 
 #endif // __TVIDEOIOYUV__
 

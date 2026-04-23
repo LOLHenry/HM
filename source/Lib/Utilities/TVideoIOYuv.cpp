@@ -48,6 +48,14 @@
 
 using namespace std;
 
+#if Y4M_SUPPORT
+constexpr int Y4M_SIGNATURE_LENGTH = 10;
+const char    y4mSignature[] = "YUV4MPEG2 ";
+constexpr int Y4M_MAX_HEADER_LENGTH = 128;
+constexpr int Y4M_FRAME_HEADER_LENGTH = 6;   // basic Y4m frame header, "FRAME" + '\n'
+const char    y4mFrameHeader[] = "FRAME\n";
+#endif
+
 // ====================================================================================================================
 // Local Functions
 // ====================================================================================================================
@@ -149,9 +157,27 @@ Void TVideoIOYuv::open( const std::string &fileName, Bool bWriteMode, const Int 
       printf("\nfailed to write reconstructed YUV file\n");
       exit(0);
     }
+#if Y4M_SUPPORT
+    if (isY4mFileExt(fileName))
+    {
+      writeY4mFileHeader();
+      m_outY4m = true;
+    }
+#endif
   }
   else
   {
+#if Y4M_SUPPORT
+    if (isY4mFileExt(fileName))
+    {
+      if (m_inY4mFileHeaderLength == 0)
+      {
+        int          dummyWidth = 0, dummyHeight = 0, dummyFrameRate = 0, dummyBitDepth = 0;
+        ChromaFormat dummyChromaFormat = CHROMA_420;
+        parseY4mFileHeader(fileName, dummyWidth, dummyHeight, dummyFrameRate, dummyBitDepth, dummyChromaFormat);
+      }
+    }
+#endif
     m_cHandle.open( fileName.c_str(), ios::binary | ios::in );
 
     if( m_cHandle.fail() )
@@ -159,10 +185,160 @@ Void TVideoIOYuv::open( const std::string &fileName, Bool bWriteMode, const Int 
       printf("\nfailed to open Input YUV file\n");
       exit(0);
     }
+#if Y4M_SUPPORT
+    if (m_inY4mFileHeaderLength)
+    {
+      m_cHandle.seekg(m_inY4mFileHeaderLength, ios::cur);
+    }
+#endif
   }
 
   return;
 }
+
+#if Y4M_SUPPORT
+void TVideoIOYuv::parseY4mFileHeader(const std::string &fileName, int &width, int &height, int &frameRate, int &bitDepth,
+  ChromaFormat &chromaFormat)
+{
+  m_cHandle.open(fileName.c_str(), ios::binary | ios::in);
+  if (m_cHandle.fail())
+  {
+    printf("\nFile open failed.");
+    exit(EXIT_FAILURE);
+  }
+
+  char header[Y4M_MAX_HEADER_LENGTH];
+  m_cHandle.read(header, sizeof(header));
+  if (strncmp(header, y4mSignature, Y4M_SIGNATURE_LENGTH))
+  {
+    printf("\nThe input is not a Y4M file!");
+    exit(EXIT_FAILURE);
+  }
+
+  // locate the end of the header
+  for (int i = Y4M_SIGNATURE_LENGTH + 1; i < Y4M_MAX_HEADER_LENGTH; i++)
+  {
+    if (header[i] == '\n')
+    {
+      header[i] = ' ';   // space is used as token end later
+      m_inY4mFileHeaderLength = i + 1;
+      break;
+    }
+  }
+  // parse Y4M header info
+  for (int i = Y4M_SIGNATURE_LENGTH; i < m_inY4mFileHeaderLength; i++)
+  {
+    int numerator = 0, denominator = 0, pos = 0;
+    switch (header[i])
+    {
+    case 'W': sscanf(header + i + 1, "%d", &width); break;
+    case 'H': sscanf(header + i + 1, "%d", &height); break;
+    case 'C':
+      if (strncmp(&header[i + 1], "mono", 4) == 0)
+      {
+        chromaFormat = CHROMA_400;
+        pos = i + 5;
+      }
+      else if (strncmp(&header[i + 1], "420", 3) == 0)
+      {
+        chromaFormat = CHROMA_420;
+        pos = i + 4;
+        if (strncmp(&header[pos], "jpeg", 4) == 0)
+        {
+          pos += 4;
+        }
+        else if (strncmp(&header[pos], "paldv", 5) == 0)
+        {
+          pos += 5;
+        }
+      }
+      else if (strncmp(&header[i + 1], "422", 3) == 0)
+      {
+        chromaFormat = CHROMA_422;
+        pos = i + 4;
+      }
+      else if (strncmp(&header[i + 1], "444", 3) == 0)
+      {
+        chromaFormat = CHROMA_444;
+        pos = i + 4;
+      }
+      bitDepth = 8;
+      if (header[pos] == 'p')
+      {
+        sscanf(&header[pos + 1], "%d", &bitDepth);
+      }
+      break;
+    case 'F':
+      if (sscanf(header + i + 1, "%d:%d", &numerator, &denominator) == 2)
+      {
+        if (denominator != 0)
+        {
+          frameRate = (int)(1.0 * numerator / denominator + 0.5);
+        }
+      }
+      break;
+    case 'I': 
+      if (header[i + 1] != 'p')
+      {
+        printf("\nInterlaced Y4M is not supported yet");
+        exit(EXIT_FAILURE);
+      }
+    case 'A':   // not support, ignore
+    case 'X':   // not support, ignore
+      break;
+    default: 
+      printf("Wrong Y4M file header!");
+      exit(EXIT_FAILURE);
+    }
+    i = (int)(strchr(header + i + 1, ' ') - header);
+  }
+
+  m_cHandle.close();
+}
+
+void TVideoIOYuv::setOutputY4mInfo(int width, int height, int frameRate, int frameScale, int bitDepth,
+  ChromaFormat chromaFormat)
+{
+  m_outPicWidth = width;
+  m_outPicHeight = height;
+  m_outBitDepth = bitDepth;
+  m_outFrameRate = frameRate;
+  m_outFrameScale = frameScale;
+  m_outChromaFormat = chromaFormat;
+}
+
+void TVideoIOYuv::writeY4mFileHeader()
+{
+  if (m_outPicWidth == 0 || m_outPicHeight == 0 || m_outBitDepth == 0 || m_outFrameRate == 0)
+  {
+    printf("\nOutput Y4M file into has not been set");
+    exit(EXIT_FAILURE);
+  }
+  std::string header = y4mSignature;
+  header += "W" + std::to_string(m_outPicWidth) + " ";
+  header += "H" + std::to_string(m_outPicHeight) + " ";
+  header += "F" + std::to_string(m_outFrameRate) + ":" + std::to_string(m_outFrameScale) + " ";
+  header += "Ip A0:0 ";
+  switch (m_outChromaFormat)
+  {
+  case CHROMA_400: header += "Cmono"; break;
+  case CHROMA_420: header += "C420"; break;
+  case CHROMA_422: header += "C422"; break;
+  case CHROMA_444: header += "C444"; break;
+  default: 
+    printf("\nUnknow chroma format");
+    exit(EXIT_FAILURE);
+  }
+  if (m_outBitDepth > 8)
+  {
+    header += "p" + std::to_string(m_outBitDepth);
+  }
+  header += "\n";
+  // not write extension/comment
+
+  m_cHandle.write(header.c_str(), header.length());
+}
+#endif
 
 Void TVideoIOYuv::close()
 {
@@ -207,6 +383,12 @@ Void TVideoIOYuv::skipFrames(Int numFrames, UInt width, UInt height, ChromaForma
   }
   frameSize *= wordsize;
   //------------------
+#if Y4M_SUPPORT
+  if (m_inY4mFileHeaderLength)
+  {
+    frameSize += Y4M_FRAME_HEADER_LENGTH;
+  }
+#endif
 
   const streamoff offset = frameSize * numFrames;
 
@@ -695,6 +877,23 @@ Bool TVideoIOYuv::read ( TComPicYuv*  pPicYuvUser, TComPicYuv* pPicYuvTrueOrg, c
     }
   }
 
+#if Y4M_SUPPORT
+  if (m_inY4mFileHeaderLength)
+  {
+    char frameHeader[Y4M_FRAME_HEADER_LENGTH + 1];
+    m_cHandle.read(frameHeader, Y4M_FRAME_HEADER_LENGTH);
+    if (m_cHandle.eof() || m_cHandle.fail())
+    {
+      return false;
+    }
+    if (strncmp(frameHeader, y4mFrameHeader, Y4M_FRAME_HEADER_LENGTH))
+    {
+      printf("\nWrong Y4M frame header!");
+      exit(EXIT_FAILURE);
+    }
+  }
+#endif
+
   const UInt stride444      = pPicYuv->getStride(COMPONENT_Y);
 
   // compute actual YUV width & height excluding padding size
@@ -815,6 +1014,13 @@ Bool TVideoIOYuv::write( TComPicYuv* pPicYuvUser, const InputColourSpaceConversi
   {
     printf ("\nWarning: writing %d x %d luma sample output picture!", width444, height444);
   }
+
+#if Y4M_SUPPORT
+  if (m_outY4m)
+  {
+    m_cHandle.write(y4mFrameHeader, Y4M_FRAME_HEADER_LENGTH);
+  }
+#endif
 
   for(UInt comp=0; retval && comp<dstPicYuv->getNumberValidComponents(); comp++)
   {
@@ -1039,3 +1245,12 @@ Void TVideoIOYuv::ColourSpaceConvert(const TComPicYuv &src, TComPicYuv &dest, co
       break;
   }
 }
+
+#if Y4M_SUPPORT
+bool isY4mFileExt(const std::string &fileName)
+{
+  auto pos = fileName.rfind(".y4m");
+  // ".y4m" must be at the end of the file name
+  return (pos != std::string::npos && pos + 4 == fileName.length());
+}
+#endif

@@ -54,6 +54,9 @@ static inline std::istream& operator >> (std::istream &in, std::map<T1, T2> &map
 
 #include "TAppEncCfg.h"
 #include "Utilities/program_options_lite.h"
+#if Y4M_SUPPORT
+#include "Utilities/TVideoIOYuv.h"
+#endif
 #include "TLibEncoder/TEncRateCtrl.h"
 #ifdef WIN32
 #define strdup _strdup
@@ -2065,6 +2068,29 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
 
 #if EXTENSION_360_VIDEO
   m_ext360.processOptions(ext360CfgContext);
+#endif
+
+#if Y4M_SUPPORT
+  if (isY4mFileExt(m_inputFileName))
+  {
+    int          width = 0, height = 0, frameRate = 0, inputBitDepth = 0;
+    ChromaFormat chromaFormat = CHROMA_420;
+    TVideoIOYuv  inputFile;
+    inputFile.parseY4mFileHeader(m_inputFileName, width, height, frameRate, inputBitDepth, chromaFormat);
+    if (width != m_sourceWidth || height != m_sourceHeight || frameRate != m_iFrameRate
+      || inputBitDepth != m_inputBitDepth[0] || chromaFormat != m_chromaFormatIDC)
+    {
+      printf("\nWarning: Y4M file info is different from input setting. Using the info from Y4M file\n");
+      m_sourceWidth = width;
+      m_sourceHeight = height;
+      m_iFrameRate = frameRate;
+      m_inputBitDepth[0] = inputBitDepth;
+      m_inputBitDepth[1] = inputBitDepth;
+      m_chromaFormatIDC = chromaFormat;
+      m_MSBExtendedBitDepth[0] = m_inputBitDepth[0];
+      m_MSBExtendedBitDepth[1] = m_inputBitDepth[1];
+    }
+  }
 #endif
 
   assert(tmpWeightedPredictionMethod>=0 && tmpWeightedPredictionMethod<=WP_PER_PICTURE_WITH_HISTOGRAM_AND_PER_COMPONENT_AND_CLIPPING_AND_EXTENSION);

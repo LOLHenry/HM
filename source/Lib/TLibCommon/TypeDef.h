@@ -184,6 +184,8 @@
 #define VECTOR_CODING__DISTORTION_CALCULATIONS            0 ///< enable vector coding for distortion calculations   0 (default if SSE not possible) disable SSE vector coding. Should not affect RD costs/decisions. Code back-ported from JEM2.0.
 #endif
 
+#define Y4M_SUPPORT                                       1
+
 // ====================================================================================================================
 // Derived macros
 // ====================================================================================================================

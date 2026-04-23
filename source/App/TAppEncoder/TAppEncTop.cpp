@@ -930,6 +930,13 @@ Void TAppEncTop::xCreateLib()
 
   if (!m_reconFileName.empty())
   {
+#if Y4M_SUPPORT
+    if (isY4mFileExt(m_reconFileName))
+    {
+      m_cTVideoIOYuvReconFile.setOutputY4mInfo(m_sourceWidth - m_confWinLeft - m_confWinRight, 
+        m_sourceHeight - m_confWinTop - m_confWinBottom, m_iFrameRate, 1, m_internalBitDepth[0], m_chromaFormatIDC);
+    }
+#endif
     m_cTVideoIOYuvReconFile.open(m_reconFileName, true, m_outputBitDepth, m_outputBitDepth, m_internalBitDepth);  // write mode
   }
 #if SHUTTER_INTERVAL_SEI_PROCESSING
