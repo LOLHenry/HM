@@ -70,15 +70,19 @@ typedef enum : uint32_t
 class SEIDigitallySignedContentInitialization: public SEI
 {
 public:
+  int8_t       dsciId                        = 0;
   int8_t       dsciHashMethodType            = 0;
   std::string  dsciKeySourceUri;
   int8_t       dsciNumVerificationSubstreams = 0;
+  std::vector<std::vector<bool>> dsciRefSubstreamFlag;
+  bool         dsciVSSImplicitAssociationModeFlag = false;
   int8_t       dsciKeyRetrievalModeIdc       = 0;
   bool         dsciUseKeyRegisterIdxFlag     = false;
   int32_t      dsciKeyRegisterIdx            = 0;
   bool         dsciContentUuidPresentFlag    = false;
   std::array<uint8_t, 16> dsciContentUuid = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
+  bool         dsciSignedContentStartFlag    = false;
+  bool         dsciSEISigningFlag            = false;
 public:
   SEIDigitallySignedContentInitialization()
   {};
@@ -92,6 +96,7 @@ public:
 class SEIDigitallySignedContentSelection: public SEI
 {
 public:
+  int8_t       dscsId = 0;
   int32_t      dscsVerificationSubstreamId = 0;
 
 public:
@@ -107,9 +112,11 @@ public:
 class SEIDigitallySignedContentVerification: public SEI
 {
 public:
+  int8_t               dscvId = 0;
   int32_t              dscvVerificationSubstreamId = 0;
   int32_t              dscvSignatureLengthInOctets = 0;
   std::vector<uint8_t> dscvSignature;
+  bool                 dscvSignedContentEndFlag    = false;
 
 public:
   SEIDigitallySignedContentVerification()
@@ -149,6 +156,7 @@ private:
   int  m_hashMethodType = -1;
   EVP_PKEY *m_pubKey    = nullptr;
   DSCStatus m_certVerificationStatus = DSCStatus::DSC_Uninitalized;
+
 public:
   ~DscVerificator()
   {
@@ -205,8 +213,14 @@ private:
 
   bool    m_sigInitialized = false;
 
+  std::vector<std::vector<bool>> m_refSubstreamFlag;
+  bool m_implicitAssociationModeFlag = false;
+  bool m_seiSigningFlag = false;
+
 public:
-  void initDscSubstreamManager (int numSubstreams, int hashMethodType, const std::string &certUri, bool hasContentUuid, std::array<uint8_t,16> &contentUuid);
+  bool getDscAssociationModeFlag(){return m_implicitAssociationModeFlag;}
+  bool getSeiSigningFlag(){return m_seiSigningFlag;}
+  void initDscSubstreamManager (int numSubstreams, int hashMethodType, const std::string &certUri, bool hasContentUuid, std::array<uint8_t,16> &contentUuid, const std::vector<std::vector<bool>> &refFlags, bool implicitAssociationFlag, bool seiSigningFlag);
 
   void initSignature   (const std::string &privKeyFile);
   bool initVerificator (const std::string &keyStoreDir, const std::string &trustStoreDir);

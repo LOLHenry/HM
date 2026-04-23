@@ -70,7 +70,6 @@ Int getLSB(Int poc, Int maxLSB)
     return (maxLSB - ((-poc) % maxLSB)) % maxLSB;
   }
 }
-
 TEncGOP::TEncGOP()
 {
   m_iLastIDR            = 0;
@@ -281,12 +280,39 @@ Void TEncGOP::xWriteSEI (NalUnitType naluType, SEIMessages& seiMessages, AccessU
     return;
   }
   OutputNALUnit nalu(naluType, temporalId);
+#if JVET_AJ0151_DSC_SEI
+    if (m_pcCfg->getDigitallySignedContentSEICfg().enabled && ((m_pcCfg->getDigitallySignedContentSEICfg().signAURSEI && (*sei)->payloadType() == SEI::PayloadType::AI_USAGE_RESTRICTIONS) ||
+                                                               (m_pcCfg->getDigitallySignedContentSEICfg().signGFVSEI && (*sei)->payloadType() == SEI::PayloadType::GENERATIVE_FACE_VIDEO) ||
+                                                               (m_pcCfg->getDigitallySignedContentSEICfg().signGFVESEI && (*sei)->payloadType() == SEI::PayloadType::GENERATIVE_FACE_VIDEO_ENHANCEMENT) ||
+                                                               (m_pcCfg->getDigitallySignedContentSEICfg().signNNPFCSEI && (*sei)->payloadType() == SEI::PayloadType::NEURAL_NETWORK_POST_FILTER_CHARACTERISTICS) ||
+                                                               (m_pcCfg->getDigitallySignedContentSEICfg().signNNPFASEI && (*sei)->payloadType() == SEI::PayloadType::NEURAL_NETWORK_POST_FILTER_ACTIVATION)))
+    {
+      SEIDigitallySignedContentSelection *sei = new SEIDigitallySignedContentSelection;
+      m_seiEncoder.initSEIDigitallySignedContentSelection(sei, m_dscSubstreamId);
+      tmpMessages.insert(tmpMessages.begin(), sei);
+      m_seiWriter.writeSEImessages(nalu.m_bitstream, tmpMessages, *m_HRD, false, temporalId);
+      if (signSEI)
+      {
+        xAddToSubstream(m_dscSubstreamId, nalu);
+      }
+    }
+    else
+    {
+      m_seiWriter.writeSEImessages(nalu.m_bitstream, tmpMessages, *m_HRD, false, temporalId);
+    }
+#else
   m_seiWriter.writeSEImessages(nalu.m_Bitstream, seiMessages, sps, false);
+#endif
   auPos = accessUnit.insert(auPos, new NALUnitEBSP(nalu));
   auPos++;
 }
 
+#if JVET_AK0194_DSC_SEI
+Void TEncGOP::xWriteSEISeparately (NalUnitType naluType, SEIMessages& seiMessages, AccessUnit &accessUnit, AccessUnit::iterator &auPos, Int temporalId, const TComSPS *sps, bool signSEI)
+#else
 Void TEncGOP::xWriteSEISeparately (NalUnitType naluType, SEIMessages& seiMessages, AccessUnit &accessUnit, AccessUnit::iterator &auPos, Int temporalId, const TComSPS *sps)
+#endif
+
 {
   // don't do anything, if we get an empty list
   if (seiMessages.empty())
@@ -459,7 +485,11 @@ Void TEncGOP::xWriteTrailingSEIMessages (SEIMessages& seiMessages, AccessUnit &a
 {
   // Note: using accessUnit.end() works only as long as this function is called after slice coding and before EOS/EOB NAL units
   AccessUnit::iterator pos = accessUnit.end();
+#if JVET_AK0194_DSC_SEI
+  xWriteSEISeparately(NAL_UNIT_SUFFIX_SEI, seiMessages, accessUnit, pos, temporalId, sps, true);
+#else
   xWriteSEISeparately(NAL_UNIT_SUFFIX_SEI, seiMessages, accessUnit, pos, temporalId, sps);
+#endif
   deleteSEIs(seiMessages);
 }
 
@@ -730,7 +760,7 @@ Void TEncGOP::xCreateIRAPLeadingSEIMessages (SEIMessages& seiMessages, const TCo
   if (m_pcCfg->getDigitallySignedContentSEICfg().enabled)
   {
     SEIDigitallySignedContentInitialization *sei = new SEIDigitallySignedContentInitialization;
-    m_seiEncoder.initSEIDigitallySignedContentInitialization(sei);
+    m_seiEncoder.initSEIDigitallySignedContentInitialization(sei, m_bFirst);
     seiMessages.push_back(sei);
   }
 #endif
@@ -2046,7 +2076,7 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
         std::vector<uint8_t> signature;
         m_dscSubstreamManager.signSubstream(0, signature);
         SEIDigitallySignedContentVerification *sei = new SEIDigitallySignedContentVerification;
-        m_seiEncoder.initSEIDigitallySignedContentVerification(sei, 0, signature);
+        m_seiEncoder.initSEIDigitallySignedContentVerification(sei, 0, signature, false);
         twcSeiMessages.push_back(sei);
         xWriteTrailingSEIMessages(twcSeiMessages, accessUnit, m_prevPicTemporalId, pcSlice->getSPS() );
       }
@@ -2058,7 +2088,7 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
         0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
       };
       const EncCfgParam::CfgSEIDigitallySignedContent &dscCfg = m_pcCfg->getDigitallySignedContentSEICfg();
-      m_dscSubstreamManager.initDscSubstreamManager(1, dscCfg.hashMethod, dscCfg.publicKeyUri , false, contentUuid);
+      m_dscSubstreamManager.initDscSubstreamManager(dscCfg.numVerificationSubstreams, dscCfg.hashMethod, dscCfg.publicKeyUri , false, contentUuid, dscCfg.refSubstreamFlag, dscCfg.implicitAssociationModeFlag, dscCfg.signAURSEI || dscCfg.signGFVSEI || dscCfg.signGFVESEI || dscCfg.signNNPFCSEI || dscCfg.signNNPFASEI);
       m_dscSubstreamManager.initSignature(dscCfg.privateKeyFile);
     }
 #endif
@@ -2313,7 +2343,7 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
           std::vector<uint8_t> signature;
           m_dscSubstreamManager.signSubstream(0, signature);
           SEIDigitallySignedContentVerification *sei = new SEIDigitallySignedContentVerification;
-          m_seiEncoder.initSEIDigitallySignedContentVerification(sei, 0, signature);
+          m_seiEncoder.initSEIDigitallySignedContentVerification(sei, m_dscSubstreamId, signature, true);
           twcSeiMessages.push_back(sei);
           xWriteTrailingSEIMessages(twcSeiMessages, accessUnit, pcSlice->getTLayer(), pcSlice->getSPS());
           m_dscSubstreamManager.uninitDscSubstreamManager();

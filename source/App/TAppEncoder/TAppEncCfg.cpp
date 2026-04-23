@@ -1489,6 +1489,7 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
 #endif
 #if JVET_AK0194_DSC_SEI
   ("SEIDSCEnabled", m_cfgDigitallySignedContentSEI.enabled, false, "Control generation of Digitally Signed Content SEI messages")
+  ("SEIDSCId", m_cfgDigitallySignedContentSEI.dscId, 0, "Identifying number of Digitally Signed Content SEI messages")
   ("SEIDSCHashMethod", m_cfgDigitallySignedContentSEI.hashMethod, 0 , "Hash type to be used:\n"
                                                                        "\t0: SHA-1 (default)\n"
                                                                        "\t1: SHA-224\n"
@@ -1499,8 +1500,14 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
                                                                        "\t6: SHA-512/256")
   ("SEIDSCSigningKeyFile", m_cfgDigitallySignedContentSEI.privateKeyFile, std::string("") , "(Private) signing key location for Digitally Signed Content SEI messages")
   ("SEIDSCVerificationKeyURI", m_cfgDigitallySignedContentSEI.publicKeyUri, std::string("") , "(Public) verification key URI for Digitally Signed Content SEI messages")
+  ("SEIDSCImplicitAssociationModeFlag", m_cfgDigitallySignedContentSEI.implicitAssociationModeFlag, false , "Used to infer the verification substream ID")
   ("SEIDSCKeyIDEnabled", m_cfgDigitallySignedContentSEI.keyIdEnabled, false, "Enable using a key ID addition to URI of public key of Digitally Signed Content SEI messages")
   ("SEIDSCKeyID", m_cfgDigitallySignedContentSEI.keyId, 0 , "Public Key ID for Digitally Signed Content SEI messages (if enabled)")
+  ("SEIDSCSignAURSEI", m_cfgDigitallySignedContentSEI.signAURSEI, false, "Enable signing of AUR SEI for Digitally Signed Content SEI messages")
+  ("SEIDSCSignGFVSEI", m_cfgDigitallySignedContentSEI.signGFVSEI, false, "Enable signing of GFV SEI for Digitally Signed Content SEI messages")
+  ("SEIDSCSignGFVESEI", m_cfgDigitallySignedContentSEI.signGFVESEI, false, "Enable signing of GFVE SEI for Digitally Signed Content SEI messages")
+  ("SEIDSCSignNNPFCSEI", m_cfgDigitallySignedContentSEI.signNNPFCSEI, false, "Enable signing of NNPFC SEI for Digitally Signed Content SEI messages")
+  ("SEIDSCSignNNPFASEI", m_cfgDigitallySignedContentSEI.signNNPFASEI, false, "Enable signing of NNPFA SEI for Digitally Signed Content SEI messages")
 #endif
 #if JVET_AJ0207_GFV
   ("SEIGenerativeFaceVideoEnabled", m_generativeFaceVideoEnabled, false, "Control use of the Generative Face Video SEI on current picture")

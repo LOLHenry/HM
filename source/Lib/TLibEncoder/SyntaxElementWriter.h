@@ -94,6 +94,7 @@ protected:
   void  xWriteStringTr        ( const std::string &value, const TChar *symbolName );
 #endif
   Void xWriteRbspTrailingBits();
+  bool isByteAligned()        { return (m_pcBitIf->getNumBitsUntilByteAligned() == 0); } ;
 
   UInt  xConvertToUInt        ( Int iValue ) {  return ( iValue <= 0) ? -iValue<<1 : (iValue<<1)-1; }
 };

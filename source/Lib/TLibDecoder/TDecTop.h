@@ -160,12 +160,14 @@ public:
 
 #endif
 #if JVET_AK0194_DSC_SEI
+  void xInitDscSubstreamManager(SEIMessages &SEIs);
   void xStoreNALUnitForSignature(InputNALUnit &nalu);
   void xRemoveLastNalUnitFromSignature();
-  void xProcessStoredNALUnitsForSignature(int substream_id);
+  void xProcessStoredNALUnitsForSignature(uint8_t dscId, int substream_id);
+  void xClearStoredNALUnitsForSignature();
 
   std::list<binNalUnit> m_signedContentNalUnitBuffer;
-  DscSubstreamManager   m_dscSubstreamManager;
+  std::map<uint8_t, DscSubstreamManager>   m_dscSubstreamManagerMap;
 #endif
 
   Void  init();
