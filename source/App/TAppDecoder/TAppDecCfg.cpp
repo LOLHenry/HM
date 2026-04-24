@@ -78,8 +78,13 @@ Bool TAppDecCfg::parseCfg( Int argc, TChar* argv[] )
                                                                                    "YUV writing is skipped if omitted")
   ("WarnUnknowParameter,w",     warnUnknowParameter,                                  0, "warn for unknown configuration parameters instead of failing")
   ("SkipFrames,s",              m_iSkipFrame,                          0,          "number of frames to skip before random access")
+#if NH_MV
+  ("OutputBitDepth,d",          m_outputBitDepth[0][CHANNEL_TYPE_LUMA],   0,          "bit depth of YUV output luma component (default: use 0 for native depth)")
+  ("OutputBitDepthC,d",         m_outputBitDepth[0][CHANNEL_TYPE_CHROMA], 0,          "bit depth of YUV output chroma component (default: use 0 for native depth)")
+#else
   ("OutputBitDepth,d",          m_outputBitDepth[CHANNEL_TYPE_LUMA],   0,          "bit depth of YUV output luma component (default: use 0 for native depth)")
   ("OutputBitDepthC,d",         m_outputBitDepth[CHANNEL_TYPE_CHROMA], 0,          "bit depth of YUV output chroma component (default: use 0 for native depth)")
+#endif
   ("OutputColourSpaceConvert",  outputColourSpaceConvert,              string(""), "Colour space conversion to apply to input 444 video. Permitted values are (empty string=UNCHANGED) " + getListOfColourSpaceConverts(false))
 #if NH_MV
   ("TargetOptLayerSetIdx,x", m_targetOptLayerSetInd, std::vector<Int>(1,-1), "Target output layer set index. (default: -1, determine automatically to be equal to highest layer set index") // Should actually equal to 0 as default. However, this would cause only the base layer to be decoded.
@@ -224,9 +229,9 @@ Void TAppDecCfg::xAppendToFileNameEnd( const TChar* pchInputFileName, const TCha
   pCDot = pCDot ? pCDot : pchInputFileName + iInLength;
   size_t iCharsToDot = pCDot - pchInputFileName ;
   size_t iCharsToEnd = iInLength - iCharsToDot;
-  strncpy(rpchOutputFileName                            ,  pchInputFileName            , iCharsToDot  );
-  strncpy(rpchOutputFileName+ iCharsToDot               ,  pchStringToAppend           , iAppendLength);
-  strncpy(rpchOutputFileName+ iCharsToDot+iAppendLength ,  pchInputFileName+iCharsToDot, iCharsToEnd  );
+  memcpy(rpchOutputFileName                            ,  pchInputFileName            , iCharsToDot  );
+  memcpy(rpchOutputFileName+ iCharsToDot               ,  pchStringToAppend           , iAppendLength);
+  memcpy(rpchOutputFileName+ iCharsToDot+iAppendLength ,  pchInputFileName+iCharsToDot, iCharsToEnd  );
   rpchOutputFileName[iInLength+iAppendLength] = '\0';
 }
 #endif

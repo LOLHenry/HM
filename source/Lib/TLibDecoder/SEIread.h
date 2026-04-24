@@ -234,12 +234,13 @@ protected:
   Void sei_read_flag(std::ostream *pOS,                UInt& ruiCode, const TChar *pSymbolName);
 #if NH_MV
   Void sei_read_string(std::ostream *pOS, UInt uiBufSize, UChar* pucCode, UInt& ruiLength, const TChar *pSymbolName);
+#endif
+  void sei_read_string(std::ostream* os,           std::string& code, const TChar* symbolName);
+#if NH_MV
   inline Void output_sei_message_header(SEI &sei, std::ostream *pDecodedMessageOutputStream, UInt payloadSize);
 private:
   Int   m_layerId;
   Int64 m_decOrder;
-#else
-  void sei_read_string(std::ostream* os,           std::string& code, const TChar* symbolName);
 #endif
   bool xPayloadExtensionPresent();
 

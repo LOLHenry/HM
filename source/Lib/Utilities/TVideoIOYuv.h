@@ -83,6 +83,7 @@ public:
 
   Bool  isEof ();                                           ///< check for end-of-file
   Bool  isFail();                                           ///< check for failure
+  Int   countFrames(UInt width, UInt height, ChromaFormat format);  ///< count frames available in file from current position
 
   void setBitdepth(const int (&internalBitDepth)[MAX_NUM_CHANNEL_TYPE])
   {

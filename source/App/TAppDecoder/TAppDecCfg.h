@@ -62,7 +62,11 @@ protected:
   std::string   m_bitstreamFileName;                    ///< input bitstream file name
   std::string   m_reconFileName;                        ///< output reconstruction file name
   Int           m_iSkipFrame;                           ///< counter for frames prior to the random access point to skip
+#if NH_MV
+  Int           m_outputBitDepth[MAX_NUM_LAYERS][MAX_NUM_CHANNEL_TYPE]; ///< bit depth used for writing output, per layer
+#else
   Int           m_outputBitDepth[MAX_NUM_CHANNEL_TYPE]; ///< bit depth used for writing output
+#endif
   InputColourSpaceConversion m_outputColourSpaceConvert;
 
   Int           m_iMaxTemporalLayer;                  ///< maximum temporal layer to be decoded
@@ -146,10 +150,20 @@ public:
   , m_targetDecLayerIdSetFileEmpty(true)
 #endif
   {
+#if NH_MV
+    for (Int layerIdx = 0; layerIdx < MAX_NUM_LAYERS; layerIdx++)
+    {
+      for (UInt channelTypeIndex = 0; channelTypeIndex < MAX_NUM_CHANNEL_TYPE; channelTypeIndex++)
+      {
+        m_outputBitDepth[layerIdx][channelTypeIndex] = 0;
+      }
+    }
+#else
     for (UInt channelTypeIndex = 0; channelTypeIndex < MAX_NUM_CHANNEL_TYPE; channelTypeIndex++)
     {
       m_outputBitDepth[channelTypeIndex] = 0;
     }
+#endif
   }
 
   virtual ~TAppDecCfg() {}

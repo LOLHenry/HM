@@ -215,25 +215,37 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setVPS(&vps);
 
 #if NH_MV
-  // These values go to the SPS of the base layer only and should apply as follows:
-  //   If the profile_tier_level( ) syntax structure is included in an active SPS for the base layer
-  //    or is the profile_tier_level( ) syntax structure VpsProfileTierLevel[ 0 ],
-  //    it applies to the OLS containing all layers in the bitstream but with only the base layer being the output layer.
-  //   Otherwise, if the profile_tier_level( ) syntax structure is included in an active SPS
-  //    for an independent non-base layer with nuh_layer_id equal to layerId, it applies to the output bitstream
-  //    of the independent non-base layer rewriting process of clause F.10.2 with the input variables assignedBaseLayerId equal to layerId and tIdTarget equal to 6.
+  // Determine the applicable PTL for this layer using the VPS profile_tier_level_idx mapping.
+  // The PTL entry is resolved from the output layer sets: we search OLSes in reverse order to
+  // find the one containing this layer and use its profile_tier_level_idx.
 
-  m_cTEncTop.setProfile                                           ( m_profiles[0]                       );
-  m_cTEncTop.setLevel                                             ( m_levelTier[0], m_level[0]          );
-  m_cTEncTop.setProgressiveSourceFlag                             ( m_progressiveSourceFlags        [0] );
-  m_cTEncTop.setInterlacedSourceFlag                              ( m_interlacedSourceFlags         [0] );
-  m_cTEncTop.setNonPackedConstraintFlag                           ( m_nonPackedConstraintFlags      [0] );
-  m_cTEncTop.setFrameOnlyConstraintFlag                           ( m_frameOnlyConstraintFlags      [0] );
-  m_cTEncTop.setBitDepthConstraintValue                           ( m_bitDepthConstraints           [0] );
-  m_cTEncTop.setChromaFormatConstraintValue                       ( m_chromaFormatConstraints       [0] );
-  m_cTEncTop.setIntraConstraintFlag                               ( m_intraConstraintFlags          [0] );
-  m_cTEncTop.setOnePictureOnlyConstraintFlag                      ( m_onePictureOnlyConstraintFlags [0] );
-  m_cTEncTop.setLowerBitRateConstraintFlag                        ( m_lowerBitRateConstraintFlags   [0] );
+  // Determine PTL index for this layer from VPS profile_tier_level_idx
+  Int ptlIdxForLayer = 0;
+  for (Int olsIdx = vps.getNumOutputLayerSets() - 1; olsIdx >= 0; olsIdx--)
+  {
+    Int lsIdx = vps.olsIdxToLsIdx(olsIdx);
+    for (Int k = 0; k < vps.getNumLayersInIdList(lsIdx); k++)
+    {
+      if (vps.getLayerSetLayerIdList(lsIdx, k) == vps.getLayerIdInNuh(layerIdInVps))
+      {
+        ptlIdxForLayer = vps.getProfileTierLevelIdx(olsIdx, k);
+        break;
+      }
+    }
+    if (ptlIdxForLayer > 0) break;
+  }
+
+  m_cTEncTop.setProfile                                           ( m_profiles[ptlIdxForLayer]                       );
+  m_cTEncTop.setLevel                                             ( m_levelTier[ptlIdxForLayer], m_level[ptlIdxForLayer]          );
+  m_cTEncTop.setProgressiveSourceFlag                             ( m_progressiveSourceFlags        [ptlIdxForLayer] );
+  m_cTEncTop.setInterlacedSourceFlag                              ( m_interlacedSourceFlags         [ptlIdxForLayer] );
+  m_cTEncTop.setNonPackedConstraintFlag                           ( m_nonPackedConstraintFlags      [ptlIdxForLayer] );
+  m_cTEncTop.setFrameOnlyConstraintFlag                           ( m_frameOnlyConstraintFlags      [ptlIdxForLayer] );
+  m_cTEncTop.setBitDepthConstraintValue                           ( m_bitDepthConstraints           [ptlIdxForLayer] );
+  m_cTEncTop.setChromaFormatConstraintValue                       ( m_chromaFormatConstraints       [ptlIdxForLayer] );
+  m_cTEncTop.setIntraConstraintFlag                               ( m_intraConstraintFlags          [ptlIdxForLayer] );
+  m_cTEncTop.setOnePictureOnlyConstraintFlag                      ( m_onePictureOnlyConstraintFlags [ptlIdxForLayer] );
+  m_cTEncTop.setLowerBitRateConstraintFlag                        ( m_lowerBitRateConstraintFlags   [ptlIdxForLayer] );
 #else
   m_cTEncTop.setProfile                                           ( m_profile);
   m_cTEncTop.setLevel                                             ( m_levelTier, m_level);
@@ -947,18 +959,6 @@ Void TAppEncTop::xInitLibCfg()
   m_cTEncTop.setSummaryPicFilenameBase                            ( m_summaryPicFilenameBase );
   m_cTEncTop.setSummaryVerboseness                                ( m_summaryVerboseness );
 
-#if NH_MV
-  }
-#endif
-
-#if !NH_MV
-#if JCTVC_AD0021_SEI_MANIFEST
-  m_cTEncTop.setSEIManifestSEIEnabled(m_SEIManifestSEIEnabled);
-#endif
-#if JCTVC_AD0021_SEI_PREFIX_INDICATION
-  m_cTEncTop.setSEIPrefixIndicationSEIEnabled(m_SEIPrefixIndicationSEIEnabled);
-#endif
-#endif
 #if JVET_AJ0207_GFV
   m_cTEncTop.setGenerativeFaceVideoSEIEnabled(m_generativeFaceVideoEnabled);
   m_cTEncTop.setGenerativeFaceVideoSEINumber(m_generativeFaceVideoSEINumber);
@@ -1037,6 +1037,18 @@ Void TAppEncTop::xInitLibCfg()
   }
 #endif
 
+#if NH_MV
+  }
+#endif
+
+#if !NH_MV
+#if JCTVC_AD0021_SEI_MANIFEST
+  m_cTEncTop.setSEIManifestSEIEnabled(m_SEIManifestSEIEnabled);
+#endif
+#if JCTVC_AD0021_SEI_PREFIX_INDICATION
+  m_cTEncTop.setSEIPrefixIndicationSEIEnabled(m_SEIPrefixIndicationSEIEnabled);
+#endif
+#endif
 
 }
 
@@ -1052,6 +1064,23 @@ Void TAppEncTop::xCreateLib()
     m_acTVideoIOYuvInputFileList[layer]->open( m_pchInputFileList[layer],     false, &m_inputBitDepths[repFormatIdx][0], &m_MSBExtendedBitDepths[repFormatIdx][0], &m_internalBitDepths[repFormatIdx][0] );  // read  mode
     m_acTVideoIOYuvInputFileList[layer]->skipFrames( m_FrameSkip, m_iSourceWidths[repFormatIdx] - m_aiPads[repFormatIdx][0], m_iSourceHeights[repFormatIdx] - m_aiPads[repFormatIdx][1], m_InputChromaFormatIDC[repFormatIdx]);
 
+    // Clamp FramesToBeEncoded to the number of frames available in the input file
+    {
+      Int availableFrames = m_acTVideoIOYuvInputFileList[layer]->countFrames(
+        m_iSourceWidths[repFormatIdx] - m_aiPads[repFormatIdx][0],
+        m_iSourceHeights[repFormatIdx] - m_aiPads[repFormatIdx][1],
+        m_InputChromaFormatIDC[repFormatIdx] );
+      if (availableFrames >= 0 && (m_framesToBeEncoded == 0 || m_framesToBeEncoded > availableFrames))
+      {
+        if (m_framesToBeEncoded > 0)
+        {
+          fprintf(stderr, "\nWarning: Layer %d input file has only %d frames, clamping FramesToBeEncoded from %d to %d.\n",
+                  layer, availableFrames, m_framesToBeEncoded, availableFrames);
+        }
+        m_framesToBeEncoded = availableFrames;
+      }
+    }
+
     if (m_pchReconFileList[layer])
     {
       m_acTVideoIOYuvReconFileList[layer]->open( m_pchReconFileList[layer], true, &m_outputBitDepths[repFormatIdx][0], &m_outputBitDepths[repFormatIdx][0], &m_internalBitDepths[repFormatIdx][0]);  // write mode
@@ -1065,10 +1094,31 @@ Void TAppEncTop::xCreateLib()
 #endif
     m_acTEncTopList[layer]->create();
   }
+
+  // Update all layer encoders with the clamped FramesToBeEncoded value
+  for( Int layer=0; layer < m_numberOfLayers; layer++)
+  {
+    m_acTEncTopList[layer]->setFramesToBeEncoded(m_framesToBeEncoded);
+  }
 #else
   // Video I/O
   m_cTVideoIOYuvInputFile.open( m_inputFileName,     false, m_inputBitDepth, m_MSBExtendedBitDepth, m_internalBitDepth );  // read  mode
   m_cTVideoIOYuvInputFile.skipFrames(m_FrameSkip, m_inputFileWidth, m_inputFileHeight, m_InputChromaFormatIDC);
+
+  // Clamp FramesToBeEncoded to the number of frames available in the input file
+  {
+    Int availableFrames = m_cTVideoIOYuvInputFile.countFrames(m_inputFileWidth, m_inputFileHeight, m_InputChromaFormatIDC);
+    if (availableFrames >= 0 && (m_framesToBeEncoded == 0 || m_framesToBeEncoded > availableFrames))
+    {
+      if (m_framesToBeEncoded > 0)
+      {
+        fprintf(stderr, "\nWarning: Input file has only %d frames, clamping FramesToBeEncoded from %d to %d.\n",
+                availableFrames, m_framesToBeEncoded, availableFrames);
+      }
+      m_framesToBeEncoded = availableFrames;
+      m_cTEncTop.setFramesToBeEncoded(m_framesToBeEncoded);
+    }
+  }
 
   if (!m_reconFileName.empty())
   {
@@ -1325,11 +1375,10 @@ Void TAppEncTop::encode()
 
         // increase number of received frames
         m_frameRcvd[layer]++;
-        
+
         frmCnt++;
 
         eos[layer] = (m_frameRcvd[layer] == m_framesToBeEncoded);
-        allEos = allEos||eos[layer];
 
         // if end of file (which is only detected on a read failure) flush the encoder of any queued pictures
         if (m_acTVideoIOYuvInputFileList[layer]->isEof())
@@ -1339,6 +1388,15 @@ Void TAppEncTop::encode()
           m_frameRcvd    [layer]--;
           m_acTEncTopList[layer]->setFramesToBeEncoded(m_frameRcvd[layer]);
         }
+      }
+    }
+    // Check if all layers have reached end-of-stream
+    allEos = true;
+    for(Int layer=0; layer < m_numberOfLayers; layer++ )
+    {
+      if (xLayerIdInTargetEncLayerIdList( m_vps->getLayerIdInNuh( layer ) ))
+      {
+        allEos = allEos && eos[layer];
       }
     }
     for ( Int gopId=0; gopId < gopSize; gopId++ )
@@ -1833,8 +1891,7 @@ Void TAppEncTop::xSetDimensionIdAndLength( TComVPS& vps )
   Int maxViewId = xGetMax( m_viewId );
 
   Int viewIdLen = gCeilLog2( maxViewId + 1 );
-  const Int maxViewIdLen = ( 1 << 4 ) - 1;
-  assert( viewIdLen <= maxViewIdLen );
+  assert( viewIdLen <= ( 1 << 4 ) - 1 );
   vps.setViewIdLen( viewIdLen );
   for (Int i = 0; i < m_iNumberOfViews; i++)
   {
@@ -2135,6 +2192,18 @@ Void TAppEncTop::xSetProfileTierLevel(TComVPS& vps, Int ptlIdx, Int subLayer, Pr
   ptl->setProfileCompatibilityFlag( m_profiles [ ptlIdx ], true );
   ptl->setInbldFlag               ( m_inblFlag [ ptlIdx ] );
 
+#if NH_MV
+  // Set backward-compatibility flags per H.265 Table A.2/Table F.3
+  if (m_profiles[ptlIdx] == Profile::MULTIVIEWREXT)
+  {
+    ptl->setProfileCompatibilityFlag(Profile::MAINREXT, true);
+  }
+  if (m_profiles[ptlIdx] == Profile::MULTIVIEWMAIN)
+  {
+    ptl->setProfileCompatibilityFlag(Profile::MAIN, true);
+  }
+#endif
+
   Int        bitDepth = m_bitDepthConstraints[ptlIdx];
   ChromaFormat chroma = m_chromaFormatConstraints[ptlIdx];
 
@@ -2158,8 +2227,8 @@ Void TAppEncTop::xSetRepFormat( TComVPS& vps )
   repFormat.resize( vps.getVpsNumRepFormatsMinus1() + 1 );
   for ( Int j = 0; j <= vps.getVpsNumRepFormatsMinus1(); j++ )
   {
-    repFormat[j].setBitDepthVpsChromaMinus8   ( m_internalBitDepths[j][CHANNEL_TYPE_LUMA  ] - 8 );
-    repFormat[j].setBitDepthVpsLumaMinus8     ( m_internalBitDepths[j][CHANNEL_TYPE_CHROMA] - 8 );
+    repFormat[j].setBitDepthVpsLumaMinus8     ( m_internalBitDepths[j][CHANNEL_TYPE_LUMA  ] - 8 );
+    repFormat[j].setBitDepthVpsChromaMinus8   ( m_internalBitDepths[j][CHANNEL_TYPE_CHROMA] - 8 );
     repFormat[j].setChromaFormatVpsIdc        ( m_chromaFormatIDCs[j] );
     repFormat[j].setPicHeightVpsInLumaSamples ( m_iSourceHeights[j] );
     repFormat[j].setPicWidthVpsInLumaSamples  ( m_iSourceWidths [j] );
@@ -2446,7 +2515,16 @@ Void TAppEncTop::xSetVPSVUI( TComVPS& vps )
     // however preliminary setting it from input parameters
 
     vpsVui.setCrossLayerPicTypeAlignedFlag( m_crossLayerPicTypeAlignedFlag );
-    vpsVui.setCrossLayerIrapAlignedFlag   ( m_crossLayerIrapAlignedFlag    );
+    // When cross_layer_pic_type_aligned_flag is equal to 1, cross_layer_irap_aligned_flag
+    // is not present and is inferred to be equal to vps_vui_present_flag (F.7.4.3.1.4).
+    if( m_crossLayerPicTypeAlignedFlag )
+    {
+      vpsVui.setCrossLayerIrapAlignedFlag( m_vpsVuiPresentFlag );
+    }
+    else
+    {
+      vpsVui.setCrossLayerIrapAlignedFlag( m_crossLayerIrapAlignedFlag );
+    }
     vpsVui.setAllLayersIdrAlignedFlag     ( m_allLayersIdrAlignedFlag      );
     vpsVui.setBitRatePresentVpsFlag( m_bitRatePresentVpsFlag );
     vpsVui.setPicRatePresentVpsFlag( m_picRatePresentVpsFlag );

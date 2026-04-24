@@ -55,11 +55,7 @@
 #define WRITE_UVLC( value,         name)    xWriteUvlcTr  ( value,         name )
 #define WRITE_SVLC( value,         name)    xWriteSvlcTr  ( value,         name )
 #define WRITE_FLAG( value,         name)    xWriteFlagTr  ( value,         name )
-#if NH_MV
-#define WRITE_STRING( value, length, name)   xWriteStringTr( value, length, name )
-#else
 #define WRITE_STRING( value,         name)  xWriteStringTr( value,         name )
-#endif
 
 #else
 #define WRITE_SCODE( value, length, name)    xWriteSCode ( value, length )
@@ -67,11 +63,7 @@
 #define WRITE_UVLC( value,         name)     xWriteUvlc  ( value )
 #define WRITE_SVLC( value,         name)     xWriteSvlc  ( value )
 #define WRITE_FLAG( value,         name)     xWriteFlag  ( value )
-#if NH_MV
-#define WRITE_STRING( value, length, name)   xWriteString( value, length )
-#else
 #define WRITE_STRING( value,         name)   xWriteString( value )
-#endif
 #endif
 
 class SyntaxElementWriter
@@ -93,9 +85,8 @@ protected:
   Void  xWriteFlag            ( UInt uiCode );
 #if NH_MV
   Void  xWriteString          ( UChar* sCode, UInt uiLength);
-#else
-  void  xWriteString          ( const std::string &value );
 #endif
+  void  xWriteString          ( const std::string &value );
 #if ENC_DEC_TRACE
   Void  xWriteSCodeTr         ( Int value,  UInt  length, const TChar *pSymbolName);
   Void  xWriteCodeTr          ( UInt value, UInt  length, const TChar *pSymbolName);
@@ -104,9 +95,8 @@ protected:
   Void  xWriteFlagTr          ( UInt value,               const TChar *pSymbolName);
 #if NH_MV
   Void  xWriteStringTr        ( UChar* value, UInt length, const TChar *pSymbolName);
-#else
-  void  xWriteStringTr        ( const std::string &value, const TChar *symbolName );
 #endif
+  void  xWriteStringTr        ( const std::string &value, const TChar *symbolName );
 #endif
   Void xWriteRbspTrailingBits();
 
