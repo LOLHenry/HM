@@ -94,7 +94,11 @@ endif()
 bb_enable_warnings( msvc warnings-as-errors "/wd4996" )
 
 # enable sse4.1 build for all source files for gcc and clang
-if( (UNIX OR MINGW) AND NOT (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|ARM64") )
+# Skip on arm64/aarch64 — check both SYSTEM_PROCESSOR and OSX_ARCHITECTURES
+# (the latter matters when cross-compiling arm64 from a Rosetta x86_64 shell)
+if( (UNIX OR MINGW)
+    AND NOT (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|ARM64")
+    AND NOT (CMAKE_OSX_ARCHITECTURES  MATCHES "arm64|aarch64") )
   add_compile_options( "-msse4.1" )
 endif()
 
