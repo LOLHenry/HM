@@ -180,6 +180,47 @@ Bool TVideoIOYuv::isFail()
 }
 
 /**
+ * Count the number of frames available in the file from the current position.
+ * Returns -1 if the file is not seekable (e.g. a pipe).
+ */
+Int TVideoIOYuv::countFrames(UInt width, UInt height, ChromaFormat format)
+{
+  streamoff frameSize = 0;
+  UInt wordsize = 1;
+  for (UInt component = 0; component < getNumberValidComponents(format); component++)
+  {
+    ComponentID compID = ComponentID(component);
+    frameSize += (width >> getComponentScaleX(compID, format)) * (height >> getComponentScaleY(compID, format));
+    if (m_fileBitdepth[toChannelType(compID)] > 8)
+    {
+      wordsize = 2;
+    }
+  }
+  frameSize *= wordsize;
+
+  if (frameSize == 0)
+  {
+    return -1;
+  }
+
+  streamoff curPos = m_cHandle.tellg();
+  if (curPos == streamoff(-1))
+  {
+    return -1;
+  }
+  m_cHandle.seekg(0, ios::end);
+  streamoff endPos = m_cHandle.tellg();
+  m_cHandle.seekg(curPos, ios::beg);
+
+  if (endPos == streamoff(-1))
+  {
+    return -1;
+  }
+
+  return static_cast<Int>((endPos - curPos) / frameSize);
+}
+
+/**
  * Skip numFrames in input.
  *
  * This function correctly handles cases where the input file is not

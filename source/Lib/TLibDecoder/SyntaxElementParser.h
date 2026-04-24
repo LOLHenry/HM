@@ -72,22 +72,14 @@
 #define READ_UVLC(        code, name)     xReadUvlc  (         code, name )
 #define READ_SVLC(        code, name)     xReadSvlc  (         code, name )
 #define READ_FLAG(        code, name)     xReadFlag  (         code, name )
-#if NH_MV
-#define READ_STRING(bufSize, code, length, name)   xReadString ( bufSize, code, length, name )
-#else
 #define READ_STRING(      code, name)     xReadString (         code, name )
-#endif
 #else
 #define READ_SCODE(length, code, name)    xReadSCode ( length, code )
 #define READ_CODE(length, code, name)     xReadCode  ( length, code )
 #define READ_UVLC(        code, name)     xReadUvlc  (         code )
 #define READ_SVLC(        code, name)     xReadSvlc  (         code )
 #define READ_FLAG(        code, name)     xReadFlag  (         code )
-#if NH_MV
-#define READ_STRING(bufSize, code, length, name)   xReadString ( bufSize, code, length )
-#else
 #define READ_STRING(      code, name)     xReadString (         code )
-#endif
 #endif
 
 //! \ingroup TLibDecoder
@@ -123,9 +115,8 @@ protected:
   Void  xReadFlag    ( UInt&  val, const TChar *pSymbolName );
 #if NH_MV
   Void  xReadString  ( UInt bufSize, UChar *val, UInt& length, const TChar *pSymbolName);
-#else
-  Void  xReadString  ( std::string& val, const TChar *symbolName );
 #endif
+  Void  xReadString  ( std::string& val, const TChar *symbolName );
 #else
   Void  xReadSCode   ( UInt   length, Int& val );
   Void  xReadCode    ( UInt   length, UInt& val );
@@ -135,9 +126,8 @@ protected:
 #if NH_MV
   Void  xReadString  ( UInt bufSize, UChar *val, UInt& length);
   Void  xReadStringTr(UInt bufSize, UChar *pValue, UInt& rLength, const TChar *pSymbolName);
-#else
-  Void  xReadString  ( std::string& val );
 #endif
+  Void  xReadString  ( std::string& val );
 #endif
 public:
   Void  setBitstream ( TComInputBitstream* p )   { m_pcBitstream = p; }

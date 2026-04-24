@@ -1913,14 +1913,7 @@ Void SEIWriter::xWriteByteAlign()
 void SEIWriter::xWriteSEIDigitallySignedContentInitialization(const SEIDigitallySignedContentInitialization &sei)
 {
   WRITE_CODE(sei.dsciHashMethodType, 8, "dsci_hash_method_type");
-#if NH_MV
-  UInt ilength = (UInt) sei.dsciKeySourceUri.size();
-  UChar* stmp (UChar*) strdup( sei.dsciKeySourceUri.c_str() );
-  WRITE_STRING(stmp, ilength, "dsci_key_source_uri");
-  free(stmp);
-#else
   WRITE_STRING(sei.dsciKeySourceUri, "dsci_key_source_uri");
-#endif
 
   CHECK (sei.dsciNumVerificationSubstreams < 1, "Number of DSC verification substreams has to be greater than zero");
   WRITE_UVLC(sei.dsciNumVerificationSubstreams - 1, "dsci_num_verification_substreams_minus1");
@@ -2115,29 +2108,18 @@ Void SEIWriter::xWriteSEIOverlayInfo( const SEIOverlayInfo& sei)
       WRITE_FLAG( 0, "overlay_zero_bit" );
     }
 
-    UChar* stmp;
-    UInt ilength;
     for( Int i = 0; i  <=  sei.m_numOverlaysMinus1; i++ )
     {
       if( sei.m_languageOverlayPresentFlag[i] )
       {
-        stmp = (UChar*) strdup( sei.m_overlayLanguage[i].c_str() );
-        ilength = (UInt) sei.m_overlayLanguage[i].size();
-        WRITE_STRING( stmp, ilength, "overlay_language" );
-        free(stmp);
+        WRITE_STRING( sei.m_overlayLanguage[i], "overlay_language" );
       }
-      stmp = (UChar*) strdup( sei.m_overlayName[i].c_str() );
-      ilength = (UInt) sei.m_overlayName[i].size();
-      WRITE_STRING( stmp, ilength, "overlay_name" );
-      free(stmp);
+      WRITE_STRING( sei.m_overlayName[i], "overlay_name" );
       if( sei.m_overlayLabelPresentFlag[i] )
       {
         for( Int j = 0; j  <=  sei.m_numOverlayElementsMinus1[i]; j++ )
         {
-          stmp = (UChar*) strdup( sei.m_overlayElementName[i][j].c_str() );
-          ilength = (UInt) sei.m_overlayElementName[i][j].size();
-          WRITE_STRING( stmp, ilength, "overlay_element_name" );
-          free(stmp);
+          WRITE_STRING( sei.m_overlayElementName[i][j], "overlay_element_name" );
         }
       }
     }
