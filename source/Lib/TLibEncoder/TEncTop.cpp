@@ -1118,7 +1118,7 @@ Void TEncTop::xInitHrdParameters(TComSPS &sps)
 
   hrd->setDuCpbSizeScale( 6 );                                     // in units of 2^( 4 + 6 ) = 1,024 bit
 
-  hrd->setInitialCpbRemovalDelayLengthMinus1(15);                  // assuming 0.5 sec, log2( 90,000 * 0.5 ) = 16-bit
+  hrd->setInitialCpbRemovalDelayLengthMinus1(23);                  // 24-bit field supports up to ~186 seconds at 90kHz
   if( isRandomAccess )
   {
     hrd->setCpbRemovalDelayLengthMinus1(5);                        // 32 = 2^5 (plus 1)
