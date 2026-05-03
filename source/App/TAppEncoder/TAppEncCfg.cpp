@@ -2701,15 +2701,8 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
   }
   if (m_fgcSEIEnabled)
   {
-    if (m_iQP < 17 && m_fgcSEIAnalysisEnabled == true)
-    {
-      fprintf(stderr, "***************************************************************************************************************\n");
-      fprintf(stderr, "** WARNING: Film Grain Estimation is disabled for Qp<17! FGC SEI will use default parameters for film grain! **\n");
-      fprintf(stderr, "***************************************************************************************************************\n");
-      m_fgcSEIAnalysisEnabled = false;
-    }
     if (m_iIntraPeriod < 1)
-    {
+    { // low delay configuration
       fprintf(stderr, "*************************************************************************************\n");
       fprintf(stderr, "** WARNING: For low delay configuration, FGC SEI is inserted for first frame only! **\n");
       fprintf(stderr, "*************************************************************************************\n");
@@ -2717,7 +2710,7 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
       m_fgcSEIPersistenceFlag = true;
     }
     else if (m_iIntraPeriod == 1)
-    {
+    { // all intra configuration
       fprintf(stderr, "*******************************************************************\n");
       fprintf(stderr, "** WARNING: For Intra Period = 1, FGC SEI is inserted per frame! **\n");
       fprintf(stderr, "*******************************************************************\n");
@@ -2746,17 +2739,18 @@ Bool TAppEncCfg::parseCfg( Int argc, TChar* argv[] )
         numModelCtr = 0;
         for (UInt i = 0; i <= m_fgcSEINumIntensityIntervalMinus1[c]; i++)
         {
-          m_fgcSEIIntensityIntervalLowerBound[c][i] = UChar((cfg_FgcSEIIntensityIntervalLowerBoundComp[c].values.size() > i) ? cfg_FgcSEIIntensityIntervalLowerBoundComp[c].values[i] : 0);
-          m_fgcSEIIntensityIntervalUpperBound[c][i] = UChar((cfg_FgcSEIIntensityIntervalUpperBoundComp[c].values.size() > i) ? cfg_FgcSEIIntensityIntervalUpperBoundComp[c].values[i] : 0);
+          m_fgcSEIIntensityIntervalLowerBound[c][i] = UChar((cfg_FgcSEIIntensityIntervalLowerBoundComp[c].values.size() > i) ? cfg_FgcSEIIntensityIntervalLowerBoundComp[c].values[i] : 10);
+          m_fgcSEIIntensityIntervalUpperBound[c][i] = UChar((cfg_FgcSEIIntensityIntervalUpperBoundComp[c].values.size() > i) ? cfg_FgcSEIIntensityIntervalUpperBoundComp[c].values[i] : 250);
           for (UInt j = 0; j <= m_fgcSEINumModelValuesMinus1[c]; j++)
           {
-            m_fgcSEICompModelValue[c][i][j] = UInt((cfg_FgcSEICompModelValueComp[c].values.size() > numModelCtr) ? cfg_FgcSEICompModelValueComp[c].values[numModelCtr] : 0);
+            m_fgcSEICompModelValue[c][i][j] = UInt((cfg_FgcSEICompModelValueComp[c].values.size() > numModelCtr) ? cfg_FgcSEICompModelValueComp[c].values[numModelCtr] : c > 0 ? 8 : 16);
             numModelCtr++;
           }
         }
       }
     }
   }
+  m_fgcSEILog2ScaleFactor = m_fgcSEILog2ScaleFactor ? m_fgcSEILog2ScaleFactor : 2;
 #endif
 #if JVET_AJ0207_GFV
   if (m_generativeFaceVideoEnabled)
