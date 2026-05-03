@@ -2045,11 +2045,11 @@ Void TEncGOP::compressGOP( Int iPOCLast, Int iNumPicRcvd, TComList<TComPic*>& rc
     if (m_pcCfg->getFilmGrainAnalysisEnabled())
     {
       int  filteredFrame = m_pcCfg->getIntraPeriod() < 1 ? 2 * m_pcCfg->getFrameRate() : m_pcCfg->getIntraPeriod();
-      bool ready_to_analyze = pcPic->getPOC() % filteredFrame ? false : true; // either it is mctf denoising or external source for film grain analysis. note: if mctf is used, it is different from mctf for encoding.
+      bool ready_to_analyze = pcPic->getPOC() % filteredFrame ? false : true;
       if (ready_to_analyze)
       {
           m_FGAnalyser.initBufs(pcPic);
-          m_FGAnalyser.estimate_grain(pcPic);
+          m_FGAnalyser.estimateGrain(pcPic);
       }
     }
 #endif
