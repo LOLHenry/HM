@@ -2190,12 +2190,24 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
   const UInt uiDCPos = codingParameters.scan[0];
   assert(uiDCPos == 0);
 
-  // First sweep: compute uiMaxAbsLevel for every position. Bail out as soon
-  // as a non-DC position is non-zero -- the fast path does not apply.
-  UInt    uiDCMaxAbsLevel  = 0;
-  Int64   iDCLevelDouble   = 0;
-  Double  dBlockUncodedCost = 0;
-  Double  dDCUncodedCost    = 0;
+  // First sweep. We need exactly three pieces of information:
+  //   (1) Does any non-DC position have a non-zero quantised magnitude?
+  //       If yes, fast path does not apply -- bail out immediately.
+  //   (2) The DC quantised magnitude uiDCMaxAbsLevel and its scaled pre-quant
+  //       value iDCLevelDouble (used by the ceil-vs-floor decision below).
+  //   (3) The DC's "uncoded" distortion dDCUncodedCost (= |iDCLevelDouble|²
+  //       · errScale_DC), which is the only AC/DC distortion term that
+  //       survives the final delta-cost comparison; AC uncoded distortion
+  //       cancels exactly between the "drop block" and "code DC" candidates,
+  //       so we never multiply or accumulate it.
+  //
+  // We also fill piArlDstCoeff (when ADAPTIVE_QP_SELECTION) for every
+  // position, since the slice-level ARL collector consumes it regardless of
+  // which RDOQ branch produced the result.
+  UInt   uiDCMaxAbsLevel = 0;
+  Int64  iDCLevelDouble  = 0;
+  Double dDCUncodedCost  = 0;
+  Double errorScaleDC    = 0;
 
 #if ADAPTIVE_QP_SELECTION
   const Int iQBitsC = iQBits - ARL_C_PRECISION;
@@ -2208,10 +2220,9 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
 
   for (UInt uiBlkPos = 0; uiBlkPos < uiMaxNumCoeff; uiBlkPos++)
   {
-    const Int    quantisationCoefficient = enableScalingLists ? piQCoef   [uiBlkPos] : defaultQuantisationCoefficient;
-    const Double errorScale              = enableScalingLists ? pdErrScale[uiBlkPos] : defaultErrorScale;
+    const Int quantisationCoefficient = enableScalingLists ? piQCoef[uiBlkPos] : defaultQuantisationCoefficient;
 
-    const Int64  tmpLevel    = Int64(abs(plSrcCoeff[uiBlkPos])) * quantisationCoefficient;
+    const Int64 tmpLevel = Int64(abs(plSrcCoeff[uiBlkPos])) * quantisationCoefficient;
     const Intermediate_Int lLevelDouble =
         (Intermediate_Int)std::min<Int64>(tmpLevel,
             std::numeric_limits<Intermediate_Int>::max() - (Intermediate_Int(1) << (iQBits - 1)));
@@ -2226,15 +2237,13 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
     const UInt uiMaxAbsLevel = std::min<UInt>(UInt(entropyCodingMaximum),
         UInt((lLevelDouble + (Intermediate_Int(1) << (iQBits - 1))) >> iQBits));
 
-    const Double dErr        = Double(lLevelDouble);
-    const Double dCost0      = dErr * dErr * errorScale;
-    dBlockUncodedCost       += dCost0;
-
     if (uiBlkPos == uiDCPos)
     {
-      uiDCMaxAbsLevel = uiMaxAbsLevel;
-      iDCLevelDouble  = (Int64)lLevelDouble;
-      dDCUncodedCost  = dCost0;
+      errorScaleDC      = enableScalingLists ? pdErrScale[uiBlkPos] : defaultErrorScale;
+      const Double dErr = Double(lLevelDouble);
+      uiDCMaxAbsLevel   = uiMaxAbsLevel;
+      iDCLevelDouble    = (Int64)lLevelDouble;
+      dDCUncodedCost    = dErr * dErr * errorScaleDC;
     }
     else if (uiMaxAbsLevel != 0)
     {
@@ -2245,59 +2254,27 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
     piDstCoeff[uiBlkPos] = 0;
   }
 
-  // Either entirely zero or only DC is non-zero.
+  // All-zero block: nothing to code, drop-block is trivially optimal.
   if (uiDCMaxAbsLevel == 0)
   {
-    // No non-zero quantized magnitude anywhere: trivially the all-zero block
-    // is optimal (no rate, only the per-coeff "uncoded" distortion which is
-    // unavoidable). uiAbsSum and piDstCoeff are already 0.
     return true;
   }
 
-  // ---- Two-candidate RD compare for "drop block" vs. "code DC only" ----
-
-  // Per-position DC parameters that match the full-path call site for the
-  // last (== first == only) significant coefficient. The quantisation
-  // coefficient itself is already folded into iDCLevelDouble.
-  const Double       errorScaleDC              = enableScalingLists ? pdErrScale[uiDCPos] : defaultErrorScale;
-
-  const UInt   uiCtxSet      = getContextSetIndex(compID, 0, 0); // ctxSet at DC, c1==1
+  // ---- Pick the best code-DC level ----
+  //
+  // We only need the "partial" cost  dBestPartial = D(L*) + λ·R_IC(L*) for
+  // the chosen level L*. The block-level CBF, last-XY and AC-uncoded terms
+  // are all common to "code DC" and "drop block" (or cancel) and are
+  // factored into a single delta-cost expression at the end of this
+  // function.
+  const UInt   uiCtxSet      = getContextSetIndex(compID, 0, 0); // c1 == 1 at DC
   const UInt   uiOneCtx      = (NUM_ONE_FLAG_CTX_PER_SET * uiCtxSet) + 1; // c1 = 1
   const UInt   uiAbsCtx      = (NUM_ABS_FLAG_CTX_PER_SET * uiCtxSet) + 0; // c2 = 0
   const UInt   initialGolombRiceParameter =
       m_pcEstBitsSbac->golombRiceAdaptationStatistics[rTu.getGolombRiceStatisticsIndex(compID)] / RExt__GOLOMB_RICE_INCREMENT_DIVISOR;
 
-  // CBF context selection mirrors the original code path.
-  Int ui16CtxCbf = 0;
-  Bool useRootCbf = !pcCU->isIntra(uiAbsPartIdx) && isLuma(compID) && pcCU->getTransformIdx(uiAbsPartIdx) == 0;
-  if (useRootCbf)
-  {
-    ui16CtxCbf = 0;
-  }
-  else
-  {
-    ui16CtxCbf  = pcCU->getCtxQtCbf(rTu, channelType);
-    ui16CtxCbf += getCBFContextOffset(compID);
-  }
-
-  const Int iCbfBits0 = useRootCbf ? m_pcEstBitsSbac->blockRootCbpBits[ui16CtxCbf][0]
-                                   : m_pcEstBitsSbac->blockCbpBits   [ui16CtxCbf][0];
-  const Int iCbfBits1 = useRootCbf ? m_pcEstBitsSbac->blockRootCbpBits[ui16CtxCbf][1]
-                                   : m_pcEstBitsSbac->blockCbpBits   [ui16CtxCbf][1];
-
-  // Candidate (a): CBF = 0 -- distortion is the whole-block uncoded cost.
-  const Double dCostDrop = dBlockUncodedCost + xGetICost(Double(iCbfBits0));
-
-  // Candidate (b): code DC only. The set of viable levels is {uiDCMaxAbsLevel,
-  // uiDCMaxAbsLevel - 1} for uiDCMaxAbsLevel >= 2, or just {1} for == 1.
-  // This mirrors xGetCodedLevel(bLast=1) (no level-0 candidate at the last
-  // significant position).
-  const Double dCostLastXY = xGetRateLast(0, 0, compID); // PosX = PosY = 0
-  const Double dRateCbf1   = xGetICost(Double(iCbfBits1));
-  const Double dACUncoded  = dBlockUncodedCost - dDCUncodedCost;
-
-  UInt   uiBestLevel    = 0;
-  Double dBestCodeCost  = MAX_DOUBLE;
+  UInt   uiBestLevel  = 0;
+  Double dBestPartial = MAX_DOUBLE;  // = D(L*) + λ·R_IC(L*)
 
 #if RDOQ_DC_FASTPATH_PAPER_OPT
   // ===== Paper-style binary ceil-vs-floor decision (eqs 12-15) =====
@@ -2371,14 +2348,13 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
     const Bool bChooseCeil = (dDeltaD + xGetICost(Double(iDeltaRate)) < 0);
     uiBestLevel            = bChooseCeil ? uiCeil : uiFloor;
 
-    // Best level's absolute D+λR for the subsequent vs-drop comparison.
-    // Distortion uses the analytic A or B already in hand (no second squaring).
+    // Best level's partial D + λ·R_IC. Distortion uses the analytic A or B
+    // already in hand (no second squaring).
     const Double dErrBest  = Double(bChooseCeil ? lA : lB);
     const Double dDistBest = dErrBest * dErrBest * errorScaleDC;
     const Int    iRateBest = xGetICRate(uiBestLevel, uiOneCtx, uiAbsCtx, initialGolombRiceParameter,
                                         /*c1Idx*/0, /*c2Idx*/0, extendedPrecision, maxLog2TrDynamicRange);
-
-    dBestCodeCost = dACUncoded + dDistBest + dRateCbf1 + dCostLastXY + xGetICost(Double(iRateBest));
+    dBestPartial = dDistBest + xGetICost(Double(iRateBest));
 
     // Paper observation 1: skip drop-block at uiDCMaxAbsLevel == 2.
     bForceCode = (uiDCMaxAbsLevel == 2);
@@ -2386,14 +2362,14 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
   else
   {
     // uiDCMaxAbsLevel == 1: single code-DC candidate (L=1); ceil-vs-floor
-    // doesn't apply (floor would be 0 ≡ drop block, already a separate
-    // candidate below).
-    const Double dErr1     = Double(iDCLevelDouble - (Int64(1) << iQBits));
-    const Double dDist1    = dErr1 * dErr1 * errorScaleDC;
-    const Int    iRate1    = xGetICRate(1, uiOneCtx, uiAbsCtx, initialGolombRiceParameter,
-                                        /*c1Idx*/0, /*c2Idx*/0, extendedPrecision, maxLog2TrDynamicRange);
-    uiBestLevel   = 1;
-    dBestCodeCost = dACUncoded + dDist1 + dRateCbf1 + dCostLastXY + xGetICost(Double(iRate1));
+    // doesn't apply (floor would be 0 ≡ drop block, handled by the final
+    // delta compare).
+    const Double dErr1  = Double(iDCLevelDouble - (Int64(1) << iQBits));
+    const Double dDist1 = dErr1 * dErr1 * errorScaleDC;
+    const Int    iRate1 = xGetICRate(1, uiOneCtx, uiAbsCtx, initialGolombRiceParameter,
+                                     /*c1Idx*/0, /*c2Idx*/0, extendedPrecision, maxLog2TrDynamicRange);
+    uiBestLevel  = 1;
+    dBestPartial = dDist1 + xGetICost(Double(iRate1));
   }
 #else // RDOQ_DC_FASTPATH_PAPER_OPT == 0: strict-optimal {max, max-1} cost-loop.
   const UInt uiMinAbsLevel = (uiDCMaxAbsLevel > 1) ? (uiDCMaxAbsLevel - 1) : 1;
@@ -2404,17 +2380,44 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
     const Int    iRateLevel = xGetICRate(uiAbsLevel, uiOneCtx, uiAbsCtx, initialGolombRiceParameter,
                                           /*c1Idx*/0, /*c2Idx*/0, extendedPrecision, maxLog2TrDynamicRange);
 
-    const Double dCost = dACUncoded + dDistLevel + dRateCbf1 + dCostLastXY + xGetICost(Double(iRateLevel));
-    if (dCost < dBestCodeCost)
+    const Double dPartial = dDistLevel + xGetICost(Double(iRateLevel));
+    if (dPartial < dBestPartial)
     {
-      dBestCodeCost = dCost;
-      uiBestLevel   = uiAbsLevel;
+      dBestPartial = dPartial;
+      uiBestLevel  = uiAbsLevel;
     }
   }
   const Bool bForceCode = false;
 #endif
 
-  if (bForceCode || dBestCodeCost < dCostDrop)
+  // ---- Final delta-cost compare: code-DC vs drop-block ----
+  //
+  // dCost(code) - dCost(drop) cancels the AC uncoded distortion sum exactly
+  // and reduces to:
+  //
+  //   = (D_DC(L*) - D_DC,uncoded) + λ · ( R_IC(L*) + R_cbf(1) + R_lastXY - R_cbf(0) )
+  //   = (dBestPartial - dDCUncodedCost)
+  //   +  λ · ( R_cbf(1) - R_cbf(0) )       <-- one ICost call
+  //   +  λ · R_lastXY                       <-- via xGetRateLast
+  //
+  // No need to ever compute dBlockUncodedCost or any AC distortion term.
+  Int ui16CtxCbf = 0;
+  const Bool useRootCbf = !pcCU->isIntra(uiAbsPartIdx) && isLuma(compID) && pcCU->getTransformIdx(uiAbsPartIdx) == 0;
+  if (!useRootCbf)
+  {
+    ui16CtxCbf  = pcCU->getCtxQtCbf(rTu, channelType);
+    ui16CtxCbf += getCBFContextOffset(compID);
+  }
+  const Int iCbfBits0 = useRootCbf ? m_pcEstBitsSbac->blockRootCbpBits[ui16CtxCbf][0]
+                                   : m_pcEstBitsSbac->blockCbpBits   [ui16CtxCbf][0];
+  const Int iCbfBits1 = useRootCbf ? m_pcEstBitsSbac->blockRootCbpBits[ui16CtxCbf][1]
+                                   : m_pcEstBitsSbac->blockCbpBits   [ui16CtxCbf][1];
+
+  const Double dDeltaCostVsDrop = (dBestPartial - dDCUncodedCost)
+                                + xGetRateLast(0, 0, compID)
+                                + xGetICost(Double(iCbfBits1 - iCbfBits0));
+
+  if (bForceCode || dDeltaCostVsDrop < 0)
   {
     const TCoeff coded = (plSrcCoeff[uiDCPos] < 0) ? -TCoeff(uiBestLevel) : TCoeff(uiBestLevel);
     piDstCoeff[uiDCPos] = coded;
