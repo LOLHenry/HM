@@ -268,6 +268,19 @@ private:
                                      const ComponentID   compID,
                                      const QpParam      &cQP );
 
+  // Fast RDOQ path for transform blocks whose only non-zero quantized
+  // magnitude is at the DC position. Returns true iff the fast path
+  // produced the final result and the caller can skip the full scan.
+  Bool           xRateDistOptQuantDCOnly(       TComTU       &rTu,
+                                                TCoeff      * plSrcCoeff,
+                                                TCoeff      * piDstCoeff,
+#if ADAPTIVE_QP_SELECTION
+                                                TCoeff      * piArlDstCoeff,
+#endif
+                                                TCoeff       &uiAbsSum,
+                                          const ComponentID   compID,
+                                          const QpParam      &cQP );
+
 __inline UInt              xGetCodedLevel  ( Double&          rd64CodedCost,
                                              Double&          rd64CodedCost0,
                                              Double&          rd64CodedCostSig,
