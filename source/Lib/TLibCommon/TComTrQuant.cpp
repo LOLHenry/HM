@@ -62,7 +62,15 @@ typedef struct
 // ====================================================================================================================
 
 #define RDOQ_CHROMA                 1           ///< use of RDOQ in chroma
+#ifndef RDOQ_DC_ONLY_FASTPATH
 #define RDOQ_DC_ONLY_FASTPATH       1           ///< 1: enable fast RDOQ path for blocks whose only non-zero quantized coefficient is at DC
+#endif
+#ifndef RDOQ_DC_FASTPATH_PAPER_OPT
+#define RDOQ_DC_FASTPATH_PAPER_OPT  1           ///< 1: pick code-DC level via paper-style analytic ΔD + piecewise ΔR (mathematically equivalent, faster)
+#endif
+#ifndef RDOQ_DC_FASTPATH_SKIP_DROP_AT_2
+#define RDOQ_DC_FASTPATH_SKIP_DROP_AT_2 1       ///< 1: when uiDCMaxAbsLevel == 2, skip drop-block candidate (paper observation 1; heuristic, not RD-bit-exact)
+#endif
 
 
 // ====================================================================================================================
@@ -2286,15 +2294,103 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
   // Candidate (a): CBF = 0 -- distortion is the whole-block uncoded cost.
   const Double dCostDrop = dBlockUncodedCost + xGetICost(Double(iCbfBits0));
 
-  // Candidate (b): code DC only. Iterate over uiAbsLevel in {max, max-1},
-  // matching xGetCodedLevel(bLast=1) so the chosen level is identical.
+  // Candidate (b): code DC only. The set of viable levels is {uiDCMaxAbsLevel,
+  // uiDCMaxAbsLevel - 1} for uiDCMaxAbsLevel >= 2, or just {1} for == 1.
+  // This mirrors xGetCodedLevel(bLast=1) (no level-0 candidate at the last
+  // significant position).
   const Double dCostLastXY = xGetRateLast(0, 0, compID); // PosX = PosY = 0
   const Double dRateCbf1   = xGetICost(Double(iCbfBits1));
   const Double dACUncoded  = dBlockUncodedCost - dDCUncodedCost;
 
-  UInt   uiBestLevel = 0;
-  Double dBestCodeCost = MAX_DOUBLE;
+  UInt   uiBestLevel    = 0;
+  Double dBestCodeCost  = MAX_DOUBLE;
 
+#if RDOQ_DC_FASTPATH_PAPER_OPT
+  // ===== Paper-style binary ceil-vs-floor decision (eqs 12-15) =====
+  //
+  // For uiDCMaxAbsLevel >= 2, the two viable code-DC candidates are uiCeil
+  // and uiFloor = uiCeil - 1. Decide via the threshold form:
+  //
+  //   ΔD_HM = D_ceil - D_floor       (≤ 0, computed analytically -- one mul,
+  //                                    no catastrophic cancellation from
+  //                                    squaring two close values)
+  //   ΔR    = R_IC(ceil) - R_IC(floor) (piecewise closed form, no xGetICRate
+  //                                    in the cheap cases; sign-bit cancels)
+  //   Choose ceil iff   ΔD_HM + λ · ΔR  <  0   (= paper eq 15, rearranged
+  //                                              from the threshold form
+  //                                              Thd_ΔR = -ΔD/λ)
+  //
+  // Mathematically identical to the previous {ceil, floor} loop comparing
+  // full D+λR per candidate, with one fewer squared-error evaluation and
+  // one fewer xGetICRate call in the common (ceil <= 3) cases.
+  if (uiDCMaxAbsLevel >= 2)
+  {
+    const UInt  uiCeil  = uiDCMaxAbsLevel;
+    const UInt  uiFloor = uiDCMaxAbsLevel - 1;
+    const Int64 lTwoQ   = Int64(1) << iQBits;
+    const Int64 lA      = iDCLevelDouble - (Int64(uiCeil) << iQBits);  // ≤ 0
+    const Int64 lB      = lA + lTwoQ;                                  // ≥ 0
+
+    // Analytic ΔD_HM: (A² - B²)·errScale = -lTwoQ·(2A + lTwoQ)·errScale.
+    const Double dDeltaD = -Double(lTwoQ) * Double((lA << 1) + lTwoQ) * errorScaleDC;
+
+    // Piecewise ΔR closed form for our DC context (bLast=1, ctxSet=0,
+    // c1Idx=0, c2Idx=0 ⇒ baseLevel=3, c1=1, c2=0). Sign-bit cancels.
+    Int iDeltaRate;
+    if (uiCeil == 2)
+    {
+      // R(2)-R(1) = (grt1[1] + abs[0]) - (grt1[0])
+      iDeltaRate = m_pcEstBitsSbac->m_levelAbsBits  [uiAbsCtx][0]
+                 + m_pcEstBitsSbac->m_greaterOneBits[uiOneCtx][1]
+                 - m_pcEstBitsSbac->m_greaterOneBits[uiOneCtx][0];
+    }
+    else if (uiCeil == 3)
+    {
+      // R(3)-R(2) = (rem(0) + grt1[1] + abs[1]) - (grt1[1] + abs[0])
+      //          = (1+goRice)<<15 + abs[1] - abs[0]
+      // (Paper eq 14 case 3 omits rem(0); we keep it for HM-exact bits.)
+      iDeltaRate = ((Int(initialGolombRiceParameter) + 1) << 15)
+                 + m_pcEstBitsSbac->m_levelAbsBits[uiAbsCtx][1]
+                 - m_pcEstBitsSbac->m_levelAbsBits[uiAbsCtx][0];
+    }
+    else
+    {
+      // uiCeil >= 4: both ceil and floor are in the rem branch. The grt1/grt2
+      // contributions cancel; only the Rice/escape suffix differs. Defer to
+      // xGetICRate to remain bit-exact across extendedPrecision and
+      // limited-prefix-length variants.
+      const Int iRateCeil  = xGetICRate(uiCeil,  uiOneCtx, uiAbsCtx, initialGolombRiceParameter,
+                                        /*c1Idx*/0, /*c2Idx*/0, extendedPrecision, maxLog2TrDynamicRange);
+      const Int iRateFloor = xGetICRate(uiFloor, uiOneCtx, uiAbsCtx, initialGolombRiceParameter,
+                                        /*c1Idx*/0, /*c2Idx*/0, extendedPrecision, maxLog2TrDynamicRange);
+      iDeltaRate = iRateCeil - iRateFloor;
+    }
+
+    const Bool bChooseCeil = (dDeltaD + xGetICost(Double(iDeltaRate)) < 0);
+    uiBestLevel            = bChooseCeil ? uiCeil : uiFloor;
+
+    // Best level's absolute D+λR for the subsequent vs-drop comparison.
+    // Distortion uses the analytic A or B already in hand (no second squaring).
+    const Double dErrBest  = Double(bChooseCeil ? lA : lB);
+    const Double dDistBest = dErrBest * dErrBest * errorScaleDC;
+    const Int    iRateBest = xGetICRate(uiBestLevel, uiOneCtx, uiAbsCtx, initialGolombRiceParameter,
+                                        /*c1Idx*/0, /*c2Idx*/0, extendedPrecision, maxLog2TrDynamicRange);
+
+    dBestCodeCost = dACUncoded + dDistBest + dRateCbf1 + dCostLastXY + xGetICost(Double(iRateBest));
+  }
+  else
+  {
+    // uiDCMaxAbsLevel == 1: single code-DC candidate (L=1); the paper's
+    // ceil-vs-floor binary doesn't apply (floor would be 0 ≡ drop block,
+    // already a separate candidate below).
+    const Double dErr1     = Double(iDCLevelDouble - (Int64(1) << iQBits));
+    const Double dDist1    = dErr1 * dErr1 * errorScaleDC;
+    const Int    iRate1    = xGetICRate(1, uiOneCtx, uiAbsCtx, initialGolombRiceParameter,
+                                        /*c1Idx*/0, /*c2Idx*/0, extendedPrecision, maxLog2TrDynamicRange);
+    uiBestLevel   = 1;
+    dBestCodeCost = dACUncoded + dDist1 + dRateCbf1 + dCostLastXY + xGetICost(Double(iRate1));
+  }
+#else // RDOQ_DC_FASTPATH_PAPER_OPT == 0: original {max, max-1} cost-loop.
   const UInt uiMinAbsLevel = (uiDCMaxAbsLevel > 1) ? (uiDCMaxAbsLevel - 1) : 1;
   for (UInt uiAbsLevel = uiDCMaxAbsLevel; uiAbsLevel >= uiMinAbsLevel; uiAbsLevel--)
   {
@@ -2310,8 +2406,21 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
       uiBestLevel   = uiAbsLevel;
     }
   }
+#endif
 
-  if (dBestCodeCost < dCostDrop)
+  // ---- Final drop-vs-code comparison ----
+  //
+  // Paper observation 1 (heuristic, not RD-bit-exact): when uiDCMaxAbsLevel
+  // == 2, the "drop block" candidate is statistically rarely chosen, so we
+  // skip the comparison and force the code-DC choice. Gated separately so it
+  // can be disabled to recover full RD optimality.
+#if RDOQ_DC_FASTPATH_SKIP_DROP_AT_2
+  const Bool bForceCode = (uiDCMaxAbsLevel == 2);
+#else
+  const Bool bForceCode = false;
+#endif
+
+  if (bForceCode || dBestCodeCost < dCostDrop)
   {
     const TCoeff coded = (plSrcCoeff[uiDCPos] < 0) ? -TCoeff(uiBestLevel) : TCoeff(uiBestLevel);
     piDstCoeff[uiDCPos] = coded;
