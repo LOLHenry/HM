@@ -62,14 +62,9 @@ typedef struct
 // ====================================================================================================================
 
 #define RDOQ_CHROMA                 1           ///< use of RDOQ in chroma
-#ifndef RDOQ_DC_ONLY_FASTPATH
-#define RDOQ_DC_ONLY_FASTPATH       1           ///< 1: enable fast RDOQ path for blocks whose only non-zero quantized coefficient is at DC
-#endif
 #ifndef RDOQ_DC_FASTPATH_PAPER_OPT
-#define RDOQ_DC_FASTPATH_PAPER_OPT  1           ///< 1: pick code-DC level via paper-style analytic ΔD + piecewise ΔR (mathematically equivalent, faster)
-#endif
-#ifndef RDOQ_DC_FASTPATH_SKIP_DROP_AT_2
-#define RDOQ_DC_FASTPATH_SKIP_DROP_AT_2 1       ///< 1: when uiDCMaxAbsLevel == 2, skip drop-block candidate (paper observation 1; heuristic, not RD-bit-exact)
+#define RDOQ_DC_FASTPATH_PAPER_OPT  1           ///< 1: pick code-DC level via paper-style analytic ΔD + piecewise ΔR (eqs 12-15) and skip drop-block when uiDCMaxAbsLevel == 2 (observation 1)
+                                                ///< 0: fall back to a {max, max-1} cost-loop and always evaluate drop-block (RD strict-optimal, slower)
 #endif
 
 
@@ -2113,7 +2108,6 @@ Void TComTrQuant::xITransformSkip( TCoeff* plCoef, Pel* pResidual, UInt uiStride
   }
 }
 
-#if RDOQ_DC_ONLY_FASTPATH
 /** Fast RDOQ path for blocks whose only non-zero quantized coefficient is at DC.
  *
  * After computing each position's quantized magnitude
@@ -2320,9 +2314,17 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
   //                                              from the threshold form
   //                                              Thd_ΔR = -ΔD/λ)
   //
-  // Mathematically identical to the previous {ceil, floor} loop comparing
-  // full D+λR per candidate, with one fewer squared-error evaluation and
-  // one fewer xGetICRate call in the common (ceil <= 3) cases.
+  // Mathematically identical to a {ceil, floor} cost-loop, with one fewer
+  // squared-error evaluation and one fewer xGetICRate call in the common
+  // (ceil <= 3) cases.
+  //
+  // Additionally (paper observation 1): when uiDCMaxAbsLevel == 2, the
+  // "drop block" candidate is statistically rarely chosen, so we skip the
+  // vs-drop comparison and force the code-DC choice. This part is
+  // heuristic, not RD-bit-exact -- flip RDOQ_DC_FASTPATH_PAPER_OPT to 0 to
+  // recover the strict-optimal cost-loop without the skip.
+  Bool bForceCode = false;
+
   if (uiDCMaxAbsLevel >= 2)
   {
     const UInt  uiCeil  = uiDCMaxAbsLevel;
@@ -2377,12 +2379,15 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
                                         /*c1Idx*/0, /*c2Idx*/0, extendedPrecision, maxLog2TrDynamicRange);
 
     dBestCodeCost = dACUncoded + dDistBest + dRateCbf1 + dCostLastXY + xGetICost(Double(iRateBest));
+
+    // Paper observation 1: skip drop-block at uiDCMaxAbsLevel == 2.
+    bForceCode = (uiDCMaxAbsLevel == 2);
   }
   else
   {
-    // uiDCMaxAbsLevel == 1: single code-DC candidate (L=1); the paper's
-    // ceil-vs-floor binary doesn't apply (floor would be 0 ≡ drop block,
-    // already a separate candidate below).
+    // uiDCMaxAbsLevel == 1: single code-DC candidate (L=1); ceil-vs-floor
+    // doesn't apply (floor would be 0 ≡ drop block, already a separate
+    // candidate below).
     const Double dErr1     = Double(iDCLevelDouble - (Int64(1) << iQBits));
     const Double dDist1    = dErr1 * dErr1 * errorScaleDC;
     const Int    iRate1    = xGetICRate(1, uiOneCtx, uiAbsCtx, initialGolombRiceParameter,
@@ -2390,7 +2395,7 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
     uiBestLevel   = 1;
     dBestCodeCost = dACUncoded + dDist1 + dRateCbf1 + dCostLastXY + xGetICost(Double(iRate1));
   }
-#else // RDOQ_DC_FASTPATH_PAPER_OPT == 0: original {max, max-1} cost-loop.
+#else // RDOQ_DC_FASTPATH_PAPER_OPT == 0: strict-optimal {max, max-1} cost-loop.
   const UInt uiMinAbsLevel = (uiDCMaxAbsLevel > 1) ? (uiDCMaxAbsLevel - 1) : 1;
   for (UInt uiAbsLevel = uiDCMaxAbsLevel; uiAbsLevel >= uiMinAbsLevel; uiAbsLevel--)
   {
@@ -2406,17 +2411,6 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
       uiBestLevel   = uiAbsLevel;
     }
   }
-#endif
-
-  // ---- Final drop-vs-code comparison ----
-  //
-  // Paper observation 1 (heuristic, not RD-bit-exact): when uiDCMaxAbsLevel
-  // == 2, the "drop block" candidate is statistically rarely chosen, so we
-  // skip the comparison and force the code-DC choice. Gated separately so it
-  // can be disabled to recover full RD optimality.
-#if RDOQ_DC_FASTPATH_SKIP_DROP_AT_2
-  const Bool bForceCode = (uiDCMaxAbsLevel == 2);
-#else
   const Bool bForceCode = false;
 #endif
 
@@ -2431,7 +2425,6 @@ Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
 
   return true;
 }
-#endif // RDOQ_DC_ONLY_FASTPATH
 
 /** RDOQ with CABAC
  * \param rTu reference to transform data
@@ -2455,7 +2448,6 @@ Void TComTrQuant::xRateDistOptQuant                 (       TComTU       &rTu,
                                                       const ComponentID   compID,
                                                       const QpParam      &cQP  )
 {
-#if RDOQ_DC_ONLY_FASTPATH
   // Try the DC-only fast path first. It returns true if it has fully handled
   // the block (either by leaving it all-zero or by writing only piDstCoeff[DC]).
   // It is safe for transform-skip blocks too because the relevant rate model
@@ -2468,7 +2460,6 @@ Void TComTrQuant::xRateDistOptQuant                 (       TComTU       &rTu,
   {
     return;
   }
-#endif
   const TComRectangle  & rect             = rTu.getRect(compID);
   const UInt             uiWidth          = rect.width;
   const UInt             uiHeight         = rect.height;
