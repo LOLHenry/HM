@@ -62,6 +62,7 @@ typedef struct
 // ====================================================================================================================
 
 #define RDOQ_CHROMA                 1           ///< use of RDOQ in chroma
+#define RDOQ_DC_ONLY_FASTPATH       1           ///< 1: enable fast RDOQ path for blocks whose only non-zero quantized coefficient is at DC
 
 
 // ====================================================================================================================
@@ -2104,6 +2105,225 @@ Void TComTrQuant::xITransformSkip( TCoeff* plCoef, Pel* pResidual, UInt uiStride
   }
 }
 
+#if RDOQ_DC_ONLY_FASTPATH
+/** Fast RDOQ path for blocks whose only non-zero quantized coefficient is at DC.
+ *
+ * After computing each position's quantized magnitude
+ *     uiMaxAbsLevel = (|coef|*qScale + (1<<(qBits-1))) >> qBits
+ * we frequently observe that every AC position is zero and only the DC bin
+ * (raster position 0, which is also the first scan position for any
+ * supported scan/size combination in HM) has a non-zero magnitude. In that
+ * case the full RDOQ machinery degenerates to a two-candidate RD compare:
+ *
+ *   (a) Drop the whole block (CBF = 0)
+ *       cost = sum_i(d_i^2 * errScale_i) + lambda * blockCbf[ctx][0]
+ *
+ *   (b) Code DC only at level L in {maxLevel, maxLevel-1}
+ *       cost = sum_{i!=DC}(d_i^2 * errScale_DC_omit) + (lLevelDoubleDC - L<<qBits)^2 * errScale_DC
+ *            + lambda * (blockCbf[ctx][1] + lastXY(0,0) + ICRate(L, ctxSet0, c1=1, c2=0, c1Idx=0, c2Idx=0, GoRice))
+ *
+ * Notes that justify equivalence with the full path for this input class:
+ *   - The DC coefficient group flag is inferred (no flag bit) for the CG that
+ *     contains the last significant coefficient, so no sig-CG-flag rate is
+ *     added for it.
+ *   - The significance flag at the last significant position is inferred
+ *     (xGetCodedLevel is called with bLast = 1 for the DC position and emits
+ *     no significance contribution).
+ *   - All other AC positions contribute zero rate (their CG flags are zero
+ *     and inferred via the position of the last significant coefficient at
+ *     scan index 0).
+ *   - SBH cannot trigger: lastNZ - firstNZ = 0 < SBH_THRESHOLD (4).
+ *   - Context-set / Golomb-Rice / c1 / c2 state are never advanced past DC,
+ *     so xGetICRate at DC sees ctxSet=0, c1=1, c2=0, c1Idx=0, c2Idx=0,
+ *     GoRice = initialGolombRiceParameter, identical to the full path.
+ */
+Bool TComTrQuant::xRateDistOptQuantDCOnly(       TComTU       &rTu,
+                                                 TCoeff      * plSrcCoeff,
+                                                 TCoeff      * piDstCoeff,
+#if ADAPTIVE_QP_SELECTION
+                                                 TCoeff      * piArlDstCoeff,
+#endif
+                                                 TCoeff       &uiAbsSum,
+                                           const ComponentID   compID,
+                                           const QpParam      &cQP )
+{
+  const TComRectangle  & rect             = rTu.getRect(compID);
+  const UInt             uiWidth          = rect.width;
+  const UInt             uiHeight         = rect.height;
+        TComDataCU    *  pcCU             = rTu.getCU();
+  const UInt             uiAbsPartIdx     = rTu.GetAbsPartIdxTU();
+  const ChannelType      channelType      = toChannelType(compID);
+  const UInt             uiLog2TrSize     = rTu.GetEquivalentLog2TrSize(compID);
+
+  const Bool             extendedPrecision     = pcCU->getSlice()->getSPS()->getSpsRangeExtension().getExtendedPrecisionProcessingFlag();
+  const Int              maxLog2TrDynamicRange = pcCU->getSlice()->getSPS()->getMaxLog2TrDynamicRange(channelType);
+  const Int              channelBitDepth       = pcCU->getSlice()->getSPS()->getBitDepth(channelType);
+
+  Int iTransformShift = getTransformShift(channelBitDepth, uiLog2TrSize, maxLog2TrDynamicRange);
+  if ((pcCU->getTransformSkip(uiAbsPartIdx, compID) != 0) && extendedPrecision)
+  {
+    iTransformShift = std::max<Int>(0, iTransformShift);
+  }
+
+  const UInt uiMaxNumCoeff = uiWidth * uiHeight;
+  const Int  scalingListType = getScalingListType(pcCU->getPredictionMode(uiAbsPartIdx), compID);
+  assert(scalingListType < SCALING_LIST_NUM);
+
+  const Int    iQBits = QUANT_SHIFT + cQP.per + iTransformShift;
+  const Double * const pdErrScale = getErrScaleCoeff(scalingListType, (uiLog2TrSize - 2), cQP.rem);
+  const Int    * const piQCoef    = getQuantCoeff   (scalingListType, cQP.rem, (uiLog2TrSize - 2));
+
+  const Bool   enableScalingLists             = getUseScalingList(uiWidth, uiHeight, (pcCU->getTransformSkip(uiAbsPartIdx, compID) != 0));
+  const Int    defaultQuantisationCoefficient = g_quantScales[cQP.rem];
+  const Double defaultErrorScale              = getErrScaleCoeffNoScalingList(scalingListType, (uiLog2TrSize - 2), cQP.rem);
+
+  const TCoeff entropyCodingMaximum =  (1 << maxLog2TrDynamicRange) - 1;
+
+  // Determine the DC raster position. For all scan types/sizes used in HM
+  // the first scan position maps to raster position 0 (DC) for both the
+  // grouped and ungrouped scans, so we can use 0 directly. The assert in
+  // debug builds documents the invariant.
+  TUEntropyCodingParameters codingParameters;
+  getTUEntropyCodingParameters(codingParameters, rTu, compID);
+  const UInt uiDCPos = codingParameters.scan[0];
+  assert(uiDCPos == 0);
+
+  // First sweep: compute uiMaxAbsLevel for every position. Bail out as soon
+  // as a non-DC position is non-zero -- the fast path does not apply.
+  UInt    uiDCMaxAbsLevel  = 0;
+  Int64   iDCLevelDouble   = 0;
+  Double  dBlockUncodedCost = 0;
+  Double  dDCUncodedCost    = 0;
+
+#if ADAPTIVE_QP_SELECTION
+  const Int iQBitsC = iQBits - ARL_C_PRECISION;
+  const Int iAddC   = 1 << (iQBitsC - 1);
+  if (m_bUseAdaptQpSelect)
+  {
+    memset(piArlDstCoeff, 0, sizeof(TCoeff) * uiMaxNumCoeff);
+  }
+#endif
+
+  for (UInt uiBlkPos = 0; uiBlkPos < uiMaxNumCoeff; uiBlkPos++)
+  {
+    const Int    quantisationCoefficient = enableScalingLists ? piQCoef   [uiBlkPos] : defaultQuantisationCoefficient;
+    const Double errorScale              = enableScalingLists ? pdErrScale[uiBlkPos] : defaultErrorScale;
+
+    const Int64  tmpLevel    = Int64(abs(plSrcCoeff[uiBlkPos])) * quantisationCoefficient;
+    const Intermediate_Int lLevelDouble =
+        (Intermediate_Int)std::min<Int64>(tmpLevel,
+            std::numeric_limits<Intermediate_Int>::max() - (Intermediate_Int(1) << (iQBits - 1)));
+
+#if ADAPTIVE_QP_SELECTION
+    if (m_bUseAdaptQpSelect)
+    {
+      piArlDstCoeff[uiBlkPos] = (TCoeff)((lLevelDouble + iAddC) >> iQBitsC);
+    }
+#endif
+
+    const UInt uiMaxAbsLevel = std::min<UInt>(UInt(entropyCodingMaximum),
+        UInt((lLevelDouble + (Intermediate_Int(1) << (iQBits - 1))) >> iQBits));
+
+    const Double dErr        = Double(lLevelDouble);
+    const Double dCost0      = dErr * dErr * errorScale;
+    dBlockUncodedCost       += dCost0;
+
+    if (uiBlkPos == uiDCPos)
+    {
+      uiDCMaxAbsLevel = uiMaxAbsLevel;
+      iDCLevelDouble  = (Int64)lLevelDouble;
+      dDCUncodedCost  = dCost0;
+    }
+    else if (uiMaxAbsLevel != 0)
+    {
+      // Non-DC has a non-zero magnitude: fast path does not apply.
+      return false;
+    }
+
+    piDstCoeff[uiBlkPos] = 0;
+  }
+
+  // Either entirely zero or only DC is non-zero.
+  if (uiDCMaxAbsLevel == 0)
+  {
+    // No non-zero quantized magnitude anywhere: trivially the all-zero block
+    // is optimal (no rate, only the per-coeff "uncoded" distortion which is
+    // unavoidable). uiAbsSum and piDstCoeff are already 0.
+    return true;
+  }
+
+  // ---- Two-candidate RD compare for "drop block" vs. "code DC only" ----
+
+  // Per-position DC parameters that match the full-path call site for the
+  // last (== first == only) significant coefficient. The quantisation
+  // coefficient itself is already folded into iDCLevelDouble.
+  const Double       errorScaleDC              = enableScalingLists ? pdErrScale[uiDCPos] : defaultErrorScale;
+
+  const UInt   uiCtxSet      = getContextSetIndex(compID, 0, 0); // ctxSet at DC, c1==1
+  const UInt   uiOneCtx      = (NUM_ONE_FLAG_CTX_PER_SET * uiCtxSet) + 1; // c1 = 1
+  const UInt   uiAbsCtx      = (NUM_ABS_FLAG_CTX_PER_SET * uiCtxSet) + 0; // c2 = 0
+  const UInt   initialGolombRiceParameter =
+      m_pcEstBitsSbac->golombRiceAdaptationStatistics[rTu.getGolombRiceStatisticsIndex(compID)] / RExt__GOLOMB_RICE_INCREMENT_DIVISOR;
+
+  // CBF context selection mirrors the original code path.
+  Int ui16CtxCbf = 0;
+  Bool useRootCbf = !pcCU->isIntra(uiAbsPartIdx) && isLuma(compID) && pcCU->getTransformIdx(uiAbsPartIdx) == 0;
+  if (useRootCbf)
+  {
+    ui16CtxCbf = 0;
+  }
+  else
+  {
+    ui16CtxCbf  = pcCU->getCtxQtCbf(rTu, channelType);
+    ui16CtxCbf += getCBFContextOffset(compID);
+  }
+
+  const Int iCbfBits0 = useRootCbf ? m_pcEstBitsSbac->blockRootCbpBits[ui16CtxCbf][0]
+                                   : m_pcEstBitsSbac->blockCbpBits   [ui16CtxCbf][0];
+  const Int iCbfBits1 = useRootCbf ? m_pcEstBitsSbac->blockRootCbpBits[ui16CtxCbf][1]
+                                   : m_pcEstBitsSbac->blockCbpBits   [ui16CtxCbf][1];
+
+  // Candidate (a): CBF = 0 -- distortion is the whole-block uncoded cost.
+  const Double dCostDrop = dBlockUncodedCost + xGetICost(Double(iCbfBits0));
+
+  // Candidate (b): code DC only. Iterate over uiAbsLevel in {max, max-1},
+  // matching xGetCodedLevel(bLast=1) so the chosen level is identical.
+  const Double dCostLastXY = xGetRateLast(0, 0, compID); // PosX = PosY = 0
+  const Double dRateCbf1   = xGetICost(Double(iCbfBits1));
+  const Double dACUncoded  = dBlockUncodedCost - dDCUncodedCost;
+
+  UInt   uiBestLevel = 0;
+  Double dBestCodeCost = MAX_DOUBLE;
+
+  const UInt uiMinAbsLevel = (uiDCMaxAbsLevel > 1) ? (uiDCMaxAbsLevel - 1) : 1;
+  for (UInt uiAbsLevel = uiDCMaxAbsLevel; uiAbsLevel >= uiMinAbsLevel; uiAbsLevel--)
+  {
+    const Double dErrLevel  = Double(iDCLevelDouble - (Int64(uiAbsLevel) << iQBits));
+    const Double dDistLevel = dErrLevel * dErrLevel * errorScaleDC;
+    const Int    iRateLevel = xGetICRate(uiAbsLevel, uiOneCtx, uiAbsCtx, initialGolombRiceParameter,
+                                          /*c1Idx*/0, /*c2Idx*/0, extendedPrecision, maxLog2TrDynamicRange);
+
+    const Double dCost = dACUncoded + dDistLevel + dRateCbf1 + dCostLastXY + xGetICost(Double(iRateLevel));
+    if (dCost < dBestCodeCost)
+    {
+      dBestCodeCost = dCost;
+      uiBestLevel   = uiAbsLevel;
+    }
+  }
+
+  if (dBestCodeCost < dCostDrop)
+  {
+    const TCoeff coded = (plSrcCoeff[uiDCPos] < 0) ? -TCoeff(uiBestLevel) : TCoeff(uiBestLevel);
+    piDstCoeff[uiDCPos] = coded;
+    uiAbsSum            = TCoeff(uiBestLevel);
+  }
+  // else: leave piDstCoeff all-zero (already memset-equivalent above) and
+  //       uiAbsSum unchanged (= 0 from caller).
+
+  return true;
+}
+#endif // RDOQ_DC_ONLY_FASTPATH
+
 /** RDOQ with CABAC
  * \param rTu reference to transform data
  * \param plSrcCoeff pointer to input buffer
@@ -2126,6 +2346,20 @@ Void TComTrQuant::xRateDistOptQuant                 (       TComTU       &rTu,
                                                       const ComponentID   compID,
                                                       const QpParam      &cQP  )
 {
+#if RDOQ_DC_ONLY_FASTPATH
+  // Try the DC-only fast path first. It returns true if it has fully handled
+  // the block (either by leaving it all-zero or by writing only piDstCoeff[DC]).
+  // It is safe for transform-skip blocks too because the relevant rate model
+  // (CBF, last-XY, single-coeff abs-level) is shared with the full path.
+  if (xRateDistOptQuantDCOnly(rTu, plSrcCoeff, piDstCoeff,
+#if ADAPTIVE_QP_SELECTION
+                              piArlDstCoeff,
+#endif
+                              uiAbsSum, compID, cQP))
+  {
+    return;
+  }
+#endif
   const TComRectangle  & rect             = rTu.getRect(compID);
   const UInt             uiWidth          = rect.width;
   const UInt             uiHeight         = rect.height;
